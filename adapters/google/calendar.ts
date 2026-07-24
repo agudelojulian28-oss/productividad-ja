@@ -9,6 +9,54 @@ export interface CalEvent {
   tz: string;
 }
 
+export interface GEvent {
+  id: string;
+  summary: string;
+  start: string | null; // ISO (dateTime) o fecha (YYYY-MM-DD para todo el día)
+  end: string | null;
+  colorId: string | null;
+  allDay: boolean;
+  htmlLink: string;
+}
+
+interface RawEvent {
+  id: string;
+  summary?: string;
+  colorId?: string;
+  htmlLink?: string;
+  start?: { dateTime?: string; date?: string };
+  end?: { dateTime?: string; date?: string };
+}
+
+/** Lista los eventos del calendario primario en un rango (RFC3339). */
+export async function listEvents(
+  accessToken: string,
+  timeMinIso: string,
+  timeMaxIso: string,
+): Promise<GEvent[]> {
+  const p = new URLSearchParams({
+    timeMin: timeMinIso,
+    timeMax: timeMaxIso,
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: '50',
+  });
+  const res = await fetch(`${BASE}?${p.toString()}`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error('listEvents: ' + (await res.text()));
+  const j = (await res.json()) as { items?: RawEvent[] };
+  return (j.items ?? []).map((e) => ({
+    id: e.id,
+    summary: e.summary ?? '(sin título)',
+    start: e.start?.dateTime ?? e.start?.date ?? null,
+    end: e.end?.dateTime ?? e.end?.date ?? null,
+    colorId: e.colorId ?? null,
+    allDay: Boolean(e.start?.date),
+    htmlLink: e.htmlLink ?? '',
+  }));
+}
+
 function body(ev: CalEvent) {
   return JSON.stringify({
     summary: ev.summary,

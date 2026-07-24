@@ -287,6 +287,24 @@ ol {
   color: var(--text-subtle);
 }
 
+/* Eventos de Google Calendar en Hoy */
+.event-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  margin-bottom: 8px;
+}
+.event-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-pill);
+}
+
 /* ── Filas / tarjetas genéricas ─────────────────────────────────────────── */
 .row-card {
   display: flex;

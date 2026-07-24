@@ -4,9 +4,38 @@ import type { WorkRepo, TaskRow } from '@/core/work/ports';
 import { getGoogleTokenCipher } from '@/adapters/supabase/integrations';
 import { decryptToken } from '@/lib/crypto';
 import { refreshAccessToken } from '@/adapters/google/oauth';
-import { createEvent, updateEvent, deleteEvent } from '@/adapters/google/calendar';
+import { createEvent, updateEvent, deleteEvent, listEvents, type GEvent } from '@/adapters/google/calendar';
 
 const DURATION_MIN = 30;
+
+/** Offset (+/-HH:MM) de la zona en una fecha dada (maneja horario de verano). */
+function offsetFor(dateYmd: string, tz: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    timeZoneName: 'longOffset',
+  }).formatToParts(new Date(`${dateYmd}T12:00:00Z`));
+  const name = parts.find((p) => p.type === 'timeZoneName')?.value ?? 'GMT+00:00';
+  const m = name.match(/GMT([+-]\d{2}:\d{2})/);
+  return m?.[1] ?? '+00:00';
+}
+
+/** Eventos de Google del día (zona del usuario). [] si no hay conexión o falla. */
+export async function getDayEvents(
+  supabase: ServerSupabase,
+  ctx: ActorContext,
+  dateYmd: string,
+): Promise<GEvent[]> {
+  try {
+    const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
+    if (!cipher) return [];
+    const { accessToken } = await refreshAccessToken(decryptToken(cipher));
+    const off = offsetFor(dateYmd, ctx.tz);
+    return await listEvents(accessToken, `${dateYmd}T00:00:00${off}`, `${dateYmd}T23:59:59${off}`);
+  } catch (e) {
+    console.error('getDayEvents:', e);
+    return [];
+  }
+}
 
 /** Borra el evento de Google asociado. No-op si Google no está conectado. */
 export async function removeTaskEvent(
