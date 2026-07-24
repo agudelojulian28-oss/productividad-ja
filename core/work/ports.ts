@@ -53,6 +53,7 @@ export interface WorkRepo {
   getTask(id: string): Promise<TaskRow | null>;
   updateTask(id: string, patch: TaskPatch): Promise<TaskRow>;
   deleteTask(id: string): Promise<void>;
+  searchTasks(text: string): Promise<TaskRow[]>;
 
   listProjects(areaId?: string): Promise<ProjectRow[]>;
   getProject(id: string): Promise<ProjectRow | null>;

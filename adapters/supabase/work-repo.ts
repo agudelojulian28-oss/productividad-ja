@@ -110,6 +110,18 @@ export function workRepo(supabase: SupabaseClient, userId: string): WorkRepo {
       if (error) throw new Error(error.message);
     },
 
+    async searchTasks(text) {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(COLS)
+        .ilike('title', `%${text}%`)
+        .neq('status', 'cancelled')
+        .order('due_at', { ascending: true, nullsFirst: false })
+        .limit(20);
+      if (error) throw new Error(error.message);
+      return ((data as DbTask[] | null) ?? []).map(toRow);
+    },
+
     async listProjects(areaId) {
       let q = supabase.from('projects').select(PROJECT_COLS).neq('status', 'archived');
       if (areaId) q = q.eq('area_id', areaId);
