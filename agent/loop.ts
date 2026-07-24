@@ -1,6 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ActorContext } from '@/core/types';
 import type { WorkRepo, TaskRow } from '@/core/work/ports';
+import type { GEvent } from '@/adapters/google/calendar';
 import { AGENT_MODEL, PRICE } from '@/adapters/anthropic/client';
 import { toolDefinitions, isToolName } from './schemas';
 import { runTool } from './tools';
@@ -15,6 +16,11 @@ export interface AgentDeps {
   /** Efectos de calendario (mismo camino que los botones de la app). */
   syncTask?: (task: TaskRow) => Promise<void>;
   removeTaskEvent?: (task: TaskRow) => Promise<void>;
+  listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
+  editEvent?: (
+    eventId: string,
+    patch: { titulo?: string; fecha?: string; colorId?: string },
+  ) => Promise<void>;
   /** Idempotencia: resultado ya ejecutado para este tool_call_id, si existe. */
   getCachedResult: (toolCallId: string) => Promise<unknown | undefined>;
   saveResult: (toolCallId: string, action: string, result: unknown) => Promise<void>;
@@ -106,6 +112,8 @@ export async function* runAgent(
             repo: deps.repo,
             syncTask: deps.syncTask,
             removeTaskEvent: deps.removeTaskEvent,
+            listCalendar: deps.listCalendar,
+            editEvent: deps.editEvent,
           },
           block.name,
           block.input,

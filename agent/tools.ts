@@ -9,9 +9,18 @@ import {
   Borrar,
   Consultar,
   Buscar,
+  VerCalendario,
+  EditarEvento,
   type ToolName,
 } from './schemas';
 import type { ZodType } from 'zod';
+import type { GEvent } from '@/adapters/google/calendar';
+
+// Nombre de color → colorId de Google Calendar.
+const colorIds: Record<string, string> = {
+  rojo: '11', flamingo: '4', naranja: '6', amarillo: '5', salvia: '2', verde: '10',
+  turquesa: '7', azul: '9', lavanda: '1', morado: '3', grafito: '8',
+};
 
 /** Efectos externos inyectados por la app (calendario). Mantiene agent puro:
  *  no importa adapters/supabase. */
@@ -20,6 +29,11 @@ export interface ToolDeps {
   repo: WorkRepo;
   syncTask?: (task: TaskRow) => Promise<void>;
   removeTaskEvent?: (task: TaskRow) => Promise<void>;
+  listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
+  editEvent?: (
+    eventId: string,
+    patch: { titulo?: string; fecha?: string; colorId?: string },
+  ) => Promise<void>;
 }
 
 function summarize(t: TaskRow) {
@@ -83,6 +97,29 @@ export async function runTool(
       if (!p.ok) return p;
       const r = await buscar(ctx, repo, p.value.texto);
       return r.ok ? ok(r.value.map(summarize)) : r;
+    }
+    case 'ver_calendario': {
+      const p = parse(VerCalendario, rawInput);
+      if (!p.ok) return p;
+      if (!deps.listCalendar) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
+      const dateYmd =
+        p.value.fecha ?? new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz }).format(new Date());
+      const events = await deps.listCalendar(dateYmd);
+      return ok(
+        events.map((e) => ({ id: e.id, titulo: e.summary, inicio: e.start, todo_el_dia: e.allDay })),
+      );
+    }
+    case 'editar_evento': {
+      const p = parse(EditarEvento, rawInput);
+      if (!p.ok) return p;
+      if (!deps.editEvent) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
+      const colorId = p.value.color ? colorIds[p.value.color] : undefined;
+      await deps.editEvent(p.value.evento_id, {
+        titulo: p.value.titulo,
+        fecha: p.value.fecha,
+        colorId,
+      });
+      return ok({ editado: p.value.evento_id });
     }
   }
 }

@@ -92,6 +92,50 @@ export async function updateEvent(
   if (!res.ok) throw new Error('updateEvent: ' + (await res.text()));
 }
 
+export async function getEvent(accessToken: string, eventId: string): Promise<GEvent | null> {
+  const res = await fetch(`${BASE}/${encodeURIComponent(eventId)}`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (res.status === 404 || res.status === 410) return null;
+  if (!res.ok) throw new Error('getEvent: ' + (await res.text()));
+  const e = (await res.json()) as RawEvent;
+  return {
+    id: e.id,
+    summary: e.summary ?? '(sin título)',
+    start: e.start?.dateTime ?? e.start?.date ?? null,
+    end: e.end?.dateTime ?? e.end?.date ?? null,
+    colorId: e.colorId ?? null,
+    allDay: Boolean(e.start?.date),
+    htmlLink: e.htmlLink ?? '',
+  };
+}
+
+export interface EventPatch {
+  summary?: string;
+  startIso?: string;
+  endIso?: string;
+  tz?: string;
+  colorId?: string;
+}
+
+export async function patchEvent(
+  accessToken: string,
+  eventId: string,
+  patch: EventPatch,
+): Promise<void> {
+  const body: Record<string, unknown> = {};
+  if (patch.summary !== undefined) body.summary = patch.summary;
+  if (patch.colorId !== undefined) body.colorId = patch.colorId;
+  if (patch.startIso) body.start = { dateTime: patch.startIso, timeZone: patch.tz };
+  if (patch.endIso) body.end = { dateTime: patch.endIso, timeZone: patch.tz };
+  const res = await fetch(`${BASE}/${encodeURIComponent(eventId)}`, {
+    method: 'PATCH',
+    headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error('patchEvent: ' + (await res.text()));
+}
+
 export async function deleteEvent(accessToken: string, eventId: string): Promise<void> {
   const res = await fetch(`${BASE}/${encodeURIComponent(eventId)}`, {
     method: 'DELETE',

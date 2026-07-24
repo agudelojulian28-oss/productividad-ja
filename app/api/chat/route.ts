@@ -4,7 +4,12 @@ import { workRepo } from '@/adapters/supabase/work-repo';
 import { anthropicClient } from '@/adapters/anthropic/client';
 import { runAgent, type AgentDeps } from '@/agent/loop';
 import { getWebConversation, loadMessages, saveMessage } from '@/lib/chat';
-import { syncTaskToCalendar, removeTaskEvent as removeCalendarEvent } from '@/lib/calendar-sync';
+import {
+  syncTaskToCalendar,
+  removeTaskEvent as removeCalendarEvent,
+  getDayEvents,
+  patchCalendarEvent,
+} from '@/lib/calendar-sync';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -28,6 +33,8 @@ export async function POST(req: Request) {
     syncTask: (task) => syncTaskToCalendar(supabase, ctx, repo, task),
     removeTaskEvent: (task) =>
       task.googleEventId ? removeCalendarEvent(supabase, ctx, task.googleEventId) : Promise.resolve(),
+    listCalendar: (dateYmd) => getDayEvents(supabase, ctx, dateYmd),
+    editEvent: (eventId, patch) => patchCalendarEvent(supabase, ctx, eventId, patch),
     async getCachedResult(id) {
       const { data } = await supabase
         .from('tool_executions')

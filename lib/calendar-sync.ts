@@ -4,9 +4,46 @@ import type { WorkRepo, TaskRow } from '@/core/work/ports';
 import { getGoogleTokenCipher } from '@/adapters/supabase/integrations';
 import { decryptToken } from '@/lib/crypto';
 import { refreshAccessToken } from '@/adapters/google/oauth';
-import { createEvent, updateEvent, deleteEvent, listEvents, type GEvent } from '@/adapters/google/calendar';
+import {
+  createEvent,
+  updateEvent,
+  deleteEvent,
+  listEvents,
+  getEvent,
+  patchEvent,
+  type GEvent,
+  type EventPatch,
+} from '@/adapters/google/calendar';
 
 const DURATION_MIN = 30;
+
+/** Edita un evento de Google (título / hora / color). Al mover la hora preserva
+ *  la duración original del evento. */
+export async function patchCalendarEvent(
+  supabase: ServerSupabase,
+  ctx: ActorContext,
+  eventId: string,
+  patch: { titulo?: string; fecha?: string; colorId?: string },
+): Promise<void> {
+  const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
+  if (!cipher) throw new Error('Google no está conectado');
+  const { accessToken } = await refreshAccessToken(decryptToken(cipher));
+
+  const fields: EventPatch = {};
+  if (patch.titulo !== undefined) fields.summary = patch.titulo;
+  if (patch.colorId !== undefined) fields.colorId = patch.colorId;
+  if (patch.fecha) {
+    let durationMs = DURATION_MIN * 60000;
+    const ev = await getEvent(accessToken, eventId);
+    if (ev?.start && ev.end && !ev.allDay) {
+      durationMs = new Date(ev.end).getTime() - new Date(ev.start).getTime();
+    }
+    fields.startIso = patch.fecha;
+    fields.endIso = new Date(new Date(patch.fecha).getTime() + durationMs).toISOString();
+    fields.tz = ctx.tz;
+  }
+  await patchEvent(accessToken, eventId, fields);
+}
 
 /** Offset (+/-HH:MM) de la zona en una fecha dada (maneja horario de verano). */
 function offsetFor(dateYmd: string, tz: string): string {
