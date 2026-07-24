@@ -50,6 +50,17 @@ export async function reopenTask(
   return ok(row);
 }
 
+export async function deleteTask(
+  _ctx: ActorContext,
+  repo: WorkRepo,
+  id: string,
+): Promise<Result<{ id: string }>> {
+  const task = await repo.getTask(id);
+  if (!task) return err('NOT_FOUND', 'La tarea no existe');
+  await repo.deleteTask(id);
+  return ok({ id });
+}
+
 export async function rescheduleTask(
   _ctx: ActorContext,
   repo: WorkRepo,

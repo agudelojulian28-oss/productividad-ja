@@ -261,11 +261,23 @@ ol {
   flex-direction: column;
   gap: 2px;
 }
-.task-action {
+.task-actions {
   flex: none;
-  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.task-action {
   font-size: 13px;
   color: var(--accent);
+  padding: 2px 4px;
+}
+.task-delete {
+  color: var(--text-subtle);
+}
+.task-delete:hover {
+  color: var(--negative);
 }
 .task-title {
   font-size: 15px;

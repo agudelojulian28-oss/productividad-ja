@@ -8,8 +8,9 @@ import {
   completeTask,
   reopenTask,
   rescheduleTask,
+  deleteTask,
 } from '@/core/work/tasks';
-import { syncTaskToCalendar } from '@/lib/calendar-sync';
+import { syncTaskToCalendar, removeTaskEvent } from '@/lib/calendar-sync';
 import type { Result } from '@/core/types';
 import type { TaskRow } from '@/core/work/ports';
 
@@ -40,6 +41,17 @@ export async function completeTaskAction(id: string): Promise<Result<TaskRow>> {
 export async function reopenTaskAction(id: string): Promise<Result<TaskRow>> {
   const { ctx, repo } = await deps();
   const result = await reopenTask(ctx, repo, id);
+  revalidatePath('/hoy');
+  return result;
+}
+
+export async function deleteTaskAction(id: string): Promise<Result<{ id: string }>> {
+  const { supabase, ctx, repo } = await deps();
+  const task = await repo.getTask(id);
+  const result = await deleteTask(ctx, repo, id);
+  if (result.ok && task?.googleEventId) {
+    await removeTaskEvent(supabase, ctx, task.googleEventId);
+  }
   revalidatePath('/hoy');
   return result;
 }

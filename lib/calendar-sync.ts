@@ -4,9 +4,25 @@ import type { WorkRepo, TaskRow } from '@/core/work/ports';
 import { getGoogleTokenCipher } from '@/adapters/supabase/integrations';
 import { decryptToken } from '@/lib/crypto';
 import { refreshAccessToken } from '@/adapters/google/oauth';
-import { createEvent, updateEvent } from '@/adapters/google/calendar';
+import { createEvent, updateEvent, deleteEvent } from '@/adapters/google/calendar';
 
 const DURATION_MIN = 30;
+
+/** Borra el evento de Google asociado. No-op si Google no está conectado. */
+export async function removeTaskEvent(
+  supabase: ServerSupabase,
+  ctx: ActorContext,
+  eventId: string,
+): Promise<void> {
+  try {
+    const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
+    if (!cipher) return;
+    const { accessToken } = await refreshAccessToken(decryptToken(cipher));
+    await deleteEvent(accessToken, eventId);
+  } catch (e) {
+    console.error('calendar delete:', e);
+  }
+}
 
 /** Sincroniza una tarea con Google Calendar. No-op si Google no está conectado.
  *  Un fallo de calendario nunca rompe la operación de la tarea. */

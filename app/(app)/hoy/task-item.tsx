@@ -1,7 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { completeTaskAction, rescheduleTaskAction } from '@/app/actions/tasks';
+import {
+  completeTaskAction,
+  rescheduleTaskAction,
+  deleteTaskAction,
+} from '@/app/actions/tasks';
 import { timeInTz, dayLabelInTz } from '@/lib/format';
 import type { TaskRow } from '@/core/work/ports';
 
@@ -70,13 +74,23 @@ export function TaskItem({
           </div>
         )}
       </div>
-      <button
-        type="button"
-        className="linkbtn task-action"
-        onClick={() => setEditing((v) => !v)}
-      >
-        {editing ? 'Cancelar' : 'Reprog.'}
-      </button>
+      <div className="task-actions">
+        <button
+          type="button"
+          className="linkbtn task-action"
+          onClick={() => setEditing((v) => !v)}
+        >
+          {editing ? 'Cancelar' : 'Reprog.'}
+        </button>
+        <button
+          type="button"
+          className="linkbtn task-action task-delete"
+          disabled={pending}
+          onClick={() => startTransition(async () => void (await deleteTaskAction(task.id)))}
+        >
+          Borrar
+        </button>
+      </div>
     </li>
   );
 }

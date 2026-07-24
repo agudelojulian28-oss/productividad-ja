@@ -105,6 +105,11 @@ export function workRepo(supabase: SupabaseClient, userId: string): WorkRepo {
       return toRow(data as DbTask);
     },
 
+    async deleteTask(id) {
+      const { error } = await supabase.from('tasks').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+
     async listProjects(areaId) {
       let q = supabase.from('projects').select(PROJECT_COLS).neq('status', 'archived');
       if (areaId) q = q.eq('area_id', areaId);
