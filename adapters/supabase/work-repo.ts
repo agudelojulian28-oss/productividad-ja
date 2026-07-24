@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { WorkRepo, TaskRow, TaskStatus } from '@/core/work/ports';
+import type { WorkRepo, TaskRow, TaskStatus, ProjectRow } from '@/core/work/ports';
 
 interface DbTask {
   id: string;
@@ -25,6 +25,19 @@ function toRow(r: DbTask): TaskRow {
     projectId: r.project_id,
     origin: r.origin,
   };
+}
+
+interface DbProject {
+  id: string;
+  title: string;
+  status: ProjectRow['status'];
+  area_id: string | null;
+}
+
+const PROJECT_COLS = 'id,title,status,area_id';
+
+function toProject(r: DbProject): ProjectRow {
+  return { id: r.id, title: r.title, status: r.status, areaId: r.area_id };
 }
 
 /** Implementación del puerto WorkRepo sobre Supabase. Usa la sesión del usuario:
@@ -83,6 +96,34 @@ export function workRepo(supabase: SupabaseClient, userId: string): WorkRepo {
         .single();
       if (error) throw new Error(error.message);
       return toRow(data as DbTask);
+    },
+
+    async listProjects(areaId) {
+      let q = supabase.from('projects').select(PROJECT_COLS).neq('status', 'archived');
+      if (areaId) q = q.eq('area_id', areaId);
+      const { data, error } = await q.order('created_at', { ascending: false });
+      if (error) throw new Error(error.message);
+      return ((data as DbProject[] | null) ?? []).map(toProject);
+    },
+
+    async getProject(id) {
+      const { data, error } = await supabase
+        .from('projects')
+        .select(PROJECT_COLS)
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? toProject(data as DbProject) : null;
+    },
+
+    async insertProject(input) {
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({ user_id: userId, title: input.title, area_id: input.areaId })
+        .select(PROJECT_COLS)
+        .single();
+      if (error) throw new Error(error.message);
+      return toProject(data as DbProject);
     },
   };
 }

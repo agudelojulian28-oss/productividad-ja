@@ -36,9 +36,20 @@ export interface TaskFilter {
   dueTo?: string; // ISO (inclusive)
 }
 
+export interface ProjectRow {
+  id: string;
+  title: string;
+  status: 'active' | 'paused' | 'archived' | 'done';
+  areaId: string | null;
+}
+
 export interface WorkRepo {
   insertTask(input: TaskInsert): Promise<TaskRow>;
   listTasks(filter: TaskFilter): Promise<TaskRow[]>;
   getTask(id: string): Promise<TaskRow | null>;
   updateTask(id: string, patch: TaskPatch): Promise<TaskRow>;
+
+  listProjects(areaId?: string): Promise<ProjectRow[]>;
+  getProject(id: string): Promise<ProjectRow | null>;
+  insertProject(input: { title: string; areaId: string }): Promise<ProjectRow>;
 }

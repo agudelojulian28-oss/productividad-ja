@@ -268,6 +268,45 @@ ol {
   color: var(--text-subtle);
 }
 
+/* ── Filas / tarjetas genéricas ─────────────────────────────────────────── */
+.row-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  margin-bottom: 8px;
+}
+.row-card:hover {
+  border-color: var(--border-strong);
+}
+.pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+.pill-negocio {
+  background: var(--accent-weak);
+  color: var(--accent);
+}
+.pill-personal {
+  background: var(--positive-weak);
+  color: var(--positive);
+}
+.back-link {
+  display: inline-block;
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
 @media (min-width: 768px) {
   .bottom-nav {
     max-width: 720px;

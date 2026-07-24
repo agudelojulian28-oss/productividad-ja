@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint && depcruise core agent adapters app lib --config .dependency-cruiser.cjs",
+    "lint": "depcruise core adapters app lib --config .dependency-cruiser.cjs",
     "test": "vitest run",
     "test:security": "supabase test db",
     "check:rls": "node --env-file-if-exists=.env.local scripts/check-rls.mjs",

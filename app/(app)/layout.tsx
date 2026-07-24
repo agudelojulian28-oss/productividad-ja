@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { signOut } from '@/app/actions/auth';
+import { BottomNav } from './bottom-nav';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,11 +15,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <main className="shell-main">{children}</main>
 
-      <nav className="bottom-nav">
-        <Link href="/hoy" className="nav-item nav-active">
-          Hoy
-        </Link>
-      </nav>
+      <BottomNav />
     </div>
   );
 }
