@@ -1,13 +1,10 @@
 name: Respaldo diario de la base de datos
 
 # Respaldo gratuito con pg_dump (respaldo desde Fase 0, no negociable).
-# Requisito único: en GitHub → Settings → Secrets and variables → Actions,
-# crear el secreto  SUPABASE_DB_URL  con la cadena de conexión "Session pooler"
-# (IPv4) de Supabase. Los runners de GitHub no tienen IPv6, así que la conexión
-# directa NO funciona: usa el Session pooler.
-#
-# GitHub envía un correo al dueño del repo si una ejecución programada falla,
-# así que la alerta ya está cubierta sin piezas extra.
+# Requisito único: secreto SUPABASE_DB_URL con la cadena "Session pooler" (IPv4)
+# de Supabase (los runners de GitHub no tienen IPv6).
+# Usa el contenedor oficial postgres:17 para que pg_dump iguale al servidor (PG17).
+# GitHub avisa por correo al dueño del repo si una ejecución programada falla.
 
 on:
   schedule:
@@ -18,25 +15,14 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Instalar cliente de PostgreSQL 17
-        run: |
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-            | sudo gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
-          echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
-            | sudo tee /etc/apt/sources.list.d/pgdg.list
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-17
-
-      - name: Volcar la base de datos
+      - name: Volcar la base de datos (pg_dump 17 vía Docker)
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           test -n "$SUPABASE_DB_URL" || { echo "Falta el secreto SUPABASE_DB_URL"; exit 1; }
-          # Usar el pg_dump más nuevo instalado (Ubuntu trae el 16; forzamos el 17+).
-          PGDUMP=$(ls -d /usr/lib/postgresql/*/bin/pg_dump | sort -V | tail -1)
-          echo "Usando: $PGDUMP"; "$PGDUMP" --version
           STAMP=$(date -u +%Y-%m-%d)
-          "$PGDUMP" "$SUPABASE_DB_URL" --no-owner --no-privileges -Fc -f "backup-$STAMP.dump"
+          docker run --rm --entrypoint pg_dump -v "$PWD:/out" postgres:17 \
+            "$SUPABASE_DB_URL" --no-owner --no-privileges -Fc -f "/out/backup-$STAMP.dump"
           ls -lh "backup-$STAMP.dump"
 
       - name: Guardar el volcado (retención 90 días)
