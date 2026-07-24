@@ -1,0 +1,20 @@
+# Dependencias y build
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# Secretos — NUNCA subir
+.env
+.env*.local
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Volcados de respaldo locales
+*.dump
+*.sql.gz
+
+# Sistema
+.DS_Store
+Thumbs.db

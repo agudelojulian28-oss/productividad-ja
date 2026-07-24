@@ -1,0 +1,447 @@
+# ADRs iniciales — Productividad Julián Agudelo
+
+**Fecha:** 23 de julio de 2026
+
+Registro de decisiones de arquitectura. Cada una recoge el contexto, la decisión, **las
+alternativas descartadas** y las consecuencias. El valor no está en la decisión: está en
+saber qué se consideró y por qué se dejó fuera.
+
+> **Los ADRs son inmutables.** No se editan. Si una decisión cambia, se escribe una nueva que
+> supersede a la anterior y la anterior se marca como superada, conservando su texto original.
+
+**Primera tarea para Claude Code:** separar este archivo en `docs/adr/NNN-titulo.md`, un
+archivo por decisión, conservando el texto tal cual.
+
+---
+
+## ADR-001 · Monolito modular en Next.js
+
+**Contexto.** Un usuario, un desarrollador, tres canales de entrada (web, chat, WhatsApp).
+
+**Decisión.** Un solo repositorio Next.js 16 que contiene frontend, rutas de API, agente y
+capa de dominio. Un solo despliegue.
+
+**Alternativas descartadas.** Backend separado en Python o Node; microservicios por dominio.
+
+**Por qué.** Separar servicios añade despliegues, latencia de red, versionado de contratos y
+modos de fallo distribuidos. A esta escala no compra nada. La modularidad se consigue con
+disciplina de imports verificada en CI, no con procesos separados.
+
+**Consecuencias.** Todo se despliega junto. Si el proyecto creciera a varios usuarios y un
+equipo, `/core` ya está aislado y es extraíble sin reescribir.
+
+---
+
+## ADR-002 · Google Calendar es la fuente de verdad de los eventos
+
+**Contexto.** El sistema gestiona tareas con fecha y eventos de agenda.
+
+**Decisión.** No se almacenan eventos. `tasks.google_calendar_id` + `tasks.google_event_id`
+son punteros al calendario real.
+
+**Alternativas descartadas.** Calendario propio en Postgres; sincronización bidireccional.
+
+**Por qué.** Recurrencia con excepciones (RRULE), zonas horarias, horario de verano,
+invitados, notificaciones y confirmaciones. Es una trampa clásica: parece un CRUD con fechas
+y no lo es. Sincronizar bidireccionalmente añade conflictos que no tienen solución correcta.
+
+**Consecuencias.** Cada consulta de calendario es una llamada de red de 200–500 ms. Se mitiga
+con el endpoint `freebusy` y caché de 60 s en el worker. Borrar una tarea **no** borra el
+evento: se desvincula y se avisa.
+
+---
+
+## ADR-003 · Supabase (Postgres) como capa de datos
+
+**Contexto.** Se necesita base de datos, autenticación y sincronización entre canales.
+
+**Decisión.** Supabase: Postgres con RLS, Auth y Realtime.
+
+**Alternativas descartadas.** Notion como capa de datos; Firebase; Postgres gestionado sin BaaS.
+
+**Por qué.** Notion tiene un límite duro de ~3 req/s, latencia alta y no tiene tiempo real:
+solo tenía sentido para ahorrarse construir una UI, y con UI propia pasa de atajo a limitación.
+RLS permite que la autorización viva en el motor y no en la aplicación, que es la base de
+ADR-004. Realtime hace que crear algo por WhatsApp aparezca al instante en la pantalla abierta.
+
+**Consecuencias.** El plan gratuito no tiene copias de seguridad: hay que montar respaldo
+propio desde la Etapa 0. Solo permite 2 proyectos.
+
+---
+
+## ADR-004 · El agente no tiene credenciales de base de datos
+
+> **Estado:** aclarado por ADR-017 (cómo reclama el worker el inbox sin sesión) y ADR-018
+> (dependencia del secreto JWT heredado). El texto original se conserva.
+
+**Contexto.** El agente LLM ejecuta herramientas que mutan datos, y lee contenido de terceros
+(invitaciones de calendario) que puede contener instrucciones inyectadas.
+
+**Decisión.** El agente **propone** acciones. `/core` las valida, autoriza y ejecuta. El agente
+no tiene claves de base de datos, no ejecuta SQL y no hace HTTP genérico. Además, todo el
+camino del agente corre con un **JWT efímero del usuario**, con RLS activa; `service_role`
+queda prohibida fuera de dos usos concretos.
+
+**Alternativas descartadas.** Herramientas con acceso directo a la base; defensa basada
+principalmente en instrucciones del prompt.
+
+**Por qué.** Es la única defensa robusta contra inyección de prompts: ninguna instrucción,
+legítima o inyectada, puede hacer algo que el usuario no pueda hacer, porque la autorización
+no depende del modelo. Las defensas de prompt son probabilísticas y se vencen.
+
+**Consecuencias.** Cada herramienta necesita su caso de uso. Es más código que llamar a la
+base directamente, y es el precio correcto. La primera versión de este ADR estaba rota en la
+implementación: el worker sin sesión usaba `service_role` y anulaba RLS justo en el camino
+con superficie de inyección. Corregido en la auditoría v2 (C1).
+
+---
+
+## ADR-005 · Telegram como primer canal de mensajería
+
+**Contexto.** El asistente debe ser accesible desde el teléfono sin abrir la app.
+
+**Decisión.** Construir primero el adaptador de Telegram. WhatsApp después, si el hábito de
+uso lo justifica.
+
+**Alternativas descartadas.** WhatsApp primero.
+
+**Por qué.** Meta anunció el 1 de julio de 2026 que desde el **1 de octubre de 2026** cobra
+los *service messages* —las respuestas dentro de la ventana de 24 h, hoy gratuitas— por
+mensaje, y aplica explícitamente a respuestas de asistentes de IA de terceros. Telegram Bot
+API no tiene costo por mensaje, no exige verificación de negocio ante Meta, no requiere
+plantillas aprobadas y se monta en minutos. Además, depurar un agente por WhatsApp es lento.
+
+**Consecuencias.** ~USD 3–6/mes de ahorro y arranque mucho más rápido. El canal es
+intercambiable en un día de trabajo por diseño (v3 §3.1), así que la decisión es reversible.
+
+---
+
+## ADR-006 · PWA en vez de aplicación nativa
+
+**Contexto.** El uso principal es desde el teléfono.
+
+**Decisión.** Aplicación web instalable como PWA. Sin React Native, sin Expo.
+
+**Alternativas descartadas.** App nativa; app híbrida.
+
+**Por qué.** Un solo código, instalable, arranque instantáneo. Las notificaciones ya llegan
+por Telegram/WhatsApp, que es además donde se responden.
+
+**Consecuencias.** Sin escritura offline: encolar mutaciones en el cliente exige resolución
+de conflictos y una segunda fuente de verdad en el navegador. Se declara explícitamente que
+no está soportado, en vez de ofrecer un guardado que pierde datos sin conexión.
+
+---
+
+## ADR-007 · Auditoría e inmutabilidad por trigger de Postgres
+
+> **Estado:** aclarado por ADR-016. La auditoría por trigger y su inmutabilidad no cambian;
+> lo que cambia es **cómo llega el contexto del actor** al trigger (claims del JWT, no un GUC
+> de sesión fijado desde el cliente REST). El texto original se conserva.
+
+**Contexto.** Requisito de que el sistema sea fácil de auditar.
+
+**Decisión.** El registro de auditoría lo escriben triggers de Postgres, no el código de
+aplicación. El contexto del actor viaja por GUCs transaccionales. La inmutabilidad del log se
+impone con un trigger que lanza excepción en UPDATE y DELETE.
+
+**Alternativas descartadas.** Llamadas explícitas a `audit.record()` en cada caso de uso, con
+una regla de CI que verificara su presencia. `REVOKE UPDATE, DELETE` para la inmutabilidad.
+
+**Por qué.** El diseño original dependía de que alguien recordara escribir la llamada, y
+quedaba fuera de la transacción de escritura: un `catch` mal puesto o una edición desde el
+editor SQL producían mutaciones sin registro. El `REVOKE` no hacía inmutable nada, porque
+`service_role` y el owner lo esquivan. Un trigger se dispara para cualquier rol y desde
+cualquier origen.
+
+**Consecuencias.** Desaparece una regla de CI. Límite declarado: un superusuario con
+`session_replication_role = replica` puede desactivar triggers. Inevitable dentro de este
+stack; se resolvería replicando a un almacén externo de solo-anexado.
+
+---
+
+## ADR-008 · Ingesta durable en vez de procesamiento en línea
+
+> **Estado:** aclarado por ADR-015. La ingesta durable no cambia; lo que se concreta es el
+> **mecanismo del barrido**: `pg_cron` + `pg_net` en Supabase, no Vercel Cron (Hobby solo
+> permite una ejecución diaria). El texto original se conserva.
+
+**Contexto.** Los webhooks de mensajería exigen respuesta en pocos segundos, y un turno de
+agente tarda 5–15 s.
+
+**Decisión.** El webhook verifica la firma, hace INSERT en `inbox` y devuelve 200. Un worker
+consume con reclamo atómico, reintentos y barrido por cron.
+
+**Alternativas descartadas.** `after()` de Next.js para procesar tras responder. Cola dedicada
+(Redis, SQS).
+
+**Por qué.** Con `after()`, si la función se corta después del 200, la plataforma ya no
+reintenta y el mensaje **desaparece sin rastro**. En un sistema cuyo propósito es no perderte
+tareas, es el peor fallo posible. Una cola dedicada resuelve lo mismo añadiendo una pieza de
+infraestructura que Postgres ya cubre con `for update skip locked`.
+
+**Consecuencias.** La deduplicación pasa a ser un `unique (channel, external_id)` en vez de
+código. Como ahora hay reintentos reales, toda escritura del agente necesita idempotencia por
+`tool_call_id`.
+
+---
+
+## ADR-009 · "Cómo lo vendo" y "cómo lo entrego" son playbooks
+
+**Contexto.** Cada oferta tiene un proceso de venta y uno de entrega.
+
+**Decisión.** Un playbook es un documento con pasos (`jsonb`) asociado a una oferta.
+Instanciarlo genera un proyecto y tareas con fechas relativas al inicio.
+
+**Alternativas descartadas.** Tablas separadas para procesos, etapas y actividades. Tabla
+`playbook_steps` normalizada.
+
+**Por qué.** Un mecanismo en lugar de seis módulos. Es lo que convierte diez tablas sueltas en
+un sistema donde vender algo produce trabajo automáticamente. Los pasos se leen siempre juntos
+y se editan como una unidad: son un documento, y se guardan como documento.
+
+**Consecuencias.** Los pasos se **copian** al instanciar, no se referencian: editar el playbook
+no reescribe las entregas en curso. Riesgo declarado: si las entregas resultan ser todas a
+medida, los playbooks son peso muerto y se reemplazan por listas de verificación por venta.
+
+---
+
+## ADR-010 · Venta y entrega son un solo ciclo de vida
+
+**Contexto.** El proceso comercial va de prospecto a cobro.
+
+**Decisión.** Una tabla `sales` con etapas que cubren ambas mitades: `prospecto → propuesta →
+negociacion → ganada → entregando → entregada → cobrada` (más `perdida`).
+
+**Alternativas descartadas.** `deals` para preventa y `engagements` para entrega.
+
+**Por qué.** En la realidad es un continuo, no dos objetos. Dos tablas obligarían a
+sincronizar estado entre ellas y a decidir cuál manda. El modelo empezó con 14 tablas de
+dominio y quedó en 10 fusionando en vez de añadiendo.
+
+**Consecuencias.** El playbook de venta gobierna las etapas anteriores a `ganada`; el de
+entrega, las posteriores. `delivery_instantiated_at` garantiza que ganar dos veces no duplica.
+
+---
+
+## ADR-011 · El catálogo del agente cubre el flujo, no la configuración
+
+**Contexto.** El dominio tiene 10 tablas y crecerá. Dar herramienta a cada entidad produciría
+~50 herramientas.
+
+**Decisión.** **11 herramientas.** Una funcionalidad necesita herramienta propia solo si se
+va a pedir por chat o voz más de una vez por semana. La configuración —áreas, fuentes de
+ingreso, ofertas, playbooks— se gestiona únicamente desde la UI.
+
+**Alternativas descartadas.** Una herramienta por entidad. Herramienta genérica
+`crear(entidad, datos)`. Carga progresiva de herramientas según el tema de la conversación.
+
+**Por qué.** Con 50 herramientas el modelo elige mal entre opciones parecidas, las
+definiciones se comen ~12.000 tokens por llamada, y nadie recuerda dónde vive cada regla. La
+herramienta genérica pierde la validación tipada. La carga progresiva exige clasificar, o sea
+latencia en cada turno. Configurar un playbook por WhatsApp sería miserable de todos modos.
+
+**Consecuencias.** El catálogo no crece con el dominio: el panel de finanzas completo —seis
+vistas, siete bloques— añadió **cero** herramientas, solo vistas a la unión discriminada de
+`consultar`.
+
+---
+
+## ADR-012 · Las cifras financieras se calculan en vistas SQL
+
+**Contexto.** El panel de finanzas y el agente responden las mismas preguntas sobre dinero.
+
+**Decisión.** Cada número sale de una vista SQL. El agente lee exactamente esas vistas. No hay
+cálculo financiero en TypeScript, ni en componentes, ni en el prompt.
+
+**Alternativas descartadas.** Calcular en el backend y exponer por API. Campos de progreso
+almacenados y actualizados por trigger.
+
+**Por qué.** Si el dashboard suma en el cliente y el agente suma en su herramienta, en tres
+semanas discrepan por un filtro que alguien cambió en un solo lado. Y una cifra que difiere
+según dónde la mires destruye la confianza en las dos. Un campo almacenado es un campo que se
+desactualiza.
+
+**Consecuencias.** Toda vista necesita `with (security_invoker = true)`: sin ese atributo
+corre con los privilegios del owner y bypasea RLS en silencio.
+
+---
+
+## ADR-013 · Móvil y escritorio son dos superficies, no una que se encoge
+
+**Contexto.** El sistema se usa a diario desde el teléfono y se configura desde el escritorio.
+
+**Decisión.** Móvil cubre el flujo (consultar, capturar, revisar). Escritorio cubre además la
+configuración (playbooks, fuentes de ingreso, ofertas, metas). En móvil, la configuración se
+muestra en lectura con aviso; nunca se oculta. El capturador universal en móvil es el chat con
+tarjeta de confirmación editable.
+
+**Alternativas descartadas.** Una UI única que se reorganiza por breakpoints. Reconstruir los
+~12 formularios de creación en versión táctil.
+
+**Por qué.** Es el mismo reparto de ADR-011 visto desde el otro lado: el flujo ocurre en el
+teléfono, la configuración en el escritorio. Hacer que el editor de playbooks funcione en 380
+píxeles es trabajo tirado —nunca vas a definir uno desde el celular— y ensucia la versión de
+escritorio con concesiones táctiles innecesarias.
+
+**Consecuencias.** Se ahorra la mayor parte del trabajo "responsivo". Ocultar secciones queda
+prohibido: un panel que esconde partes te hace dudar de si existen.
+
+---
+
+## ADR-014 · La documentación se genera desde el código
+
+**Contexto.** Requisito de que el sistema esté completamente documentado.
+
+**Decisión.** Se separan dos tipos. Lo derivable se **genera**: esquema desde las migraciones,
+catálogo de herramientas desde los schemas Zod, tipos desde Supabase. Lo escrito a mano cubre
+solo el **porqué**: ADRs, modelo mental y runbook.
+
+**Alternativas descartadas.** Documentación de referencia escrita y mantenida a mano.
+
+**Por qué.** La documentación escrita a mano se desactualiza en la tercera semana, y una
+documentación que miente es peor que ninguna. Un solo schema Zod por herramienta genera tres
+cosas: validación en runtime, el JSON Schema que se envía al modelo, y la fila en
+`docs/tools.md`. Una definición, tres usos, imposible que se desincronicen.
+
+**Consecuencias.** Añadir una herramienta actualiza su documentación automáticamente. Los
+ADRs son el único documento que envejece a propósito: registran lo que se pensaba entonces.
+
+---
+
+## ADR-015 · El barrido de la ingesta durable corre en `pg_cron`, no en Vercel Cron
+
+**Contexto.** La ingesta durable (ADR-008) necesita una red de seguridad que recupere los
+mensajes que quedaron `pending` si la ruta rápida (`void fetch` al worker) no dispara. El diseño
+la describía como "un cron cada 60 s".
+
+**Decisión.** El barrido lo dispara **`pg_cron` dentro de Supabase**, que invoca cada minuto el
+endpoint del worker mediante **`pg_net`**. No se usa Vercel Cron para esto.
+
+**Alternativas descartadas.** Vercel Cron; un pinger externo (cron-job.org, GitHub Actions);
+subir a Vercel Pro.
+
+**Por qué.** El plan **Vercel Hobby limita el cron a una ejecución diaria** —cualquier expresión
+más frecuente falla en el deploy—, así que "cada 60 s" era imposible en el plan gratuito y la
+prueba de aceptación de la Etapa 3 ("recuperación en <60 s") no se podía pasar. `pg_cron` está
+habilitado en el plan gratuito de Supabase con **precisión de minuto**, y `pg_net` hace la
+llamada HTTP asíncrona. El barrido queda en la misma plataforma que ya alberga los datos, sin
+piezas nuevas y sin coste: el hosting sigue en $0. Un pinger externo resolvería lo mismo
+añadiendo una dependencia fuera de la plataforma; Vercel Pro cuesta ~USD 20/mes y rompería el
+presupuesto.
+
+**Consecuencias.** La Etapa 0 habilita las extensiones `pg_cron` y `pg_net`. La ruta rápida
+(`void fetch`) pasa a ser explícitamente *best-effort*: la garantía de durabilidad la da el
+barrido de `pg_cron`, no el `fetch`. El endpoint del worker debe aceptar la invocación de
+`pg_net` con el mismo secreto interno que la ruta rápida.
+
+---
+
+## ADR-016 · El contexto del actor viaja por *claims* del JWT, no por un GUC de sesión
+
+**Contexto.** La auditoría por trigger (ADR-007) necesita saber quién actúa —usuario, agente o
+sistema— y por qué canal. El diseño lo transportaba con `set_actor_context`, que fija GUCs
+locales a la transacción (`set_config(..., true)`), y el trigger los leía con
+`current_setting('app.actor', true)`.
+
+**Decisión.** El actor viaja como **claims personalizados del JWT** (`actor`, `channel`,
+`conversation`, `tool_call`). El trigger los lee de
+`current_setting('request.jwt.claims', true)::jsonb`. `set_actor_context` se conserva **solo**
+para el camino que escribe dentro de una función RPC de Postgres (o vía `db-pre-request`).
+
+**Alternativas descartadas.** Fijar el GUC con `set_config` justo antes de cada escritura desde
+el cliente REST; un GUC de sesión (no transaccional).
+
+**Por qué.** El cliente REST de Supabase (PostgREST) **abre una transacción por cada request**,
+y no permite ejecutar `select set_actor_context(...)` y la escritura en la *misma* transacción.
+Con GUCs locales, el trigger los leería vacíos y `coalesce(..., 'system')` marcaría **todo como
+`actor='system'`**, borrando la distinción user/agent/whatsapp que el sistema requiere (v3 §6).
+PostgREST sí expone los claims del JWT por request —es la misma vía por la que Supabase resuelve
+`auth.uid()`—, así que leerlos ahí es transaccionalmente correcto. El worker ya firma el JWT
+efímero (ADR-004/C1), de modo que añadir los claims no cuesta una pieza nueva.
+
+**Consecuencias.** El firmador del JWT (`adapters/supabase/as-user.ts`) incluye los claims de
+actor. El trigger `audit_row()` parsea `request.jwt.claims`. El camino de Server Actions de la
+UI, que usa la sesión emitida por Supabase (sin claims propios), enruta sus escrituras por RPCs
+que llaman `set_actor_context`, o define el actor con `db-pre-request`.
+
+---
+
+## ADR-017 · El worker reclama el inbox bajo el JWT del usuario único
+
+**Contexto.** Para reclamar una fila `pending` del inbox (`for update skip locked`), el worker
+debe leerla **antes** de saber de qué usuario es —el `user_id` está en la propia fila—, y en ese
+momento no hay sesión. La vía directa sin sesión es `service_role`, que bypasea RLS.
+
+**Decisión.** El worker firma el JWT del **`ALLOWED_USER_ID`** (constante del sistema de un solo
+usuario) y reclama el inbox **bajo RLS**. `service_role` **no** participa en el reclamo.
+
+**Alternativas descartadas.** Reclamar con `service_role`; pasar el `user_id` desde el webhook
+al worker (no cubre el camino del barrido, que escanea a ciegas).
+
+**Por qué.** Usar `service_role` aquí reabriría el fallo C1 justo en el camino con superficie de
+inyección: si tras reclamar alguien olvidara cambiar al JWT del usuario para la parte del agente,
+todo el turno correría sin RLS. Como el sistema es de **un solo usuario**, la política
+`user_id = (select auth.uid())` cubre todas las filas del inbox al firmar el JWT del usuario
+constante, de modo que el reclamo funciona bajo RLS sin excepción. Así **se conserva el enunciado
+de ADR-004**: `service_role` sigue restringida a exactamente dos usos —el INSERT en `inbox`
+(antes de conocer al usuario) y las migraciones—.
+
+**Consecuencias.** La regla de `dependency-cruiser` que confina `admin.ts` (service_role) a
+`app/api/channels/**` se mantiene: el worker no lo importa. El reclamo del inbox se hace con
+`adapters/supabase/as-user.ts`. Si algún día el sistema pasara a varios usuarios, este reclamo
+necesitaría rediseño (un rol acotado o el paso del `user_id` por la ruta rápida más un barrido
+con privilegio mínimo).
+
+---
+
+## ADR-018 · Dependencia declarada del secreto JWT heredado (HS256)
+
+**Contexto.** El worker firma su JWT efímero con `SUPABASE_JWT_SECRET` (HS256), el secreto
+simétrico heredado del proyecto.
+
+**Decisión.** Se asume y se declara esta dependencia. Se conserva el secreto JWT heredado
+habilitado, y se valida el flujo `clientAsUser` end-to-end en la Etapa 0/3 antes de construir
+sobre él.
+
+**Alternativas descartadas.** Firmar con una clave asimétrica propia; asumir sin verificar que
+HS256 seguirá aceptándose.
+
+**Por qué.** Desde el 1-oct-2025 los proyectos nuevos de Supabase firman las sesiones con
+**ES256 asimétrico por defecto**, pero el gateway **sigue aceptando** tokens HS256 firmados con
+el secreto heredado (el JWKS conserva el secreto simétrico para verificación). El enfoque
+funciona hoy. El riesgo es que la nueva UI de *signing keys* permite rotar o deshabilitar ese
+secreto heredado: si eso ocurre, los tokens firmados a mano dejan de validar y **se cae la
+defensa C1 de golpe**. Declararlo evita que alguien lo dé por sentado.
+
+**Consecuencias.** No rotar ni deshabilitar el secreto JWT heredado sin migrar antes el firmado
+del worker. Revisar si Supabase anuncia forzar el modo asimétrico exclusivo; en ese caso, migrar
+`as-user.ts` a firmar con el mecanismo vigente del proyecto.
+
+---
+
+## ADR-019 · Sistema de diseño: tema oscuro con acento naranja
+
+**Contexto.** La interfaz necesitaba una dirección visual concreta. Se tomó como referencia un
+dashboard financiero (oscuro, acento naranja en gradiente, tarjetas redondeadas, sidebar en
+escritorio y navegación inferior en móvil).
+
+**Decisión.** **Tema oscuro único.** Un solo acento cálido (naranja) reservado para la acción
+primaria y para la única cifra más accionable. Se adopta el **lenguaje visual** de la referencia
+—paleta, tarjetas, acento, navegación, pills de estado, gráfico de barras—, **no sus funciones**.
+El detalle vive en `productividad-ja-sistema-diseno.md`.
+
+**Alternativas descartadas.** Tema claro + oscuro; copiar también las funciones de la referencia
+(wallets multi-moneda con límites de gasto, planes "Upgrade Pro", "Share").
+
+**Por qué.** Esas funciones contradicen un sistema personal de un solo usuario en COP: no hay
+tiers, no hay compartir, y las "tarjetas de moneda con límite" no existen en el modelo de datos.
+Tomar solo el lenguaje visual da coherencia estética sin arrastrar features fuera de alcance.
+Comprometerse a tema oscuro único reduce los tokens a mantener y garantiza que la estética
+coincida con la referencia, a cambio de renunciar al modo claro.
+
+**Consecuencias.** Los componentes de la referencia se **remapean** al dominio: las tarjetas de
+moneda se convierten en tarjetas de fuente de ingreso; los tres KPIs en saldo/por-cobrar/neto,
+con una sola tarjeta destacada en naranja (la más accionable). Sin modo claro, cualquier uso a
+plena luz depende del brillo del dispositivo. El naranja no se usa para "el dinero" en general,
+solo como marca y acción, para no diluir su señal.
