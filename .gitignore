@@ -10,6 +10,7 @@ coverage/
 .env*.local
 CLAUDE.local.md
 .claude/settings.local.json
+.claude/launch.json
 
 # Volcados de respaldo locales
 *.dump
