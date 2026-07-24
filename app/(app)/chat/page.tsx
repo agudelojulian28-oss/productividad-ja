@@ -2,8 +2,16 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react';
 
-type Msg = { role: 'user' | 'assistant'; text: string };
-type Event = { type: string; text?: string; message?: string };
+type Msg = { role: 'user' | 'assistant'; text: string; tools?: string[] };
+type Event = { type: string; text?: string; message?: string; name?: string };
+
+const toolLabels: Record<string, string> = {
+  crear_tarea: 'creó una tarea',
+  completar: 'completó una tarea',
+  reprogramar: 'reprogramó una tarea',
+  consultar: 'consultó tus tareas',
+  buscar: 'buscó tareas',
+};
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -15,10 +23,12 @@ export default function ChatPage() {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  function setLastAssistant(text: string) {
+  function updateLast(patch: Partial<Msg>) {
     setMessages((prev) => {
+      if (prev.length === 0) return prev;
       const copy = [...prev];
-      copy[copy.length - 1] = { role: 'assistant', text };
+      const last = copy[copy.length - 1]!;
+      copy[copy.length - 1] = { ...last, ...patch };
       return copy;
     });
   }
@@ -29,7 +39,7 @@ export default function ChatPage() {
     if (!text || busy) return;
     setInput('');
     const history = messages;
-    setMessages([...messages, { role: 'user', text }, { role: 'assistant', text: '' }]);
+    setMessages([...messages, { role: 'user', text }, { role: 'assistant', text: '', tools: [] }]);
     setBusy(true);
 
     try {
@@ -43,6 +53,7 @@ export default function ChatPage() {
       const dec = new TextDecoder();
       let buf = '';
       let assistant = '';
+      const tools: string[] = [];
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -57,13 +68,20 @@ export default function ChatPage() {
           } catch {
             continue;
           }
-          if (ev.type === 'text') assistant += ev.text ?? '';
-          else if (ev.type === 'error') assistant += `\n⚠️ ${ev.message ?? ''}`;
-          setLastAssistant(assistant);
+          if (ev.type === 'text') {
+            assistant += ev.text ?? '';
+            updateLast({ text: assistant });
+          } else if (ev.type === 'tool' && ev.name) {
+            tools.push(ev.name);
+            updateLast({ tools: [...tools] });
+          } else if (ev.type === 'error') {
+            assistant += `\n⚠️ ${ev.message ?? ''}`;
+            updateLast({ text: assistant });
+          }
         }
       }
     } catch {
-      setLastAssistant('Error de conexión.');
+      updateLast({ text: 'Error de conexión.' });
     } finally {
       setBusy(false);
     }
@@ -79,8 +97,17 @@ export default function ChatPage() {
           </p>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={`bubble bubble-${m.role}`}>
-            {m.text || (busy && i === messages.length - 1 ? '…' : '')}
+          <div key={i} className={`msg msg-${m.role}`}>
+            {m.tools && m.tools.length > 0 && (
+              <div className="tool-trace">
+                {m.tools.map((t, j) => (
+                  <span key={j}>· {toolLabels[t] ?? t}</span>
+                ))}
+              </div>
+            )}
+            <div className={`bubble bubble-${m.role}`}>
+              {m.text || (busy && i === messages.length - 1 ? '…' : '')}
+            </div>
           </div>
         ))}
         <div ref={endRef} />

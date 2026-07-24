@@ -342,21 +342,40 @@ ol {
   margin-top: 12px;
   font-size: 14px;
 }
-.bubble {
+.msg {
+  display: flex;
+  flex-direction: column;
   max-width: 85%;
+}
+.msg-user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.msg-assistant {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+.tool-trace {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-subtle);
+  margin-bottom: 3px;
+}
+.bubble {
+  max-width: 100%;
   padding: 10px 14px;
   border-radius: var(--radius-card);
   white-space: pre-wrap;
   line-height: 1.45;
 }
 .bubble-user {
-  align-self: flex-end;
   background: var(--grad-accent);
   color: var(--on-accent);
   border-bottom-right-radius: 6px;
 }
 .bubble-assistant {
-  align-self: flex-start;
   background: var(--surface);
   border: 1px solid var(--border);
   border-bottom-left-radius: 6px;
