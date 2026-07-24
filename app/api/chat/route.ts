@@ -3,26 +3,23 @@ import { requireContext } from '@/lib/auth';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { anthropicClient } from '@/adapters/anthropic/client';
 import { runAgent, type AgentDeps } from '@/agent/loop';
+import { getWebConversation, loadMessages, saveMessage } from '@/lib/chat';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-interface Body {
-  history?: { role: 'user' | 'assistant'; text: string }[];
-  message: string;
-}
-
 export async function POST(req: Request) {
   const { supabase, ctx } = await requireContext();
-  const body = (await req.json()) as Body;
+  const body = (await req.json()) as { message: string };
   if (!body.message?.trim()) return new Response('Falta el mensaje', { status: 400 });
 
-  const history: Anthropic.MessageParam[] = (body.history ?? [])
-    .filter((m) => m.text.trim())
-    .map((m) => ({ role: m.role, content: m.text }));
+  const conversationId = await getWebConversation(supabase, ctx.userId);
+  const prior = await loadMessages(supabase, conversationId);
+  const history: Anthropic.MessageParam[] = prior.map((m) => ({ role: m.role, content: m.text }));
+
+  await saveMessage(supabase, conversationId, ctx.userId, 'user', body.message);
 
   const repo = workRepo(supabase, ctx.userId);
-
   const deps: AgentDeps = {
     client: anthropicClient(),
     ctx,
@@ -45,18 +42,20 @@ export async function POST(req: Request) {
         p_user: ctx.userId,
         p_usd: usd,
       });
-      if (error) return true; // no bloquear por un fallo del breaker
-      return data === true;
+      return error ? true : data === true;
     },
   };
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      let assistantText = '';
       try {
         for await (const ev of runAgent(deps, history, body.message)) {
+          if (ev.type === 'text') assistantText += ev.text;
           controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n'));
         }
+        await saveMessage(supabase, conversationId, ctx.userId, 'assistant', assistantText);
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Error del agente';
         controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', message }) + '\n'));
