@@ -326,7 +326,59 @@ ol {
   margin-bottom: 8px;
 }
 
+/* ── Chat ───────────────────────────────────────────────────────────────── */
+.chat {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 80px;
+}
+.chat-hint {
+  margin-top: 12px;
+  font-size: 14px;
+}
+.bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: var(--radius-card);
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+.bubble-user {
+  align-self: flex-end;
+  background: var(--grad-accent);
+  color: var(--on-accent);
+  border-bottom-right-radius: 6px;
+}
+.bubble-assistant {
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 6px;
+}
+.chat-input {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(64px + var(--safe-bottom));
+  display: flex;
+  gap: 8px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(8px);
+}
+
 @media (min-width: 768px) {
+  .chat-input {
+    bottom: calc(72px + var(--safe-bottom));
+  }
   .bottom-nav {
     max-width: 720px;
     margin: 0 auto;
