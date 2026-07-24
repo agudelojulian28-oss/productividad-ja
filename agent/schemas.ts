@@ -33,10 +33,15 @@ export const Buscar = z.object({
   texto: z.string().trim().min(1).max(100).describe('Texto a buscar'),
 });
 
+export const Borrar = z.object({
+  tarea_id: z.uuid().describe('ID de la tarea a borrar'),
+});
+
 export const toolSchemas = {
   crear_tarea: CrearTarea,
   completar: Completar,
   reprogramar: Reprogramar,
+  borrar: Borrar,
   consultar: Consultar,
   buscar: Buscar,
 } as const;
@@ -48,6 +53,7 @@ const descriptions: Record<ToolName, string> = {
   crear_tarea: 'Crea una tarea. Acepta fecha/hora y proyecto opcionales.',
   completar: 'Marca una tarea como completada.',
   reprogramar: 'Cambia la fecha/hora de una tarea.',
+  borrar: 'Borra una tarea de forma permanente.',
   consultar: 'Consulta la agenda de hoy o la lista de pendientes.',
   buscar: 'Busca por texto en las tareas.',
 };

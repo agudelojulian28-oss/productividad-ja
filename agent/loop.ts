@@ -1,6 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ActorContext } from '@/core/types';
-import type { WorkRepo } from '@/core/work/ports';
+import type { WorkRepo, TaskRow } from '@/core/work/ports';
 import { AGENT_MODEL, PRICE } from '@/adapters/anthropic/client';
 import { toolDefinitions, isToolName } from './schemas';
 import { runTool } from './tools';
@@ -12,6 +12,9 @@ export interface AgentDeps {
   client: Anthropic;
   ctx: ActorContext;
   repo: WorkRepo;
+  /** Efectos de calendario (mismo camino que los botones de la app). */
+  syncTask?: (task: TaskRow) => Promise<void>;
+  removeTaskEvent?: (task: TaskRow) => Promise<void>;
   /** Idempotencia: resultado ya ejecutado para este tool_call_id, si existe. */
   getCachedResult: (toolCallId: string) => Promise<unknown | undefined>;
   saveResult: (toolCallId: string, action: string, result: unknown) => Promise<void>;
@@ -97,7 +100,16 @@ export async function* runAgent(
 
       let result = await deps.getCachedResult(block.id);
       if (result === undefined) {
-        result = await runTool(deps.ctx, deps.repo, block.name, block.input);
+        result = await runTool(
+          {
+            ctx: deps.ctx,
+            repo: deps.repo,
+            syncTask: deps.syncTask,
+            removeTaskEvent: deps.removeTaskEvent,
+          },
+          block.name,
+          block.input,
+        );
         await deps.saveResult(block.id, block.name, result);
       }
       results.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) });

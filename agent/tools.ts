@@ -1,16 +1,26 @@
 import { ok, err, type Result, type ActorContext } from '@/core/types';
 import type { WorkRepo, TaskRow } from '@/core/work/ports';
-import { createTask, completeTask, rescheduleTask } from '@/core/work/tasks';
+import { createTask, completeTask, rescheduleTask, deleteTask } from '@/core/work/tasks';
 import { consultar, buscar } from '@/core/work/queries';
 import {
   CrearTarea,
   Completar,
   Reprogramar,
+  Borrar,
   Consultar,
   Buscar,
   type ToolName,
 } from './schemas';
 import type { ZodType } from 'zod';
+
+/** Efectos externos inyectados por la app (calendario). Mantiene agent puro:
+ *  no importa adapters/supabase. */
+export interface ToolDeps {
+  ctx: ActorContext;
+  repo: WorkRepo;
+  syncTask?: (task: TaskRow) => Promise<void>;
+  removeTaskEvent?: (task: TaskRow) => Promise<void>;
+}
 
 function summarize(t: TaskRow) {
   return { id: t.id, titulo: t.title, estado: t.status, fecha: t.dueAt };
@@ -21,14 +31,14 @@ function parse<T>(schema: ZodType<T>, raw: unknown): Result<T> {
   return p.success ? ok(p.data) : err('INVALID_INPUT', 'Entrada inválida', p.error.issues);
 }
 
-/** Ejecuta una herramienta del agente: valida (Zod), mapea al caso de uso de /core.
- *  El agente propone; /core autoriza y ejecuta bajo RLS. */
+/** Ejecuta una herramienta: valida (Zod), llama al caso de uso de /core, y aplica
+ *  los efectos de calendario — el MISMO camino que los botones de la app. */
 export async function runTool(
-  ctx: ActorContext,
-  repo: WorkRepo,
+  deps: ToolDeps,
   name: ToolName,
   rawInput: unknown,
 ): Promise<Result<unknown>> {
+  const { ctx, repo } = deps;
   switch (name) {
     case 'crear_tarea': {
       const p = parse(CrearTarea, rawInput);
@@ -38,6 +48,7 @@ export async function runTool(
         dueAt: p.value.fecha,
         projectId: p.value.proyecto_id,
       });
+      if (r.ok) await deps.syncTask?.(r.value);
       return r.ok ? ok(summarize(r.value)) : r;
     }
     case 'completar': {
@@ -50,7 +61,16 @@ export async function runTool(
       const p = parse(Reprogramar, rawInput);
       if (!p.ok) return p;
       const r = await rescheduleTask(ctx, repo, { id: p.value.tarea_id, dueAt: p.value.fecha });
+      if (r.ok) await deps.syncTask?.(r.value);
       return r.ok ? ok(summarize(r.value)) : r;
+    }
+    case 'borrar': {
+      const p = parse(Borrar, rawInput);
+      if (!p.ok) return p;
+      const task = await repo.getTask(p.value.tarea_id);
+      const r = await deleteTask(ctx, repo, p.value.tarea_id);
+      if (r.ok && task) await deps.removeTaskEvent?.(task);
+      return r.ok ? ok({ borrada: p.value.tarea_id }) : r;
     }
     case 'consultar': {
       const p = parse(Consultar, rawInput);
