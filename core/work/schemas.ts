@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 // Fechas: ISO-8601 con offset explícito. Nunca z.coerce.date() (interpreta en UTC
 // y corre todo 5 horas). Ver docs/arquitectura-v2.md §6.2.
-const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)$/;
+const ISO_WITH_OFFSET =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?([+-]\d{2}:\d{2}|Z)$/;
 
 export const Instant = z
   .string()
