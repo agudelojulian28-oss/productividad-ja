@@ -9,12 +9,13 @@ import {
   reopenTask,
   rescheduleTask,
 } from '@/core/work/tasks';
+import { syncTaskToCalendar } from '@/lib/calendar-sync';
 import type { Result } from '@/core/types';
 import type { TaskRow } from '@/core/work/ports';
 
-async function repo() {
+async function deps() {
   const { supabase, ctx } = await requireContext();
-  return { ctx, repo: workRepo(supabase, ctx.userId) };
+  return { supabase, ctx, repo: workRepo(supabase, ctx.userId) };
 }
 
 export async function createTaskAction(input: {
@@ -22,22 +23,23 @@ export async function createTaskAction(input: {
   dueAt?: string;
   projectId?: string;
 }): Promise<Result<TaskRow>> {
-  const { ctx, repo: r } = await repo();
-  const result = await createTask(ctx, r, input);
+  const { supabase, ctx, repo } = await deps();
+  const result = await createTask(ctx, repo, input);
+  if (result.ok) await syncTaskToCalendar(supabase, ctx, repo, result.value);
   revalidatePath('/hoy');
   return result;
 }
 
 export async function completeTaskAction(id: string): Promise<Result<TaskRow>> {
-  const { ctx, repo: r } = await repo();
-  const result = await completeTask(ctx, r, id);
+  const { ctx, repo } = await deps();
+  const result = await completeTask(ctx, repo, id);
   revalidatePath('/hoy');
   return result;
 }
 
 export async function reopenTaskAction(id: string): Promise<Result<TaskRow>> {
-  const { ctx, repo: r } = await repo();
-  const result = await reopenTask(ctx, r, id);
+  const { ctx, repo } = await deps();
+  const result = await reopenTask(ctx, repo, id);
   revalidatePath('/hoy');
   return result;
 }
@@ -46,8 +48,9 @@ export async function rescheduleTaskAction(
   id: string,
   dueAt: string,
 ): Promise<Result<TaskRow>> {
-  const { ctx, repo: r } = await repo();
-  const result = await rescheduleTask(ctx, r, { id, dueAt });
+  const { supabase, ctx, repo } = await deps();
+  const result = await rescheduleTask(ctx, repo, { id, dueAt });
+  if (result.ok) await syncTaskToCalendar(supabase, ctx, repo, result.value);
   revalidatePath('/hoy');
   return result;
 }

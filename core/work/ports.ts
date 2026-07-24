@@ -12,6 +12,8 @@ export interface TaskRow {
   completedAt: string | null; // ISO
   projectId: string | null;
   origin: string | null;
+  googleCalendarId: string | null;
+  googleEventId: string | null;
 }
 
 export interface TaskInsert {
@@ -28,6 +30,8 @@ export interface TaskPatch {
   status?: TaskStatus;
   dueAt?: string | null;
   completedAt?: string | null;
+  googleCalendarId?: string | null;
+  googleEventId?: string | null;
 }
 
 export interface TaskFilter {

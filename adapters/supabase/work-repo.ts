@@ -10,9 +10,12 @@ interface DbTask {
   completed_at: string | null;
   project_id: string | null;
   origin: string | null;
+  google_calendar_id: string | null;
+  google_event_id: string | null;
 }
 
-const COLS = 'id,title,notes,status,due_at,completed_at,project_id,origin';
+const COLS =
+  'id,title,notes,status,due_at,completed_at,project_id,origin,google_calendar_id,google_event_id';
 
 function toRow(r: DbTask): TaskRow {
   return {
@@ -24,6 +27,8 @@ function toRow(r: DbTask): TaskRow {
     completedAt: r.completed_at,
     projectId: r.project_id,
     origin: r.origin,
+    googleCalendarId: r.google_calendar_id,
+    googleEventId: r.google_event_id,
   };
 }
 
@@ -88,6 +93,8 @@ export function workRepo(supabase: SupabaseClient, userId: string): WorkRepo {
       if (patch.status !== undefined) upd.status = patch.status;
       if (patch.dueAt !== undefined) upd.due_at = patch.dueAt;
       if (patch.completedAt !== undefined) upd.completed_at = patch.completedAt;
+      if (patch.googleCalendarId !== undefined) upd.google_calendar_id = patch.googleCalendarId;
+      if (patch.googleEventId !== undefined) upd.google_event_id = patch.googleEventId;
       const { data, error } = await supabase
         .from('tasks')
         .update(upd)

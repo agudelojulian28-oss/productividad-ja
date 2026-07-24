@@ -4,6 +4,8 @@ import { cookies } from 'next/headers';
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
+export type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
+
 /** Cliente Supabase con la sesión del usuario web (RLS activa). Uso en Server Components,
  *  Server Actions y Route Handlers. */
 export async function createClient() {
