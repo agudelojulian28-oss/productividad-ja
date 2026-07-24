@@ -32,8 +32,11 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           test -n "$SUPABASE_DB_URL" || { echo "Falta el secreto SUPABASE_DB_URL"; exit 1; }
+          # Usar el pg_dump más nuevo instalado (Ubuntu trae el 16; forzamos el 17+).
+          PGDUMP=$(ls -d /usr/lib/postgresql/*/bin/pg_dump | sort -V | tail -1)
+          echo "Usando: $PGDUMP"; "$PGDUMP" --version
           STAMP=$(date -u +%Y-%m-%d)
-          pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges -Fc -f "backup-$STAMP.dump"
+          "$PGDUMP" "$SUPABASE_DB_URL" --no-owner --no-privileges -Fc -f "backup-$STAMP.dump"
           ls -lh "backup-$STAMP.dump"
 
       - name: Guardar el volcado (retención 90 días)
