@@ -20,6 +20,7 @@ async function repo() {
 export async function createTaskAction(input: {
   title: string;
   dueAt?: string;
+  projectId?: string;
 }): Promise<Result<TaskRow>> {
   const { ctx, repo: r } = await repo();
   const result = await createTask(ctx, r, input);

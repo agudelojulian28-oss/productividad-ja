@@ -4,13 +4,18 @@ import { todayInTz, dateInTz } from '@/lib/format';
 import type { TaskRow } from '@/core/work/ports';
 import { NewTaskForm } from './new-task-form';
 import { TaskItem } from './task-item';
+import { RealtimeRefresh } from '../realtime-refresh';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HoyPage() {
   const { supabase, ctx } = await requireContext();
   const repo = workRepo(supabase, ctx.userId);
-  const tasks = await repo.listTasks({ status: 'pending' });
+  const [tasks, projects] = await Promise.all([
+    repo.listTasks({ status: 'pending' }),
+    repo.listProjects(),
+  ]);
+  const projectName = new Map(projects.map((p) => [p.id, p.title] as const));
   const today = todayInTz(ctx.tz);
 
   const vencidas: TaskRow[] = [];
@@ -37,8 +42,9 @@ export default async function HoyPage() {
 
   return (
     <div className="page">
+      <RealtimeRefresh tables={['tasks', 'projects']} />
       <h1 className="page-title">Hoy</h1>
-      <NewTaskForm />
+      <NewTaskForm projects={projects.map((p) => ({ id: p.id, title: p.title }))} />
 
       {tasks.length === 0 ? (
         <p className="muted" style={{ marginTop: 24 }}>
@@ -54,7 +60,12 @@ export default async function HoyPage() {
               </h2>
               <ul>
                 {s.items.map((t) => (
-                  <TaskItem key={t.id} task={t} tz={ctx.tz} />
+                  <TaskItem
+                    key={t.id}
+                    task={t}
+                    tz={ctx.tz}
+                    projectName={t.projectId ? projectName.get(t.projectId) : undefined}
+                  />
                 ))}
               </ul>
             </section>

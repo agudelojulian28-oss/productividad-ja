@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { requireContext } from '@/lib/auth';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { NewAreaForm } from './new-area-form';
+import { RealtimeRefresh } from '../realtime-refresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,7 @@ export default async function AreasPage() {
 
   return (
     <div className="page">
+      <RealtimeRefresh tables={['areas']} />
       <h1 className="page-title">Áreas</h1>
       <NewAreaForm />
 
