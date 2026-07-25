@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TimeGrid } from './time-grid';
 import { MonthGrid } from './month-grid';
@@ -60,6 +60,10 @@ export function CalendarView({
   const router = useRouter();
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [canDrag, setCanDrag] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinchDist = useRef<number | null>(null);
+  const lastZoom = useRef(0);
 
   // Arrastre solo en punteros finos (escritorio); en táctil, tocar para editar.
   useEffect(() => {
@@ -69,6 +73,62 @@ export function CalendarView({
   function push(v: CalView, d: string) {
     router.push(`/calendario?view=${v}&date=${d}`);
   }
+
+  // Zoom: pellizcar (o ctrl+rueda / pinch de trackpad) salta entre Mes ⇄ Semana ⇄ Día.
+  const ZOOM_ORDER: CalView[] = ['mes', 'semana', 'dia'];
+  function zoom(dir: 1 | -1) {
+    const now = Date.now();
+    if (now - lastZoom.current < 450) return;
+    const i = ZOOM_ORDER.indexOf(view);
+    const ni = i + dir;
+    if (ni < 0 || ni >= ZOOM_ORDER.length) return;
+    lastZoom.current = now;
+    push(ZOOM_ORDER[ni]!, date);
+  }
+  function twoFingerDist(): number | null {
+    const pts = [...pointers.current.values()];
+    if (pts.length < 2) return null;
+    const [a, b] = pts;
+    return Math.hypot(a!.x - b!.x, a!.y - b!.y);
+  }
+  function onPointerDown(e: React.PointerEvent) {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2) pinchDist.current = twoFingerDist();
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2 && pinchDist.current) {
+      const d = twoFingerDist();
+      if (!d) return;
+      const r = d / pinchDist.current;
+      if (r > 1.3) {
+        zoom(1);
+        pinchDist.current = d;
+      } else if (r < 0.77) {
+        zoom(-1);
+        pinchDist.current = d;
+      }
+    }
+  }
+  function onPointerUpCal(e: React.PointerEvent) {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinchDist.current = null;
+  }
+
+  // ctrl + rueda (y pinch de trackpad, que el navegador emite como ctrl+wheel).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      zoom(e.deltaY < 0 ? 1 : -1);
+    }
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, date]);
   function shift(dir: -1 | 1) {
     const d =
       view === 'dia'
@@ -88,7 +148,14 @@ export function CalendarView({
   } else title = labelYmd(date, { month: 'long', year: 'numeric' });
 
   return (
-    <div className="cal">
+    <div
+      className="cal"
+      ref={containerRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUpCal}
+      onPointerCancel={onPointerUpCal}
+    >
       <div className="cal-toolbar">
         <div className="cal-nav">
           <button className="cal-arrow" aria-label="Anterior" onClick={() => shift(-1)}>
