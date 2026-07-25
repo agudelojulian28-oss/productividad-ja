@@ -39,3 +39,17 @@ export function dayLabelInTz(iso: string, tz: string): string {
     month: 'short',
   }).format(new Date(iso));
 }
+
+/** Minutos desde medianoche (0–1439) de un instante ISO, en la zona del usuario.
+ *  Sirve para posicionar eventos en la rejilla horaria del calendario. */
+export function minutesInTz(iso: string, tz: string): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const h = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
+  const m = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
+  return (h % 24) * 60 + m;
+}

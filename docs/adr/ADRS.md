@@ -98,6 +98,8 @@ con superficie de inyección. Corregido en la auditoría v2 (C1).
 
 ## ADR-005 · Telegram como primer canal de mensajería
 
+> Estado: reemplazado por ADR-020.
+
 **Contexto.** El asistente debe ser accesible desde el teléfono sin abrir la app.
 
 **Decisión.** Construir primero el adaptador de Telegram. WhatsApp después, si el hábito de
@@ -445,3 +447,35 @@ moneda se convierten en tarjetas de fuente de ingreso; los tres KPIs en saldo/po
 con una sola tarjeta destacada en naranja (la más accionable). Sin modo claro, cualquier uso a
 plena luz depende del brillo del dispositivo. El naranja no se usa para "el dinero" en general,
 solo como marca y acción, para no diluir su señal.
+
+---
+
+## ADR-020 · WhatsApp como primer canal de mensajería
+
+> Reemplaza a ADR-005.
+
+**Contexto.** El asistente debe ser accesible desde el teléfono sin abrir la app. El ADR-005
+había elegido Telegram como primer canal por costo y rapidez de montaje. Julián decide que el
+canal donde de verdad vive su conversación es WhatsApp y prefiere construir ahí desde el inicio.
+
+**Decisión.** Construir primero el adaptador de **WhatsApp** (Cloud API de Meta). Telegram queda
+como alternativa disponible, no como primer paso. La Etapa 3 de `arquitectura-v3.md` —titulada
+"WhatsApp"— pasa a ser la implementación literal; este ADR alinea la decisión de canal con ese
+roadmap (el ADR-005 era el documento discordante).
+
+**Alternativas descartadas.** Telegram primero (ADR-005); mantener ambos como iguales desde el
+día uno (duplica el trabajo de canal antes de validar el hábito).
+
+**Por qué.** Es una decisión de producto del dueño, no técnica: el valor de responder donde ya
+está la conversación pesa más que el ahorro. Se asume conscientemente el costo: desde el
+**1 de octubre de 2026** Meta cobra los *service messages* por mensaje (incluye respuestas de
+asistentes de IA), exige **verificación de negocio** y **plantillas aprobadas** para mensajes
+iniciados por el bot. La verificación de firma sigue siendo HMAC-SHA256 del cuerpo crudo contra
+`X-Hub-Signature-256` (v2 §3.1); nada de la arquitectura durable cambia.
+
+**Consecuencias.** Los pasos humanos de la Etapa 3 son los de WhatsApp Cloud API (App de Meta,
+producto WhatsApp, App Secret, Phone Number ID, token permanente, Verify Token, verificación de
+negocio), no los de Telegram. ~USD 3–6/mes adicionales desde octubre de 2026 (v2 §9). El canal
+sigue siendo intercambiable por diseño (v3 §3.1): si el costo no compensa, revertir a Telegram
+es un día de trabajo. No se construye la Etapa 3 hasta que las etapas previas lleven una semana
+de uso real (regla del roadmap).

@@ -7,6 +7,7 @@ export interface CalEvent {
   startIso: string;
   endIso: string;
   tz: string;
+  colorId?: string;
 }
 
 export interface GEvent {
@@ -62,6 +63,7 @@ function body(ev: CalEvent) {
     summary: ev.summary,
     start: { dateTime: ev.startIso, timeZone: ev.tz },
     end: { dateTime: ev.endIso, timeZone: ev.tz },
+    ...(ev.colorId ? { colorId: ev.colorId } : {}),
   });
 }
 

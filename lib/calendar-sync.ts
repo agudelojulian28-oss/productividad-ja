@@ -29,13 +29,37 @@ export async function deleteCalendarEvent(
   await deleteEvent(accessToken, eventId);
 }
 
-/** Edita un evento de Google (título / hora / color). Al mover la hora preserva
- *  la duración original del evento. */
+/** Crea un evento en Google Calendar. Devuelve el id del evento creado. */
+export async function createCalendarEvent(
+  supabase: ServerSupabase,
+  ctx: ActorContext,
+  input: { titulo: string; fecha: string; colorId?: string; durationMin?: number },
+): Promise<string> {
+  const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
+  if (!cipher) throw new Error('Google no está conectado');
+  const { accessToken } = await refreshAccessToken(decryptToken(cipher));
+
+  const durMs = (input.durationMin ?? DURATION_MIN) * 60000;
+  const endIso = new Date(new Date(input.fecha).getTime() + durMs).toISOString();
+  const { eventId } = await createEvent(accessToken, {
+    summary: input.titulo,
+    startIso: input.fecha,
+    endIso,
+    tz: ctx.tz,
+    colorId: input.colorId,
+  });
+  return eventId;
+}
+
+/** Edita un evento de Google (título / hora / color / duración).
+ *  - `fecha` sin `durationMin`: mueve el inicio y preserva la duración original.
+ *  - `durationMin` sin `fecha`: redimensiona (mismo inicio, nuevo fin).
+ *  - ambos: mueve y fija la duración. */
 export async function patchCalendarEvent(
   supabase: ServerSupabase,
   ctx: ActorContext,
   eventId: string,
-  patch: { titulo?: string; fecha?: string; colorId?: string },
+  patch: { titulo?: string; fecha?: string; colorId?: string; durationMin?: number },
 ): Promise<void> {
   const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
   if (!cipher) throw new Error('Google no está conectado');
@@ -44,14 +68,29 @@ export async function patchCalendarEvent(
   const fields: EventPatch = {};
   if (patch.titulo !== undefined) fields.summary = patch.titulo;
   if (patch.colorId !== undefined) fields.colorId = patch.colorId;
-  if (patch.fecha) {
-    let durationMs = DURATION_MIN * 60000;
-    const ev = await getEvent(accessToken, eventId);
-    if (ev?.start && ev.end && !ev.allDay) {
-      durationMs = new Date(ev.end).getTime() - new Date(ev.start).getTime();
+
+  if (patch.fecha || patch.durationMin !== undefined) {
+    // Fin explícito por duración, o duración preservada del evento actual.
+    let startMs: number;
+    let durationMs = (patch.durationMin ?? DURATION_MIN) * 60000;
+
+    if (patch.fecha) {
+      startMs = new Date(patch.fecha).getTime();
+      if (patch.durationMin === undefined) {
+        const ev = await getEvent(accessToken, eventId);
+        if (ev?.start && ev.end && !ev.allDay) {
+          durationMs = new Date(ev.end).getTime() - new Date(ev.start).getTime();
+        }
+      }
+    } else {
+      // Redimensionado puro: conservar el inicio actual.
+      const ev = await getEvent(accessToken, eventId);
+      if (!ev?.start) throw new Error('Evento sin hora de inicio');
+      startMs = new Date(ev.start).getTime();
     }
-    fields.startIso = patch.fecha;
-    fields.endIso = new Date(new Date(patch.fecha).getTime() + durationMs).toISOString();
+
+    fields.startIso = new Date(startMs).toISOString();
+    fields.endIso = new Date(startMs + durationMs).toISOString();
     fields.tz = ctx.tz;
   }
   await patchEvent(accessToken, eventId, fields);
@@ -82,6 +121,31 @@ export async function getDayEvents(
     return await listEvents(accessToken, `${dateYmd}T00:00:00${off}`, `${dateYmd}T23:59:59${off}`);
   } catch (e) {
     console.error('getDayEvents:', e);
+    return [];
+  }
+}
+
+/** Eventos de Google en un rango de días [startYmd, endYmd] inclusive (zona del
+ *  usuario). [] si no hay conexión o falla. */
+export async function getRangeEvents(
+  supabase: ServerSupabase,
+  ctx: ActorContext,
+  startYmd: string,
+  endYmd: string,
+): Promise<GEvent[]> {
+  try {
+    const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
+    if (!cipher) return [];
+    const { accessToken } = await refreshAccessToken(decryptToken(cipher));
+    const offStart = offsetFor(startYmd, ctx.tz);
+    const offEnd = offsetFor(endYmd, ctx.tz);
+    return await listEvents(
+      accessToken,
+      `${startYmd}T00:00:00${offStart}`,
+      `${endYmd}T23:59:59${offEnd}`,
+    );
+  } catch (e) {
+    console.error('getRangeEvents:', e);
     return [];
   }
 }
