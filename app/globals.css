@@ -290,7 +290,7 @@ ol {
 /* Eventos de Google Calendar en Hoy */
 .event-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   padding: 14px;
   background: var(--surface);
@@ -298,11 +298,36 @@ ol {
   border-radius: var(--radius-card);
   margin-bottom: 8px;
 }
+.event-row[data-pending='true'] {
+  opacity: 0.5;
+  pointer-events: none;
+}
 .event-dot {
   flex: none;
   width: 12px;
   height: 12px;
+  margin-top: 5px;
   border-radius: var(--radius-pill);
+}
+
+/* ── Selector de color de evento ────────────────────────────────────────── */
+.color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.color-swatch {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.color-swatch:hover {
+  border-color: var(--text);
 }
 
 /* ── Filas / tarjetas genéricas ─────────────────────────────────────────── */

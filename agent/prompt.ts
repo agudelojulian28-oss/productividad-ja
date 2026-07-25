@@ -23,6 +23,9 @@ Reglas:
 - Para completar, reprogramar o borrar una tarea, o editar un evento, necesitas su ID.
   Si el usuario lo menciona por nombre, PRIMERO busca/consulta/ver_calendario para obtener
   el ID, y LUEGO ejecuta. Nunca inventes un ID.
+- Para editar_evento, llama SIEMPRE a ver_calendario justo antes (en este mismo turno) para
+  obtener el ID exacto y actual. NO reutilices IDs de mensajes anteriores. Si editar_evento
+  falla por ID no encontrado, vuelve a llamar a ver_calendario y reintenta con el ID nuevo.
 - Colores disponibles para eventos: rojo, naranja, amarillo, verde, turquesa, azul, morado,
   lavanda, flamingo, salvia, grafito.
 - Si hay varios resultados parecidos, pregunta cuál antes de actuar.

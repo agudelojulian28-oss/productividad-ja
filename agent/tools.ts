@@ -15,12 +15,7 @@ import {
 } from './schemas';
 import type { ZodType } from 'zod';
 import type { GEvent } from '@/adapters/google/calendar';
-
-// Nombre de color → colorId de Google Calendar.
-const colorIds: Record<string, string> = {
-  rojo: '11', flamingo: '4', naranja: '6', amarillo: '5', salvia: '2', verde: '10',
-  turquesa: '7', azul: '9', lavanda: '1', morado: '3', grafito: '8',
-};
+import { nameToColorId } from '@/lib/calendar-colors';
 
 /** Efectos externos inyectados por la app (calendario). Mantiene agent puro:
  *  no importa adapters/supabase. */
@@ -113,13 +108,20 @@ export async function runTool(
       const p = parse(EditarEvento, rawInput);
       if (!p.ok) return p;
       if (!deps.editEvent) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
-      const colorId = p.value.color ? colorIds[p.value.color] : undefined;
-      await deps.editEvent(p.value.evento_id, {
-        titulo: p.value.titulo,
-        fecha: p.value.fecha,
-        colorId,
-      });
-      return ok({ editado: p.value.evento_id });
+      const colorId = p.value.color ? nameToColorId[p.value.color] : undefined;
+      try {
+        await deps.editEvent(p.value.evento_id, {
+          titulo: p.value.titulo,
+          fecha: p.value.fecha,
+          colorId,
+        });
+        return ok({ editado: p.value.evento_id });
+      } catch {
+        return err(
+          'NOT_FOUND',
+          'No encontré ese evento con ese ID. Llama a ver_calendario para obtener el ID actual y reintenta.',
+        );
+      }
     }
   }
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { COLOR_NAMES } from '@/lib/calendar-colors';
 
 // Fechas: ISO-8601 con offset explícito (acepta milisegundos). Nunca z.coerce.date().
 const ISO_WITH_OFFSET =
@@ -37,11 +38,6 @@ export const Borrar = z.object({
   tarea_id: z.uuid().describe('ID de la tarea a borrar'),
 });
 
-export const COLORES = [
-  'rojo', 'naranja', 'amarillo', 'verde', 'turquesa', 'azul',
-  'morado', 'lavanda', 'flamingo', 'salvia', 'grafito',
-] as const;
-
 export const VerCalendario = z.object({
   fecha: z
     .string()
@@ -54,7 +50,7 @@ export const EditarEvento = z.object({
   evento_id: z.string().min(1).describe('ID del evento de Google (de ver_calendario)'),
   titulo: z.string().trim().min(1).max(200).optional().describe('Nuevo título'),
   fecha: Instant.optional().describe('Nueva hora de inicio, ISO con offset'),
-  color: z.enum(COLORES).optional().describe('Nuevo color del evento'),
+  color: z.enum(COLOR_NAMES).optional().describe('Nuevo color del evento'),
 });
 
 export const toolSchemas = {

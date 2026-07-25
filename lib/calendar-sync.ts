@@ -17,6 +17,18 @@ import {
 
 const DURATION_MIN = 30;
 
+/** Borra un evento de Google Calendar. */
+export async function deleteCalendarEvent(
+  supabase: ServerSupabase,
+  ctx: ActorContext,
+  eventId: string,
+): Promise<void> {
+  const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
+  if (!cipher) throw new Error('Google no está conectado');
+  const { accessToken } = await refreshAccessToken(decryptToken(cipher));
+  await deleteEvent(accessToken, eventId);
+}
+
 /** Edita un evento de Google (título / hora / color). Al mover la hora preserva
  *  la duración original del evento. */
 export async function patchCalendarEvent(

@@ -1,18 +1,14 @@
 import { requireContext } from '@/lib/auth';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { getDayEvents } from '@/lib/calendar-sync';
-import { todayInTz, dateInTz, timeInTz } from '@/lib/format';
+import { todayInTz, dateInTz } from '@/lib/format';
 import type { TaskRow } from '@/core/work/ports';
 import { NewTaskForm } from './new-task-form';
 import { TaskItem } from './task-item';
+import { EventItem } from './event-item';
 import { RealtimeRefresh } from '../realtime-refresh';
 
 export const dynamic = 'force-dynamic';
-
-const eventColors: Record<string, string> = {
-  '1': '#7986cb', '2': '#33b679', '3': '#8e24aa', '4': '#e67c73', '5': '#f6bf26',
-  '6': '#f4511e', '7': '#039be5', '8': '#616161', '9': '#3f51b5', '10': '#0b8043', '11': '#d50000',
-};
 
 export default async function HoyPage() {
   const { supabase, ctx } = await requireContext();
@@ -67,18 +63,17 @@ export default async function HoyPage() {
           <h2 className="section-title">Calendario · {calEvents.length}</h2>
           <ul>
             {calEvents.map((e) => (
-              <li key={e.id} className="event-row">
-                <span
-                  className="event-dot"
-                  style={{ background: (e.colorId && eventColors[e.colorId]) || '#039be5' }}
-                />
-                <div className="task-body">
-                  <span className="task-title">{e.summary}</span>
-                  <span className="task-meta">
-                    {e.allDay || !e.start ? 'Todo el día' : timeInTz(e.start, ctx.tz)}
-                  </span>
-                </div>
-              </li>
+              <EventItem
+                key={e.id}
+                event={{
+                  id: e.id,
+                  summary: e.summary,
+                  start: e.start,
+                  allDay: e.allDay,
+                  colorId: e.colorId,
+                }}
+                tz={ctx.tz}
+              />
             ))}
           </ul>
         </section>
