@@ -670,6 +670,25 @@ ol {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Eventos cortos (≤ 30–45 min): una sola línea, prioriza el nombre. */
+.tg-block-sm {
+  flex-direction: row;
+  align-items: center;
+  padding: 1px 6px;
+}
+.tg-block-sm .tg-block-time {
+  display: none;
+}
+.tg-block-sm .tg-block-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+}
+/* Mientras se arrastra, no scrollear el cuerpo. */
+.tg-body-locked {
+  overflow: hidden;
+  touch-action: none;
+}
 .tg-resize {
   position: absolute;
   left: 0;

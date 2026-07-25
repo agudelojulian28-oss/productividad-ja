@@ -21,12 +21,13 @@ export function dateInTz(iso: string, tz: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(iso));
 }
 
-/** Hora local legible de un instante ISO, en la zona del usuario. */
+/** Hora local legible (12 h con a. m./p. m.) de un instante ISO, en la zona del usuario. */
 export function timeInTz(iso: string, tz: string): string {
   return new Intl.DateTimeFormat('es-CO', {
     timeZone: tz,
-    hour: '2-digit',
+    hour: 'numeric',
     minute: '2-digit',
+    hour12: true,
   }).format(new Date(iso));
 }
 

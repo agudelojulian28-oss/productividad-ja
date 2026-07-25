@@ -25,6 +25,15 @@ function itemHex(it: CalItem): string {
   return it.kind === 'task' ? 'var(--accent)' : hexForColorId(it.colorId);
 }
 
+/** Etiqueta compacta de hora en 12 h para la columna de horas (ej. "7 am", "12 pm"). */
+function hourLabel(h: number): string {
+  const ap = h < 12 ? 'am' : 'pm';
+  const hr = h % 12 === 0 ? 12 : h % 12;
+  return `${hr} ${ap}`;
+}
+
+const LONG_PRESS_MS = 320;
+
 /** Día (YYYY-MM-DD) al que pertenece el ítem, en la zona del usuario.
  *  Los de todo el día ya vienen como fecha pura: no reinterpretar como instante. */
 function dayOf(it: CalItem, tz: string): string | null {
@@ -67,6 +76,8 @@ export function TimeGrid({
   const bodyRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
   const movedRef = useRef(false);
+  const lpTimer = useRef<number | undefined>(undefined);
+  const pressRef = useRef<{ x: number; y: number } | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -78,6 +89,7 @@ export function TimeGrid({
   useEffect(() => {
     if (!drag) return;
     function move(e: PointerEvent) {
+      e.preventDefault();
       setDrag((d) => {
         if (!d) return d;
         const dx = e.clientX - d.startX;
@@ -128,23 +140,55 @@ export function TimeGrid({
     });
   }
 
-  function startDrag(e: React.PointerEvent, it: CalItem, mode: 'move' | 'resize') {
-    if (!canDrag || !it.start) return;
-    e.stopPropagation();
-    e.preventDefault();
+  function beginDrag(it: CalItem, mode: 'move' | 'resize', startX: number, startY: number) {
+    if (!it.start) return;
     movedRef.current = false;
     setDrag({
       id: it.id,
       kind: it.kind,
       mode,
-      startX: e.clientX,
-      startY: e.clientY,
+      startX,
+      startY,
       origStartMs: new Date(it.start).getTime(),
       origDurMin: durationMin(it),
       colWidth: colsRef.current ? colsRef.current.clientWidth / days.length : 0,
       dx: 0,
       dy: 0,
     });
+  }
+
+  // Escritorio (puntero fino): arrastrar de inmediato.
+  function onDesktopDown(e: React.PointerEvent, it: CalItem, mode: 'move' | 'resize') {
+    if (!canDrag || !it.start) return;
+    e.stopPropagation();
+    e.preventDefault();
+    beginDrag(it, mode, e.clientX, e.clientY);
+  }
+
+  // Táctil: mantener pulsado (~320 ms sin moverse) activa el arrastre.
+  function onTouchDown(e: React.PointerEvent, it: CalItem) {
+    if (canDrag || !it.start) return;
+    const x = e.clientX;
+    const y = e.clientY;
+    pressRef.current = { x, y };
+    clearTimeout(lpTimer.current);
+    lpTimer.current = window.setTimeout(() => {
+      movedRef.current = true; // suprime el click posterior
+      if (navigator.vibrate) navigator.vibrate(12);
+      beginDrag(it, 'move', x, y);
+    }, LONG_PRESS_MS);
+  }
+  function onTouchMovePending(e: React.PointerEvent) {
+    const p = pressRef.current;
+    if (!p) return;
+    if (Math.abs(e.clientX - p.x) > 10 || Math.abs(e.clientY - p.y) > 10) {
+      clearTimeout(lpTimer.current); // se movió: es scroll, no pulsación larga
+      pressRef.current = null;
+    }
+  }
+  function cancelPress() {
+    clearTimeout(lpTimer.current);
+    pressRef.current = null;
   }
 
   function createAt(day: string, e: React.MouseEvent<HTMLDivElement>) {
@@ -199,11 +243,11 @@ export function TimeGrid({
         </div>
       )}
 
-      <div className="tg-body" ref={bodyRef}>
+      <div className={`tg-body${drag ? ' tg-body-locked' : ''}`} ref={bodyRef}>
         <div className="tg-hours" style={{ height: 24 * HOUR_H }}>
           {hours.map((h) => (
             <div key={h} className="tg-hour" style={{ height: HOUR_H }}>
-              <span>{String(h).padStart(2, '0')}:00</span>
+              <span>{hourLabel(h)}</span>
             </div>
           ))}
         </div>
@@ -229,17 +273,24 @@ export function TimeGrid({
                   const extraH = dOff?.mode === 'resize' ? dOff.dy : 0;
                   const moveX = dOff?.mode === 'move' ? dOff.dx : 0;
                   const moveY = dOff?.mode === 'move' ? dOff.dy : 0;
+                  const sm = dur < 45;
                   return (
                     <div
                       key={it.kind + it.id}
-                      className={`tg-block${it.kind === 'task' ? ' tg-task' : ''}${isDragged ? ' tg-dragging' : ''}`}
+                      className={`tg-block${sm ? ' tg-block-sm' : ''}${it.kind === 'task' ? ' tg-task' : ''}${isDragged ? ' tg-dragging' : ''}`}
                       style={{
                         top: startMin * PX_PER_MIN,
                         height: Math.max(18, dur * PX_PER_MIN + extraH),
                         borderLeftColor: itemHex(it),
                         transform: `translate(${moveX}px, ${moveY}px)`,
                       }}
-                      onPointerDown={(e) => startDrag(e, it, 'move')}
+                      onPointerDown={(e) => {
+                        onDesktopDown(e, it, 'move');
+                        onTouchDown(e, it);
+                      }}
+                      onPointerMove={onTouchMovePending}
+                      onPointerUp={cancelPress}
+                      onPointerCancel={cancelPress}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (movedRef.current) {
@@ -254,7 +305,7 @@ export function TimeGrid({
                       {canDrag && it.kind === 'event' && (
                         <span
                           className="tg-resize"
-                          onPointerDown={(e) => startDrag(e, it, 'resize')}
+                          onPointerDown={(e) => onDesktopDown(e, it, 'resize')}
                         />
                       )}
                     </div>
