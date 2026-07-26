@@ -21,6 +21,29 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const raw = await req.text();
 
+  // TEMP DEBUG — captura cada hit del webhook para diagnóstico. REVERTIR tras diagnosticar.
+  try {
+    const sig = req.headers.get('x-hub-signature-256');
+    const secret = process.env.WHATSAPP_APP_SECRET;
+    const sigValid = !!(secret && sig && verifySignature(raw, sig, secret));
+    await adminClient()
+      .from('inbox')
+      .insert({
+        user_id: process.env.ALLOWED_USER_ID,
+        channel: '__debug',
+        external_id: 'dbg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+        status: 'done',
+        payload: {
+          sig_present: !!sig,
+          has_secret: !!secret,
+          sig_valid: sigValid,
+          snippet: raw.slice(0, 400),
+        },
+      });
+  } catch {
+    // el diagnóstico nunca debe romper el webhook
+  }
+
   const appSecret = process.env.WHATSAPP_APP_SECRET;
   if (!appSecret || !verifySignature(raw, req.headers.get('x-hub-signature-256'), appSecret)) {
     return new Response('Firma inválida', { status: 401 });
