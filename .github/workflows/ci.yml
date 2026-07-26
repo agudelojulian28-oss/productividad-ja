@@ -1,0 +1,39 @@
+name: CI
+
+# Corre las verificaciones no negociables de CLAUDE.md en cada push/PR a main:
+# arquitectura (dependency-cruiser), tipos, tests de dominio y RLS de la base real.
+# El secreto SUPABASE_DB_URL (Session pooler, IPv4) ya existe para el respaldo.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Arquitectura (dependency-cruiser)
+        run: npm run lint
+
+      - name: Tipos (tsc)
+        run: npx tsc --noEmit
+
+      - name: Tests de dominio (vitest)
+        run: npm run test
+
+      - name: RLS en la base real (check:rls)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: npm run check:rls
