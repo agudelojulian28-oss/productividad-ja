@@ -1,15 +1,8 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { requireContext } from '@/lib/auth';
-import { workRepo } from '@/adapters/supabase/work-repo';
-import { anthropicClient } from '@/adapters/anthropic/client';
-import { runAgent, type AgentDeps } from '@/agent/loop';
+import { buildAgentDeps } from '@/lib/agent-run';
+import { runAgent } from '@/agent/loop';
 import { getWebConversation, loadMessages, saveMessage } from '@/lib/chat';
-import {
-  syncTaskToCalendar,
-  removeTaskEvent as removeCalendarEvent,
-  getDayEvents,
-  patchCalendarEvent,
-} from '@/lib/calendar-sync';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -25,37 +18,7 @@ export async function POST(req: Request) {
 
   await saveMessage(supabase, conversationId, ctx.userId, 'user', body.message);
 
-  const repo = workRepo(supabase, ctx.userId);
-  const deps: AgentDeps = {
-    client: anthropicClient(),
-    ctx,
-    repo,
-    syncTask: (task) => syncTaskToCalendar(supabase, ctx, repo, task),
-    removeTaskEvent: (task) =>
-      task.googleEventId ? removeCalendarEvent(supabase, ctx, task.googleEventId) : Promise.resolve(),
-    listCalendar: (dateYmd) => getDayEvents(supabase, ctx, dateYmd),
-    editEvent: (eventId, patch) => patchCalendarEvent(supabase, ctx, eventId, patch),
-    async getCachedResult(id) {
-      const { data } = await supabase
-        .from('tool_executions')
-        .select('result')
-        .eq('tool_call_id', id)
-        .maybeSingle();
-      return data ? (data as { result: unknown }).result : undefined;
-    },
-    async saveResult(id, action, result) {
-      await supabase
-        .from('tool_executions')
-        .insert({ tool_call_id: id, user_id: ctx.userId, action, result });
-    },
-    async consumeBudget(usd) {
-      const { data, error } = await supabase.rpc('check_and_consume_budget', {
-        p_user: ctx.userId,
-        p_usd: usd,
-      });
-      return error ? true : data === true;
-    },
-  };
+  const deps = buildAgentDeps(supabase, ctx);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

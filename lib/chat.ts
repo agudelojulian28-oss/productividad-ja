@@ -5,16 +5,17 @@ export interface ChatMessage {
   text: string;
 }
 
-/** La conversación web del usuario (una sola; se reutiliza la más reciente). */
-export async function getWebConversation(
+/** La conversación del usuario en un canal (una sola; se reutiliza la más reciente). */
+export async function getConversation(
   supabase: ServerSupabase,
   userId: string,
+  channel: string,
 ): Promise<string> {
   const { data } = await supabase
     .from('conversations')
     .select('id')
     .eq('user_id', userId)
-    .eq('channel', 'web')
+    .eq('channel', channel)
     .order('last_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -22,11 +23,16 @@ export async function getWebConversation(
 
   const { data: created, error } = await supabase
     .from('conversations')
-    .insert({ user_id: userId, channel: 'web' })
+    .insert({ user_id: userId, channel })
     .select('id')
     .single();
   if (error) throw new Error(error.message);
   return (created as { id: string }).id;
+}
+
+/** La conversación web del usuario. */
+export function getWebConversation(supabase: ServerSupabase, userId: string): Promise<string> {
+  return getConversation(supabase, userId, 'web');
 }
 
 export async function loadMessages(

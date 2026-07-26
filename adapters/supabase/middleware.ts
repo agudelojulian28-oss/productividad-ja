@@ -27,7 +27,13 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isPublic = path.startsWith('/login') || path.startsWith('/auth');
+  // Públicas: login/auth, y los endpoints de canal/worker (se autentican por firma
+  // del webhook y por WORKER_SECRET, no por sesión). /api/chat sí exige sesión.
+  const isPublic =
+    path.startsWith('/login') ||
+    path.startsWith('/auth') ||
+    path.startsWith('/api/channels') ||
+    path.startsWith('/api/worker');
 
   if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
