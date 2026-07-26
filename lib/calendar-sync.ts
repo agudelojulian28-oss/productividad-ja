@@ -14,19 +14,30 @@ import {
   type GEvent,
   type EventPatch,
 } from '@/adapters/google/calendar';
+import { buildRecurrence, type Recurrencia } from '@/lib/recurrence';
 
 const DURATION_MIN = 30;
 
-/** Borra un evento de Google Calendar. */
+export type EventScope = 'serie' | 'instancia';
+
+/** Borra un evento de Google Calendar. `scope: 'serie'` borra toda la serie
+ *  recurrente (resuelve el evento maestro); por defecto borra solo el id dado. */
 export async function deleteCalendarEvent(
   supabase: ServerSupabase,
   ctx: ActorContext,
   eventId: string,
+  opts?: { scope?: EventScope },
 ): Promise<void> {
   const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
   if (!cipher) throw new Error('Google no está conectado');
   const { accessToken } = await refreshAccessToken(decryptToken(cipher));
-  await deleteEvent(accessToken, eventId);
+
+  let target = eventId;
+  if (opts?.scope === 'serie') {
+    const ev = await getEvent(accessToken, eventId);
+    target = ev?.recurringEventId ?? eventId;
+  }
+  await deleteEvent(accessToken, target);
 }
 
 /** Crea un evento en Google Calendar. Devuelve el id del evento creado. */
@@ -51,49 +62,69 @@ export async function createCalendarEvent(
   return eventId;
 }
 
-/** Edita un evento de Google (título / hora / color / duración).
+/** Edita un evento de Google (título / hora / color / duración / recurrencia).
  *  - `fecha` sin `durationMin`: mueve el inicio y preserva la duración original.
  *  - `durationMin` sin `fecha`: redimensiona (mismo inicio, nuevo fin).
- *  - ambos: mueve y fija la duración. */
+ *  - ambos: mueve y fija la duración.
+ *  - `recurrencia`: cambia (o quita, con frecuencia 'ninguna') la repetición.
+ *  - `scope: 'serie'`: aplica sobre el evento maestro (necesario para recurrencia).
+ *  Si se toca la recurrencia siempre se apunta a la serie maestra. */
 export async function patchCalendarEvent(
   supabase: ServerSupabase,
   ctx: ActorContext,
   eventId: string,
-  patch: { titulo?: string; fecha?: string; colorId?: string; durationMin?: number },
+  patch: {
+    titulo?: string;
+    fecha?: string;
+    colorId?: string;
+    durationMin?: number;
+    recurrencia?: Recurrencia;
+    scope?: EventScope;
+  },
 ): Promise<void> {
   const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
   if (!cipher) throw new Error('Google no está conectado');
   const { accessToken } = await refreshAccessToken(decryptToken(cipher));
 
+  // Cache perezoso del evento (para resolver la serie y/o preservar duración).
+  let ev: GEvent | null | undefined;
+  const getEv = async () => (ev === undefined ? (ev = await getEvent(accessToken, eventId)) : ev);
+
+  // La recurrencia solo vive en la serie maestra; scope 'serie' también apunta ahí.
+  let targetId = eventId;
+  if (patch.recurrencia !== undefined || patch.scope === 'serie') {
+    const e = await getEv();
+    targetId = e?.recurringEventId ?? eventId;
+  }
+
   const fields: EventPatch = {};
   if (patch.titulo !== undefined) fields.summary = patch.titulo;
   if (patch.colorId !== undefined) fields.colorId = patch.colorId;
+  if (patch.recurrencia !== undefined) fields.recurrence = buildRecurrence(patch.recurrencia);
 
   if (patch.fecha || patch.durationMin !== undefined) {
-    // Fin explícito por duración, o duración preservada del evento actual.
     let startMs: number;
     let durationMs = (patch.durationMin ?? DURATION_MIN) * 60000;
 
     if (patch.fecha) {
       startMs = new Date(patch.fecha).getTime();
       if (patch.durationMin === undefined) {
-        const ev = await getEvent(accessToken, eventId);
-        if (ev?.start && ev.end && !ev.allDay) {
-          durationMs = new Date(ev.end).getTime() - new Date(ev.start).getTime();
+        const e = await getEv();
+        if (e?.start && e.end && !e.allDay) {
+          durationMs = new Date(e.end).getTime() - new Date(e.start).getTime();
         }
       }
     } else {
-      // Redimensionado puro: conservar el inicio actual.
-      const ev = await getEvent(accessToken, eventId);
-      if (!ev?.start) throw new Error('Evento sin hora de inicio');
-      startMs = new Date(ev.start).getTime();
+      const e = await getEv();
+      if (!e?.start) throw new Error('Evento sin hora de inicio');
+      startMs = new Date(e.start).getTime();
     }
 
     fields.startIso = new Date(startMs).toISOString();
     fields.endIso = new Date(startMs + durationMs).toISOString();
     fields.tz = ctx.tz;
   }
-  await patchEvent(accessToken, eventId, fields);
+  await patchEvent(accessToken, targetId, fields);
 }
 
 /** Offset (+/-HH:MM) de la zona en una fecha dada (maneja horario de verano). */

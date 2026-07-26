@@ -9,6 +9,7 @@ import {
   removeTaskEvent as removeCalendarEvent,
   getDayEvents,
   patchCalendarEvent,
+  deleteCalendarEvent,
 } from '@/lib/calendar-sync';
 
 /** Arma las dependencias del agente para un cliente Supabase (RLS) y un contexto.
@@ -26,6 +27,7 @@ export function buildAgentDeps(supabase: ServerSupabase, ctx: ActorContext): Age
         : Promise.resolve(),
     listCalendar: (dateYmd) => getDayEvents(supabase, ctx, dateYmd),
     editEvent: (eventId, patch) => patchCalendarEvent(supabase, ctx, eventId, patch),
+    deleteEvent: (eventId, opts) => deleteCalendarEvent(supabase, ctx, eventId, opts),
     async getCachedResult(id) {
       const { data } = await supabase
         .from('tool_executions')

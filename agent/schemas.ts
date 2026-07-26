@@ -46,11 +46,39 @@ export const VerCalendario = z.object({
     .describe('Día YYYY-MM-DD; por defecto hoy'),
 });
 
+const Alcance = z
+  .enum(['serie', 'instancia'])
+  .describe('serie = toda la serie recurrente; instancia = solo esta ocurrencia');
+
+export const Recurrencia = z.object({
+  frecuencia: z
+    .enum(['diaria', 'semanal', 'mensual', 'anual', 'ninguna'])
+    .describe('Frecuencia de repetición; "ninguna" la quita'),
+  intervalo: z.number().int().min(1).optional().describe('Cada cuántos periodos (cada 2 semanas = 2)'),
+  dias_semana: z
+    .array(z.enum(['LU', 'MA', 'MI', 'JU', 'VI', 'SA', 'DO']))
+    .optional()
+    .describe('Días de la semana (solo para frecuencia semanal)'),
+  hasta: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .describe('Termina en esta fecha YYYY-MM-DD'),
+  veces: z.number().int().min(1).optional().describe('Termina tras N repeticiones'),
+});
+
 export const EditarEvento = z.object({
   evento_id: z.string().min(1).describe('ID del evento de Google (de ver_calendario)'),
   titulo: z.string().trim().min(1).max(200).optional().describe('Nuevo título'),
   fecha: Instant.optional().describe('Nueva hora de inicio, ISO con offset'),
   color: z.enum(COLOR_NAMES).optional().describe('Nuevo color del evento'),
+  recurrencia: Recurrencia.optional().describe('Nueva regla de repetición del evento'),
+  alcance: Alcance.optional().describe('A qué aplica el cambio; por defecto la serie si tocas recurrencia'),
+});
+
+export const BorrarEvento = z.object({
+  evento_id: z.string().min(1).describe('ID del evento de Google (de ver_calendario)'),
+  alcance: Alcance.optional().describe('Por defecto borra la serie completa si es recurrente'),
 });
 
 export const toolSchemas = {
@@ -62,6 +90,7 @@ export const toolSchemas = {
   buscar: Buscar,
   ver_calendario: VerCalendario,
   editar_evento: EditarEvento,
+  borrar_evento: BorrarEvento,
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;
@@ -75,7 +104,8 @@ const descriptions: Record<ToolName, string> = {
   consultar: 'Consulta la agenda de hoy o la lista de pendientes (solo tareas).',
   buscar: 'Busca por texto en las tareas.',
   ver_calendario: 'Lista los eventos de Google Calendar de un día (por defecto hoy).',
-  editar_evento: 'Edita un evento de Google Calendar: título, hora o color.',
+  editar_evento: 'Edita un evento de Google Calendar: título, hora, color o recurrencia.',
+  borrar_evento: 'Borra un evento de Google Calendar (serie completa o una instancia).',
 };
 
 /** Definiciones de herramientas para la API de Anthropic (JSON Schema desde Zod). */

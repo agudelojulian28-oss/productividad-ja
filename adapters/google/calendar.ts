@@ -8,6 +8,7 @@ export interface CalEvent {
   endIso: string;
   tz: string;
   colorId?: string;
+  recurrence?: string[];
 }
 
 export interface GEvent {
@@ -18,6 +19,10 @@ export interface GEvent {
   colorId: string | null;
   allDay: boolean;
   htmlLink: string;
+  /** Si es una instancia de una serie recurrente, el id del evento maestro. */
+  recurringEventId: string | null;
+  /** Reglas de recurrencia (RRULE) si el evento es la serie maestra. */
+  recurrence: string[] | null;
 }
 
 interface RawEvent {
@@ -25,6 +30,8 @@ interface RawEvent {
   summary?: string;
   colorId?: string;
   htmlLink?: string;
+  recurringEventId?: string;
+  recurrence?: string[];
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
 }
@@ -55,6 +62,8 @@ export async function listEvents(
     colorId: e.colorId ?? null,
     allDay: Boolean(e.start?.date),
     htmlLink: e.htmlLink ?? '',
+    recurringEventId: e.recurringEventId ?? null,
+    recurrence: e.recurrence ?? null,
   }));
 }
 
@@ -64,6 +73,7 @@ function body(ev: CalEvent) {
     start: { dateTime: ev.startIso, timeZone: ev.tz },
     end: { dateTime: ev.endIso, timeZone: ev.tz },
     ...(ev.colorId ? { colorId: ev.colorId } : {}),
+    ...(ev.recurrence ? { recurrence: ev.recurrence } : {}),
   });
 }
 
@@ -109,6 +119,8 @@ export async function getEvent(accessToken: string, eventId: string): Promise<GE
     colorId: e.colorId ?? null,
     allDay: Boolean(e.start?.date),
     htmlLink: e.htmlLink ?? '',
+    recurringEventId: e.recurringEventId ?? null,
+    recurrence: e.recurrence ?? null,
   };
 }
 
@@ -118,6 +130,8 @@ export interface EventPatch {
   endIso?: string;
   tz?: string;
   colorId?: string;
+  /** RRULE(s); `[]` quita la recurrencia (evento pasa a único). Solo en la serie maestra. */
+  recurrence?: string[];
 }
 
 export async function patchEvent(
@@ -130,6 +144,7 @@ export async function patchEvent(
   if (patch.colorId !== undefined) body.colorId = patch.colorId;
   if (patch.startIso) body.start = { dateTime: patch.startIso, timeZone: patch.tz };
   if (patch.endIso) body.end = { dateTime: patch.endIso, timeZone: patch.tz };
+  if (patch.recurrence !== undefined) body.recurrence = patch.recurrence;
   const res = await fetch(`${BASE}/${encodeURIComponent(eventId)}`, {
     method: 'PATCH',
     headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },

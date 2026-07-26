@@ -11,11 +11,15 @@ import {
   Buscar,
   VerCalendario,
   EditarEvento,
+  BorrarEvento,
   type ToolName,
 } from './schemas';
 import type { ZodType } from 'zod';
 import type { GEvent } from '@/adapters/google/calendar';
 import { nameToColorId } from '@/lib/calendar-colors';
+import type { Recurrencia } from '@/lib/recurrence';
+
+type EventScope = 'serie' | 'instancia';
 
 /** Efectos externos inyectados por la app (calendario). Mantiene agent puro:
  *  no importa adapters/supabase. */
@@ -27,8 +31,16 @@ export interface ToolDeps {
   listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
   editEvent?: (
     eventId: string,
-    patch: { titulo?: string; fecha?: string; colorId?: string },
+    patch: {
+      titulo?: string;
+      fecha?: string;
+      colorId?: string;
+      durationMin?: number;
+      recurrencia?: Recurrencia;
+      scope?: EventScope;
+    },
   ) => Promise<void>;
+  deleteEvent?: (eventId: string, opts?: { scope?: EventScope }) => Promise<void>;
 }
 
 function summarize(t: TaskRow) {
@@ -101,7 +113,14 @@ export async function runTool(
         p.value.fecha ?? new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz }).format(new Date());
       const events = await deps.listCalendar(dateYmd);
       return ok(
-        events.map((e) => ({ id: e.id, titulo: e.summary, inicio: e.start, todo_el_dia: e.allDay })),
+        events.map((e) => ({
+          id: e.id,
+          titulo: e.summary,
+          inicio: e.start,
+          todo_el_dia: e.allDay,
+          es_recurrente: Boolean(e.recurringEventId || e.recurrence),
+          serie_id: e.recurringEventId,
+        })),
       );
     }
     case 'editar_evento': {
@@ -114,8 +133,24 @@ export async function runTool(
           titulo: p.value.titulo,
           fecha: p.value.fecha,
           colorId,
+          recurrencia: p.value.recurrencia,
+          scope: p.value.alcance,
         });
         return ok({ editado: p.value.evento_id });
+      } catch {
+        return err(
+          'NOT_FOUND',
+          'No encontré ese evento con ese ID. Llama a ver_calendario para obtener el ID actual y reintenta.',
+        );
+      }
+    }
+    case 'borrar_evento': {
+      const p = parse(BorrarEvento, rawInput);
+      if (!p.ok) return p;
+      if (!deps.deleteEvent) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
+      try {
+        await deps.deleteEvent(p.value.evento_id, { scope: p.value.alcance ?? 'serie' });
+        return ok({ borrado: p.value.evento_id });
       } catch {
         return err(
           'NOT_FOUND',

@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { ActorContext } from '@/core/types';
 import type { WorkRepo, TaskRow } from '@/core/work/ports';
 import type { GEvent } from '@/adapters/google/calendar';
+import type { Recurrencia } from '@/lib/recurrence';
 import { AGENT_MODEL, PRICE } from '@/adapters/anthropic/client';
 import { toolDefinitions, isToolName } from './schemas';
 import { runTool } from './tools';
@@ -19,8 +20,16 @@ export interface AgentDeps {
   listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
   editEvent?: (
     eventId: string,
-    patch: { titulo?: string; fecha?: string; colorId?: string },
+    patch: {
+      titulo?: string;
+      fecha?: string;
+      colorId?: string;
+      durationMin?: number;
+      recurrencia?: Recurrencia;
+      scope?: 'serie' | 'instancia';
+    },
   ) => Promise<void>;
+  deleteEvent?: (eventId: string, opts?: { scope?: 'serie' | 'instancia' }) => Promise<void>;
   /** Idempotencia: resultado ya ejecutado para este tool_call_id, si existe. */
   getCachedResult: (toolCallId: string) => Promise<unknown | undefined>;
   saveResult: (toolCallId: string, action: string, result: unknown) => Promise<void>;
@@ -114,6 +123,7 @@ export async function* runAgent(
             removeTaskEvent: deps.removeTaskEvent,
             listCalendar: deps.listCalendar,
             editEvent: deps.editEvent,
+            deleteEvent: deps.deleteEvent,
           },
           block.name,
           block.input,
