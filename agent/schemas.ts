@@ -12,8 +12,11 @@ const Instant = z
 export const CrearTarea = z.object({
   titulo: z.string().trim().min(1).max(200).describe('Título de la tarea'),
   fecha: Instant.optional().describe('Fecha y hora con offset, opcional'),
-  proyecto_id: z.uuid().optional().describe('ID del proyecto, opcional'),
+  proyecto_id: z.uuid().optional().describe('ID del proyecto (de estructura)'),
+  meta_id: z.uuid().optional().describe('ID de la meta, opcional (de estructura)'),
 });
+
+export const Estructura = z.object({});
 
 export const Completar = z.object({
   tarea_id: z.uuid().describe('ID de la tarea a completar'),
@@ -91,6 +94,7 @@ export const toolSchemas = {
   ver_calendario: VerCalendario,
   editar_evento: EditarEvento,
   borrar_evento: BorrarEvento,
+  estructura: Estructura,
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;
@@ -106,6 +110,7 @@ const descriptions: Record<ToolName, string> = {
   ver_calendario: 'Lista los eventos de Google Calendar de un día (por defecto hoy).',
   editar_evento: 'Edita un evento de Google Calendar: título, hora, color o recurrencia.',
   borrar_evento: 'Borra un evento de Google Calendar (serie completa o una instancia).',
+  estructura: 'Lista los proyectos del usuario y sus metas (para ubicar tareas). Sin parámetros.',
 };
 
 /** Definiciones de herramientas para la API de Anthropic (JSON Schema desde Zod). */

@@ -4,6 +4,8 @@ import { requireContext } from '@/lib/auth';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { NewProjectForm } from './new-project-form';
+import { DescriptionEditor } from '../../description-editor';
+import { setAreaDescriptionAction } from '@/app/actions/areas';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +26,14 @@ export default async function AreaDetailPage({
         ← Áreas
       </Link>
       <h1 className="page-title">{area.name}</h1>
+      <DescriptionEditor
+        initial={area.description ?? ''}
+        action={setAreaDescriptionAction.bind(null, area.id)}
+      />
+
+      <h2 className="section-title" style={{ marginTop: 20 }}>
+        Proyectos
+      </h2>
       <NewProjectForm areaId={area.id} />
 
       {projects.length === 0 ? (
@@ -34,7 +44,9 @@ export default async function AreaDetailPage({
         <ul style={{ marginTop: 16 }}>
           {projects.map((p) => (
             <li key={p.id} className="row-card">
-              <span className="task-title">{p.title}</span>
+              <Link href={`/proyectos/${p.id}`} className="task-title">
+                {p.title}
+              </Link>
               <span className="pill">{p.status}</span>
             </li>
           ))}

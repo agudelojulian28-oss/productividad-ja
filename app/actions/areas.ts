@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireContext } from '@/lib/auth';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
-import { createArea, archiveArea } from '@/core/structure/areas';
+import { createArea, archiveArea, setAreaDescription } from '@/core/structure/areas';
 import type { Result } from '@/core/types';
 import type { AreaRow } from '@/core/structure/ports';
 
@@ -26,5 +26,15 @@ export async function archiveAreaAction(id: string): Promise<Result<AreaRow>> {
   const { ctx, repo } = await ctxRepo();
   const res = await archiveArea(ctx, repo, id);
   revalidatePath('/areas');
+  return res;
+}
+
+export async function setAreaDescriptionAction(
+  id: string,
+  description: string,
+): Promise<Result<AreaRow>> {
+  const { ctx, repo } = await ctxRepo();
+  const res = await setAreaDescription(ctx, repo, id, description);
+  revalidatePath(`/areas/${id}`);
   return res;
 }

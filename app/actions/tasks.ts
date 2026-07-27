@@ -9,6 +9,7 @@ import {
   reopenTask,
   rescheduleTask,
   deleteTask,
+  setTaskDescription,
 } from '@/core/work/tasks';
 import { syncTaskToCalendar, removeTaskEvent } from '@/lib/calendar-sync';
 import type { Result } from '@/core/types';
@@ -23,6 +24,7 @@ export async function createTaskAction(input: {
   title: string;
   dueAt?: string;
   projectId?: string;
+  goalId?: string;
 }): Promise<Result<TaskRow>> {
   const { supabase, ctx, repo } = await deps();
   const result = await createTask(ctx, repo, input);
@@ -53,6 +55,16 @@ export async function deleteTaskAction(id: string): Promise<Result<{ id: string 
     await removeTaskEvent(supabase, ctx, task.googleEventId);
   }
   revalidatePath('/hoy');
+  return result;
+}
+
+export async function setTaskDescriptionAction(
+  id: string,
+  description: string,
+): Promise<Result<TaskRow>> {
+  const { ctx, repo } = await deps();
+  const result = await setTaskDescription(ctx, repo, id, description);
+  revalidatePath(`/tareas/${id}`);
   return result;
 }
 

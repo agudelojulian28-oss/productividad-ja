@@ -22,6 +22,15 @@ export default async function HoyPage() {
   ]);
   const projectName = new Map(projects.map((p) => [p.id, p.title] as const));
 
+  // Metas por proyecto, para el selector opcional del formulario de tareas.
+  const goalsByProject: Record<string, { id: string; title: string }[]> = {};
+  await Promise.all(
+    projects.map(async (p) => {
+      const gs = await repo.listGoals(p.id);
+      goalsByProject[p.id] = gs.map((g) => ({ id: g.id, title: g.title }));
+    }),
+  );
+
   // Eventos de Google que NO son tareas de la app (evita duplicar).
   const { data: linked } = await supabase
     .from('tasks')
@@ -56,7 +65,10 @@ export default async function HoyPage() {
     <div className="page">
       <RealtimeRefresh tables={['tasks', 'projects']} />
       <h1 className="page-title">Hoy</h1>
-      <NewTaskForm projects={projects.map((p) => ({ id: p.id, title: p.title }))} />
+      <NewTaskForm
+        projects={projects.map((p) => ({ id: p.id, title: p.title }))}
+        goalsByProject={goalsByProject}
+      />
 
       {calEvents.length > 0 && (
         <section className="task-section">

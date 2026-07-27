@@ -6,10 +6,11 @@ interface DbArea {
   name: string;
   kind: AreaKind;
   position: number;
+  description: string | null;
   archived_at: string | null;
 }
 
-const COLS = 'id,name,kind,position,archived_at';
+const COLS = 'id,name,kind,position,description,archived_at';
 
 function toRow(r: DbArea): AreaRow {
   return {
@@ -17,6 +18,7 @@ function toRow(r: DbArea): AreaRow {
     name: r.name,
     kind: r.kind,
     position: r.position,
+    description: r.description,
     archivedAt: r.archived_at,
   };
 }
@@ -54,6 +56,7 @@ export function structureRepo(supabase: SupabaseClient, userId: string): Structu
     async updateArea(id, patch) {
       const upd: Record<string, unknown> = {};
       if (patch.name !== undefined) upd.name = patch.name;
+      if (patch.description !== undefined) upd.description = patch.description;
       if (patch.archivedAt !== undefined) upd.archived_at = patch.archivedAt;
       const { data, error } = await supabase
         .from('areas')

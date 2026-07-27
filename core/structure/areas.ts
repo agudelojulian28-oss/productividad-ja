@@ -36,3 +36,16 @@ export async function archiveArea(
   const row = await repo.updateArea(id, { archivedAt: new Date().toISOString() });
   return ok(row);
 }
+
+export async function setAreaDescription(
+  _ctx: ActorContext,
+  repo: StructureRepo,
+  id: string,
+  description: string | null,
+): Promise<Result<AreaRow>> {
+  const desc = (description ?? '').trim();
+  if (desc.length > 5000) return err('INVALID_INPUT', 'La descripción es demasiado larga');
+  const area = await repo.getArea(id);
+  if (!area) return err('NOT_FOUND', 'El área no existe');
+  return ok(await repo.updateArea(id, { description: desc || null }));
+}

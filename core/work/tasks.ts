@@ -13,11 +13,25 @@ export async function createTask(
   const parsed = TaskCreate.safeParse(raw);
   if (!parsed.success) return err('INVALID_INPUT', 'Datos inválidos', parsed.error.issues);
 
-  const { title, notes, projectId, dueAt } = parsed.data;
+  const { title, notes, projectId, goalId, dueAt } = parsed.data;
+
+  // Si viene meta: debe existir; y si también viene proyecto, deben coincidir.
+  // El proyecto se deriva de la meta cuando no se especifica.
+  let finalProjectId = projectId;
+  if (goalId) {
+    const goal = await repo.getGoal(goalId);
+    if (!goal) return err('NOT_FOUND', 'La meta no existe');
+    if (projectId && goal.projectId && goal.projectId !== projectId) {
+      return err('RULE_VIOLATION', 'La meta no pertenece a ese proyecto');
+    }
+    finalProjectId = projectId ?? goal.projectId ?? undefined;
+  }
+
   const row = await repo.insertTask({
     title,
     notes,
-    projectId,
+    projectId: finalProjectId,
+    goalId,
     dueAt,
     origin: ctx.actor === 'user' ? 'manual' : 'agente',
   });
@@ -59,6 +73,19 @@ export async function deleteTask(
   if (!task) return err('NOT_FOUND', 'La tarea no existe');
   await repo.deleteTask(id);
   return ok({ id });
+}
+
+export async function setTaskDescription(
+  _ctx: ActorContext,
+  repo: WorkRepo,
+  id: string,
+  description: string | null,
+): Promise<Result<TaskRow>> {
+  const desc = (description ?? '').trim();
+  if (desc.length > 5000) return err('INVALID_INPUT', 'La descripción es demasiado larga');
+  const task = await repo.getTask(id);
+  if (!task) return err('NOT_FOUND', 'La tarea no existe');
+  return ok(await repo.updateTask(id, { notes: desc || null }));
 }
 
 export async function rescheduleTask(

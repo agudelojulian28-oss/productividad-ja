@@ -479,3 +479,41 @@ negocio), no los de Telegram. ~USD 3–6/mes adicionales desde octubre de 2026 (
 sigue siendo intercambiable por diseño (v3 §3.1): si el costo no compensa, revertir a Telegram
 es un día de trabajo. No se construye la Etapa 3 hasta que las etapas previas lleven una semana
 de uso real (regla del roadmap).
+
+---
+
+## ADR-021 · Las metas cuelgan de proyectos (opcionales para las tareas)
+
+> Amplía v3 §2.4 (metas: una tabla, una vista). No la revierte: el cálculo sigue en `goal_progress`.
+
+**Contexto.** El árbol era Área → {proyectos, metas, fuentes…} con las metas planas e
+independientes. Julián quiere un árbol coherente **Área → Proyecto → (Meta) → Tarea/Evento**,
+donde las cosas nazcan del proyecto, y que el agente ubique solo a qué proyecto/meta pertenece
+una tarea, confirmando antes.
+
+**Decisión.**
+- Las metas ganan `project_id`: cuelgan de un proyecto. Una tarea **puede** asociarse a una meta
+  de su proyecto, pero **la meta es opcional**. Lo **obligatorio** de una tarea sigue siendo su
+  **proyecto** (y por él, su **área**, que se mantiene como raíz obligatoria).
+- Se **conserva** el principio de v3 §2.4: el progreso de metas se calcula en la vista
+  `goal_progress`; el módulo de metas no importa `finance`/`commerce`. Solo se le suma la columna
+  `project_id` y una capa opcional en la UI.
+- El **agente infiere** el proyecto/área (y meta si aplica) desde el mensaje y **confirma antes**
+  de crear ("Creo 'X' en Proyecto Y / Meta Z, ¿ok?"). Si no puede determinar proyecto/área,
+  pregunta. No inventa proyectos/metas: si no existen, ofrece crearlos.
+
+**Alternativas descartadas.** (a) Jerarquía **estricta** (toda tarea bajo una meta, con una meta
+"General" forzada por proyecto): traba la captura rápida por chat/WhatsApp. (b) **Áreas opcionales**
+y proyecto como raíz absoluta: se descartó; el área se mantiene obligatoria. (c) **Reapuntar el
+negocio** (fuentes/ventas/clientes/transacciones) de área→proyecto ahora: rompería las 6 vistas
+financieras que igual se rediseñan en la Etapa 4; como el área sigue siendo la raíz, el negocio se
+queda bajo áreas por ahora.
+
+**Por qué.** Da la coherencia "todo cuelga del proyecto" sin romper la ingesta de captura rápida
+(meta opcional) ni las finanzas (no se tocan las vistas). Es aditivo y de bajo riesgo.
+
+**Consecuencias.** `goals.project_id` (nullable en columna; lo pone el caso de uso para metas del
+árbol de trabajo) y `tasks.goal_id` (opcional). Módulo `core/work/goals`; `tasks → goals` es
+intra-`work`. UI gana selector de meta opcional y pantalla de metas por proyecto. El agente suma
+`meta_id` opcional a `crear_tarea` y una vista `estructura` para inferir. El negocio/finanzas se
+reordenan cuando llegue la Etapa 4.

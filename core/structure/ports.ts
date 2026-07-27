@@ -5,6 +5,7 @@ export interface AreaRow {
   name: string;
   kind: AreaKind;
   position: number;
+  description: string | null;
   archivedAt: string | null;
 }
 
@@ -14,6 +15,6 @@ export interface StructureRepo {
   insertArea(input: { name: string; kind: AreaKind }): Promise<AreaRow>;
   updateArea(
     id: string,
-    patch: { name?: string; archivedAt?: string | null },
+    patch: { name?: string; description?: string | null; archivedAt?: string | null },
   ): Promise<AreaRow>;
 }

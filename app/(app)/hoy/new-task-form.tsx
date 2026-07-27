@@ -5,14 +5,19 @@ import { createTaskAction } from '@/app/actions/tasks';
 
 export function NewTaskForm({
   projects,
+  goalsByProject = {},
 }: {
   projects: { id: string; title: string }[];
+  goalsByProject?: Record<string, { id: string; title: string }[]>;
 }) {
   const [title, setTitle] = useState('');
   const [due, setDue] = useState('');
   const [projectId, setProjectId] = useState('');
+  const [goalId, setGoalId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const goals = projectId ? (goalsByProject[projectId] ?? []) : [];
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -27,12 +32,14 @@ export function NewTaskForm({
         title: t,
         dueAt,
         projectId: projectId || undefined,
+        goalId: goalId || undefined,
       });
       if (!res.ok) setError(res.message ?? 'No se pudo crear');
       else {
         setTitle('');
         setDue('');
         setProjectId('');
+        setGoalId('');
       }
     });
   }
@@ -62,7 +69,10 @@ export function NewTaskForm({
       {projects.length > 0 && (
         <select
           value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
+          onChange={(e) => {
+            setProjectId(e.target.value);
+            setGoalId('');
+          }}
           className="field"
           aria-label="Proyecto"
         >
@@ -70,6 +80,21 @@ export function NewTaskForm({
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.title}
+            </option>
+          ))}
+        </select>
+      )}
+      {goals.length > 0 && (
+        <select
+          value={goalId}
+          onChange={(e) => setGoalId(e.target.value)}
+          className="field"
+          aria-label="Meta"
+        >
+          <option value="">Sin meta</option>
+          {goals.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.title}
             </option>
           ))}
         </select>

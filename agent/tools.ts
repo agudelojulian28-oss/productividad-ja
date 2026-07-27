@@ -12,6 +12,7 @@ import {
   VerCalendario,
   EditarEvento,
   BorrarEvento,
+  Estructura,
   type ToolName,
 } from './schemas';
 import type { ZodType } from 'zod';
@@ -68,6 +69,7 @@ export async function runTool(
         title: p.value.titulo,
         dueAt: p.value.fecha,
         projectId: p.value.proyecto_id,
+        goalId: p.value.meta_id,
       });
       if (r.ok) await deps.syncTask?.(r.value);
       return r.ok ? ok(summarize(r.value)) : r;
@@ -104,6 +106,22 @@ export async function runTool(
       if (!p.ok) return p;
       const r = await buscar(ctx, repo, p.value.texto);
       return r.ok ? ok(r.value.map(summarize)) : r;
+    }
+    case 'estructura': {
+      const p = parse(Estructura, rawInput);
+      if (!p.ok) return p;
+      const projects = await repo.listProjects();
+      const arbol = [];
+      for (const proj of projects) {
+        const metas = await repo.listGoals(proj.id);
+        arbol.push({
+          proyecto_id: proj.id,
+          titulo: proj.title,
+          area_id: proj.areaId,
+          metas: metas.map((g) => ({ meta_id: g.id, titulo: g.title })),
+        });
+      }
+      return ok(arbol);
     }
     case 'ver_calendario': {
       const p = parse(VerCalendario, rawInput);

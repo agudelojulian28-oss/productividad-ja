@@ -14,9 +14,16 @@ export const TaskCreate = z.object({
   title: z.string().trim().min(1, 'El título es obligatorio').max(200),
   notes: z.string().max(5000).optional(),
   projectId: z.uuid().optional(),
+  goalId: z.uuid().optional(),
   dueAt: Instant.optional(),
 });
 export type TaskCreateInput = z.infer<typeof TaskCreate>;
+
+export const GoalCreate = z.object({
+  projectId: z.uuid(),
+  title: z.string().trim().min(1, 'El título es obligatorio').max(200),
+});
+export type GoalCreateInput = z.infer<typeof GoalCreate>;
 
 export const TaskReschedule = z.object({
   id: z.uuid(),

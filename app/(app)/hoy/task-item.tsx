@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import {
   completeTaskAction,
@@ -52,7 +53,9 @@ export function TaskItem({
         onClick={complete}
       />
       <div className="task-body">
-        <span className="task-title">{task.title}</span>
+        <Link href={`/tareas/${task.id}`} className="task-title">
+          {task.title}
+        </Link>
         <span className="task-meta">{meta}</span>
         {editing && (
           <div className="new-task-row" style={{ marginTop: 8 }}>

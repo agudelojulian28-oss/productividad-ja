@@ -20,3 +20,16 @@ export async function createProject(
   const row = await repo.insertProject(parsed.data);
   return ok(row);
 }
+
+export async function setProjectDescription(
+  _ctx: ActorContext,
+  repo: WorkRepo,
+  id: string,
+  description: string | null,
+): Promise<Result<ProjectRow>> {
+  const desc = (description ?? '').trim();
+  if (desc.length > 5000) return err('INVALID_INPUT', 'La descripción es demasiado larga');
+  const project = await repo.getProject(id);
+  if (!project) return err('NOT_FOUND', 'El proyecto no existe');
+  return ok(await repo.updateProject(id, { description: desc || null }));
+}
