@@ -16,6 +16,7 @@ export type CalItem = {
   end: string | null; // ISO
   allDay: boolean;
   colorId: string | null;
+  description: string | null;
 };
 
 function addDaysYmd(ymd: string, n: number): string {

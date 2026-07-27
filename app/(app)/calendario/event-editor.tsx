@@ -64,6 +64,7 @@ export function EventEditor({
   );
   const [durMin, setDurMin] = useState(item ? durationOf(item) : 30);
   const [colorId, setColorId] = useState<string | null>(item?.colorId ?? null);
+  const [descripcion, setDescripcion] = useState(item?.description ?? '');
   const [pending, startTransition] = useTransition();
 
   const iso = () => (when ? new Date(when).toISOString() : undefined);
@@ -77,6 +78,7 @@ export function EventEditor({
         fecha,
         colorId: colorId ?? undefined,
         durationMin: durMin,
+        descripcion: descripcion.trim() || undefined,
       });
       onDone();
     });
@@ -90,6 +92,7 @@ export function EventEditor({
         fecha: iso(),
         colorId: colorId ?? undefined,
         durationMin: durMin,
+        descripcion: descripcion.trim() || null,
       });
       onDone();
     });
@@ -224,6 +227,17 @@ export function EventEditor({
                 })}
               </div>
             </div>
+            <label className="cal-field-label">
+              Descripción
+              <textarea
+                className="field"
+                rows={3}
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
+                placeholder="Notas del evento…"
+                style={{ resize: 'vertical', fontFamily: 'inherit' }}
+              />
+            </label>
             <div className="cal-modal-actions">
               {target.mode === 'create' ? (
                 <button

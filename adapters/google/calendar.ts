@@ -9,6 +9,7 @@ export interface CalEvent {
   tz: string;
   colorId?: string;
   recurrence?: string[];
+  description?: string;
 }
 
 export interface GEvent {
@@ -19,6 +20,7 @@ export interface GEvent {
   colorId: string | null;
   allDay: boolean;
   htmlLink: string;
+  description: string | null;
   /** Si es una instancia de una serie recurrente, el id del evento maestro. */
   recurringEventId: string | null;
   /** Reglas de recurrencia (RRULE) si el evento es la serie maestra. */
@@ -30,6 +32,7 @@ interface RawEvent {
   summary?: string;
   colorId?: string;
   htmlLink?: string;
+  description?: string;
   recurringEventId?: string;
   recurrence?: string[];
   start?: { dateTime?: string; date?: string };
@@ -62,6 +65,7 @@ export async function listEvents(
     colorId: e.colorId ?? null,
     allDay: Boolean(e.start?.date),
     htmlLink: e.htmlLink ?? '',
+    description: e.description ?? null,
     recurringEventId: e.recurringEventId ?? null,
     recurrence: e.recurrence ?? null,
   }));
@@ -74,6 +78,7 @@ function body(ev: CalEvent) {
     end: { dateTime: ev.endIso, timeZone: ev.tz },
     ...(ev.colorId ? { colorId: ev.colorId } : {}),
     ...(ev.recurrence ? { recurrence: ev.recurrence } : {}),
+    ...(ev.description !== undefined ? { description: ev.description } : {}),
   });
 }
 
@@ -119,6 +124,7 @@ export async function getEvent(accessToken: string, eventId: string): Promise<GE
     colorId: e.colorId ?? null,
     allDay: Boolean(e.start?.date),
     htmlLink: e.htmlLink ?? '',
+    description: e.description ?? null,
     recurringEventId: e.recurringEventId ?? null,
     recurrence: e.recurrence ?? null,
   };
@@ -130,6 +136,7 @@ export interface EventPatch {
   endIso?: string;
   tz?: string;
   colorId?: string;
+  description?: string | null;
   /** RRULE(s); `[]` quita la recurrencia (evento pasa a único). Solo en la serie maestra. */
   recurrence?: string[];
 }
@@ -142,6 +149,7 @@ export async function patchEvent(
   const body: Record<string, unknown> = {};
   if (patch.summary !== undefined) body.summary = patch.summary;
   if (patch.colorId !== undefined) body.colorId = patch.colorId;
+  if (patch.description !== undefined) body.description = patch.description;
   if (patch.startIso) body.start = { dateTime: patch.startIso, timeZone: patch.tz };
   if (patch.endIso) body.end = { dateTime: patch.endIso, timeZone: patch.tz };
   if (patch.recurrence !== undefined) body.recurrence = patch.recurrence;

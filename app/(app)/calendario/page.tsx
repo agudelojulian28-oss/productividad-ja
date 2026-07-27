@@ -78,6 +78,7 @@ export default async function CalendarioPage({
           end: e.end,
           allDay: e.allDay,
           colorId: e.colorId,
+          description: e.description,
         }),
       ),
     ...tasks
@@ -91,6 +92,7 @@ export default async function CalendarioPage({
           end: null,
           allDay: false,
           colorId: null,
+          description: t.notes,
         }),
       ),
   ];

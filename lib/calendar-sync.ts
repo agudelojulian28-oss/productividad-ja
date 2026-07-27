@@ -44,7 +44,13 @@ export async function deleteCalendarEvent(
 export async function createCalendarEvent(
   supabase: ServerSupabase,
   ctx: ActorContext,
-  input: { titulo: string; fecha: string; colorId?: string; durationMin?: number },
+  input: {
+    titulo: string;
+    fecha: string;
+    colorId?: string;
+    durationMin?: number;
+    descripcion?: string;
+  },
 ): Promise<string> {
   const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
   if (!cipher) throw new Error('Google no está conectado');
@@ -58,6 +64,7 @@ export async function createCalendarEvent(
     endIso,
     tz: ctx.tz,
     colorId: input.colorId,
+    description: input.descripcion,
   });
   return eventId;
 }
@@ -80,6 +87,7 @@ export async function patchCalendarEvent(
     durationMin?: number;
     recurrencia?: Recurrencia;
     scope?: EventScope;
+    descripcion?: string | null;
   },
 ): Promise<void> {
   const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
@@ -100,6 +108,7 @@ export async function patchCalendarEvent(
   const fields: EventPatch = {};
   if (patch.titulo !== undefined) fields.summary = patch.titulo;
   if (patch.colorId !== undefined) fields.colorId = patch.colorId;
+  if (patch.descripcion !== undefined) fields.description = patch.descripcion;
   if (patch.recurrencia !== undefined) fields.recurrence = buildRecurrence(patch.recurrencia);
 
   if (patch.fecha || patch.durationMin !== undefined) {

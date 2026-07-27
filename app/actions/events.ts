@@ -14,6 +14,7 @@ export async function createEventAction(input: {
   fecha: string;
   colorId?: string;
   durationMin?: number;
+  descripcion?: string;
 }): Promise<Result<{ id: string }>> {
   const { supabase, ctx } = await requireContext();
   try {
@@ -29,7 +30,13 @@ export async function createEventAction(input: {
 
 export async function editEventAction(
   eventId: string,
-  patch: { titulo?: string; fecha?: string; colorId?: string; durationMin?: number },
+  patch: {
+    titulo?: string;
+    fecha?: string;
+    colorId?: string;
+    durationMin?: number;
+    descripcion?: string | null;
+  },
 ): Promise<Result<{ id: string }>> {
   const { supabase, ctx } = await requireContext();
   try {
