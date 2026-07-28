@@ -70,6 +70,14 @@ export const Recurrencia = z.object({
   veces: z.number().int().min(1).optional().describe('Termina tras N repeticiones'),
 });
 
+export const CrearEvento = z.object({
+  titulo: z.string().trim().min(1).max(200).describe('Título del evento'),
+  fecha: Instant.describe('Inicio del evento, ISO-8601 con offset'),
+  duracion_min: z.number().int().min(5).max(1440).optional().describe('Duración en minutos (30 por defecto)'),
+  color: z.enum(COLOR_NAMES).optional().describe('Color del evento'),
+  descripcion: z.string().max(5000).optional().describe('Descripción/notas del evento'),
+});
+
 export const EditarEvento = z.object({
   evento_id: z.string().min(1).describe('ID del evento de Google (de ver_calendario)'),
   titulo: z.string().trim().min(1).max(200).optional().describe('Nuevo título'),
@@ -92,6 +100,7 @@ export const toolSchemas = {
   consultar: Consultar,
   buscar: Buscar,
   ver_calendario: VerCalendario,
+  crear_evento: CrearEvento,
   editar_evento: EditarEvento,
   borrar_evento: BorrarEvento,
   estructura: Estructura,
@@ -108,6 +117,7 @@ const descriptions: Record<ToolName, string> = {
   consultar: 'Consulta la agenda de hoy o la lista de pendientes (solo tareas).',
   buscar: 'Busca por texto en las tareas.',
   ver_calendario: 'Lista los eventos de Google Calendar de un día (por defecto hoy).',
+  crear_evento: 'Crea un EVENTO en Google Calendar (algo agendado con hora). No es una tarea.',
   editar_evento: 'Edita un evento de Google Calendar: título, hora, color o recurrencia.',
   borrar_evento: 'Borra un evento de Google Calendar (serie completa o una instancia).',
   estructura: 'Lista los proyectos del usuario y sus metas (para ubicar tareas). Sin parámetros.',

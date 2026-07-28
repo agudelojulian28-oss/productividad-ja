@@ -10,6 +10,7 @@ import {
   Consultar,
   Buscar,
   VerCalendario,
+  CrearEvento,
   EditarEvento,
   BorrarEvento,
   Estructura,
@@ -27,9 +28,14 @@ type EventScope = 'serie' | 'instancia';
 export interface ToolDeps {
   ctx: ActorContext;
   repo: WorkRepo;
-  syncTask?: (task: TaskRow) => Promise<void>;
-  removeTaskEvent?: (task: TaskRow) => Promise<void>;
   listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
+  createEvent?: (input: {
+    titulo: string;
+    fecha: string;
+    colorId?: string;
+    durationMin?: number;
+    descripcion?: string;
+  }) => Promise<string>;
   editEvent?: (
     eventId: string,
     patch: {
@@ -71,7 +77,6 @@ export async function runTool(
         projectId: p.value.proyecto_id,
         goalId: p.value.meta_id,
       });
-      if (r.ok) await deps.syncTask?.(r.value);
       return r.ok ? ok(summarize(r.value)) : r;
     }
     case 'completar': {
@@ -84,15 +89,12 @@ export async function runTool(
       const p = parse(Reprogramar, rawInput);
       if (!p.ok) return p;
       const r = await rescheduleTask(ctx, repo, { id: p.value.tarea_id, dueAt: p.value.fecha });
-      if (r.ok) await deps.syncTask?.(r.value);
       return r.ok ? ok(summarize(r.value)) : r;
     }
     case 'borrar': {
       const p = parse(Borrar, rawInput);
       if (!p.ok) return p;
-      const task = await repo.getTask(p.value.tarea_id);
       const r = await deleteTask(ctx, repo, p.value.tarea_id);
-      if (r.ok && task) await deps.removeTaskEvent?.(task);
       return r.ok ? ok({ borrada: p.value.tarea_id }) : r;
     }
     case 'consultar': {
@@ -140,6 +142,20 @@ export async function runTool(
           serie_id: e.recurringEventId,
         })),
       );
+    }
+    case 'crear_evento': {
+      const p = parse(CrearEvento, rawInput);
+      if (!p.ok) return p;
+      if (!deps.createEvent) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
+      const colorId = p.value.color ? nameToColorId[p.value.color] : undefined;
+      const id = await deps.createEvent({
+        titulo: p.value.titulo,
+        fecha: p.value.fecha,
+        colorId,
+        durationMin: p.value.duracion_min,
+        descripcion: p.value.descripcion,
+      });
+      return ok({ evento_id: id });
     }
     case 'editar_evento': {
       const p = parse(EditarEvento, rawInput);

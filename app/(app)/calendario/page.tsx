@@ -1,5 +1,4 @@
 import { requireContext } from '@/lib/auth';
-import { workRepo } from '@/adapters/supabase/work-repo';
 import { getRangeEvents } from '@/lib/calendar-sync';
 import { todayInTz } from '@/lib/format';
 import { CalendarView, type CalItem, type CalView } from './calendar-view';
@@ -36,7 +35,6 @@ export default async function CalendarioPage({
   searchParams: Promise<{ view?: string; date?: string }>;
 }) {
   const { supabase, ctx } = await requireContext();
-  const repo = workRepo(supabase, ctx.userId);
   const today = todayInTz(ctx.tz);
 
   const sp = await searchParams;
@@ -48,54 +46,21 @@ export default async function CalendarioPage({
   const rangeStart = days[0]!;
   const rangeEnd = days[days.length - 1]!;
 
-  // Fin exclusivo del rango en ISO para filtrar tareas por dueAt.
-  const dueFrom = `${rangeStart}T00:00:00`;
-  const dueTo = `${rangeEnd}T23:59:59`;
+  // El calendario muestra SOLO eventos de Google (las tareas viven en la app, ADR-022).
+  const events = await getRangeEvents(supabase, ctx, rangeStart, rangeEnd);
 
-  const [events, tasks] = await Promise.all([
-    getRangeEvents(supabase, ctx, rangeStart, rangeEnd),
-    repo.listTasks({ status: 'pending', dueFrom, dueTo }),
-  ]);
-
-  // Eventos de Google que ya son tareas de la app (evita duplicar).
-  const { data: linked } = await supabase
-    .from('tasks')
-    .select('google_event_id')
-    .not('google_event_id', 'is', null);
-  const appEventIds = new Set(
-    ((linked as { google_event_id: string }[] | null) ?? []).map((r) => r.google_event_id),
+  const items: CalItem[] = events.map(
+    (e): CalItem => ({
+      kind: 'event',
+      id: e.id,
+      title: e.summary,
+      start: e.start,
+      end: e.end,
+      allDay: e.allDay,
+      colorId: e.colorId,
+      description: e.description,
+    }),
   );
-
-  const items: CalItem[] = [
-    ...events
-      .filter((e) => !appEventIds.has(e.id))
-      .map(
-        (e): CalItem => ({
-          kind: 'event',
-          id: e.id,
-          title: e.summary,
-          start: e.start,
-          end: e.end,
-          allDay: e.allDay,
-          colorId: e.colorId,
-          description: e.description,
-        }),
-      ),
-    ...tasks
-      .filter((t) => t.dueAt)
-      .map(
-        (t): CalItem => ({
-          kind: 'task',
-          id: t.id,
-          title: t.title,
-          start: t.dueAt,
-          end: null,
-          allDay: false,
-          colorId: null,
-          description: t.notes,
-        }),
-      ),
-  ];
 
   return (
     <div className="page">

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireContext } from '@/lib/auth';
 import { workRepo } from '@/adapters/supabase/work-repo';
-import { dayLabelInTz } from '@/lib/format';
+import { dayLabelInTz, todayInTz } from '@/lib/format';
 import { DescriptionEditor } from '../../description-editor';
 import { GoalFactorsForm } from './goal-factors-form';
 import { setGoalDescriptionAction } from '@/app/actions/goals';
@@ -24,6 +24,8 @@ export default async function GoalDetailPage({
   const total = tasks.length;
   const done = tasks.filter((t) => t.status === 'done').length;
   const pct = total ? Math.round((done / total) * 100) : 0;
+  const completa = total > 0 && done === total;
+  const vencida = goal.periodEnd < todayInTz(ctx.tz) && !completa;
 
   return (
     <div className="page">
@@ -44,7 +46,11 @@ export default async function GoalDetailPage({
         </div>
         <p className="muted" style={{ marginTop: 6 }}>
           Cantidad objetivo: {goal.targetValue} · Inicio: {goal.periodStart} · Cumplimiento
-          esperado: {goal.periodEnd}
+          esperado:{' '}
+          <span className={vencida ? 'overdue' : undefined}>
+            {goal.periodEnd}
+            {vencida ? ' (vencida)' : ''}
+          </span>
         </p>
       </div>
 

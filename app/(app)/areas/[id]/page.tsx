@@ -30,6 +30,9 @@ export default async function AreaDetailPage({
       return { p, total, done, pct: total ? Math.round((done / total) * 100) : 0 };
     }),
   );
+  const areaDone = rows.reduce((s, r) => s + r.done, 0);
+  const areaTotal = rows.reduce((s, r) => s + r.total, 0);
+  const areaPct = areaTotal ? Math.round((areaDone / areaTotal) * 100) : 0;
 
   return (
     <div className="page">
@@ -41,6 +44,20 @@ export default async function AreaDetailPage({
         initial={area.description ?? ''}
         action={setAreaDescriptionAction.bind(null, area.id)}
       />
+
+      {areaTotal > 0 && (
+        <div className="goal-progress" style={{ marginTop: 16 }}>
+          <div className="goal-progress-head">
+            <span>
+              Progreso del área · {areaDone}/{areaTotal} tareas
+            </span>
+            <span>{areaPct}%</span>
+          </div>
+          <div className="goal-bar">
+            <div className="goal-bar-fill" style={{ width: `${areaPct}%` }} />
+          </div>
+        </div>
+      )}
 
       <h2 className="section-title" style={{ marginTop: 20 }}>
         Proyectos

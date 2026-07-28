@@ -517,3 +517,33 @@ queda bajo áreas por ahora.
 intra-`work`. UI gana selector de meta opcional y pantalla de metas por proyecto. El agente suma
 `meta_id` opcional a `crear_tarea` y una vista `estructura` para inferir. El negocio/finanzas se
 reordenan cuando llegue la Etapa 4.
+
+---
+
+## ADR-022 · Las tareas NO se sincronizan al calendario; los eventos sí
+
+> Ajusta el comportamiento de sincronización de la Etapa 1 (v3 §Etapa 1).
+
+**Contexto.** En la Etapa 1, una tarea con hora se creaba también como evento de Google Calendar
+(`syncTaskToCalendar`). Julián quiere separar los conceptos: una **tarea** es un pendiente de la
+app; un **evento** es algo agendado (reunión, cita) que vive en Google Calendar.
+
+**Decisión.**
+- Las **tareas** viven solo en la app y **no** tocan el calendario, aunque tengan fecha/hora (la
+  fecha es un recordatorio dentro de la app). Se quita `syncTaskToCalendar`/`removeTaskEvent` del
+  camino de tareas (acciones y agente).
+- Los **eventos** son entidades de Google Calendar. El agente gana la herramienta **`crear_evento`**
+  (11.ª y última del catálogo) y su prompt distingue tarea vs evento por el fraseo del usuario; si
+  duda, pregunta.
+- El **calendario** muestra solo eventos de Google (ya no mezcla tareas). La pantalla **Hoy** sigue
+  mostrando ambos (tareas de la app + eventos del día) porque es la agenda diaria.
+
+**Alternativas descartadas.** Mantener el auto-sync tarea→evento (mezcla dos modelos mentales y
+llena el calendario de to-dos); tabla local de eventos (contradice ADR-002: Google es la fuente de
+verdad de los eventos).
+
+**Consecuencias.** ADR-002 se mantiene (Google = fuente de verdad de eventos). Las tareas ya
+sincronizadas antes del cambio conservan su evento viejo en Google (no se limpian automáticamente).
+El catálogo del agente llega a **11 herramientas** (el tope). La asociación evento↔proyecto/meta
+queda pendiente (los eventos aún no cuelgan del árbol); se abordará con `extendedProperties` de
+Google más adelante.

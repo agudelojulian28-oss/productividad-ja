@@ -11,10 +11,11 @@ import {
   deleteTask,
   setTaskDescription,
 } from '@/core/work/tasks';
-import { syncTaskToCalendar, removeTaskEvent } from '@/lib/calendar-sync';
 import type { Result } from '@/core/types';
 import type { TaskRow } from '@/core/work/ports';
 
+// Las TAREAS viven solo en la app: no se sincronizan a Google Calendar (los
+// EVENTOS son los que van al calendario). Ver ADR-022.
 async function deps() {
   const { supabase, ctx } = await requireContext();
   return { supabase, ctx, repo: workRepo(supabase, ctx.userId) };
@@ -26,9 +27,8 @@ export async function createTaskAction(input: {
   projectId?: string;
   goalId?: string;
 }): Promise<Result<TaskRow>> {
-  const { supabase, ctx, repo } = await deps();
+  const { ctx, repo } = await deps();
   const result = await createTask(ctx, repo, input);
-  if (result.ok) await syncTaskToCalendar(supabase, ctx, repo, result.value);
   revalidatePath('/hoy');
   return result;
 }
@@ -48,12 +48,8 @@ export async function reopenTaskAction(id: string): Promise<Result<TaskRow>> {
 }
 
 export async function deleteTaskAction(id: string): Promise<Result<{ id: string }>> {
-  const { supabase, ctx, repo } = await deps();
-  const task = await repo.getTask(id);
+  const { ctx, repo } = await deps();
   const result = await deleteTask(ctx, repo, id);
-  if (result.ok && task?.googleEventId) {
-    await removeTaskEvent(supabase, ctx, task.googleEventId);
-  }
   revalidatePath('/hoy');
   return result;
 }
@@ -72,9 +68,8 @@ export async function rescheduleTaskAction(
   id: string,
   dueAt: string,
 ): Promise<Result<TaskRow>> {
-  const { supabase, ctx, repo } = await deps();
+  const { ctx, repo } = await deps();
   const result = await rescheduleTask(ctx, repo, { id, dueAt });
-  if (result.ok) await syncTaskToCalendar(supabase, ctx, repo, result.value);
   revalidatePath('/hoy');
   return result;
 }

@@ -5,27 +5,23 @@ import { workRepo } from '@/adapters/supabase/work-repo';
 import { anthropicClient } from '@/adapters/anthropic/client';
 import { runAgent, type AgentDeps } from '@/agent/loop';
 import {
-  syncTaskToCalendar,
-  removeTaskEvent as removeCalendarEvent,
   getDayEvents,
+  createCalendarEvent,
   patchCalendarEvent,
   deleteCalendarEvent,
 } from '@/lib/calendar-sync';
 
 /** Arma las dependencias del agente para un cliente Supabase (RLS) y un contexto.
- *  Mismo cableado para el chat web y para el worker de canales — un solo camino. */
+ *  Mismo cableado para el chat web y para el worker de canales — un solo camino.
+ *  Las TAREAS no se sincronizan al calendario (ADR-022): solo los EVENTOS. */
 export function buildAgentDeps(supabase: ServerSupabase, ctx: ActorContext): AgentDeps {
   const repo = workRepo(supabase, ctx.userId);
   return {
     client: anthropicClient(),
     ctx,
     repo,
-    syncTask: (task) => syncTaskToCalendar(supabase, ctx, repo, task),
-    removeTaskEvent: (task) =>
-      task.googleEventId
-        ? removeCalendarEvent(supabase, ctx, task.googleEventId)
-        : Promise.resolve(),
     listCalendar: (dateYmd) => getDayEvents(supabase, ctx, dateYmd),
+    createEvent: (input) => createCalendarEvent(supabase, ctx, input),
     editEvent: (eventId, patch) => patchCalendarEvent(supabase, ctx, eventId, patch),
     deleteEvent: (eventId, opts) => deleteCalendarEvent(supabase, ctx, eventId, opts),
     async getCachedResult(id) {

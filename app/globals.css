@@ -902,6 +902,10 @@ ol {
   flex-direction: column;
   gap: 12px;
 }
+.overdue {
+  color: var(--negative);
+  font-weight: 600;
+}
 .crumb {
   color: var(--accent);
   text-decoration: none;
