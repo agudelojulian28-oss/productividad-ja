@@ -6,17 +6,24 @@ import { updateGoalAction } from '@/app/actions/goals';
 export function GoalFactorsForm({
   goalId,
   targetValue,
+  startDate,
   deadline,
 }: {
   goalId: string;
   targetValue: number;
+  startDate: string;
   deadline: string;
 }) {
   const [cantidad, setCantidad] = useState(String(targetValue));
-  const [fecha, setFecha] = useState(deadline);
+  const [inicio, setInicio] = useState(startDate);
+  const [fin, setFin] = useState(deadline);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  function touched() {
+    setSaved(false);
+  }
 
   function save() {
     setError(null);
@@ -24,7 +31,8 @@ export function GoalFactorsForm({
     startTransition(async () => {
       const res = await updateGoalAction(goalId, {
         targetValue: cantidad ? Number(cantidad) : undefined,
-        deadline: fecha || undefined,
+        startDate: inicio || undefined,
+        deadline: fin || undefined,
       });
       if (!res.ok) setError(res.message ?? 'No se pudo guardar');
       else setSaved(true);
@@ -43,22 +51,36 @@ export function GoalFactorsForm({
           value={cantidad}
           onChange={(e) => {
             setCantidad(e.target.value);
-            setSaved(false);
+            touched();
           }}
         />
       </label>
-      <label className="cal-field-label">
-        Fecha límite
-        <input
-          type="date"
-          className="field"
-          value={fecha}
-          onChange={(e) => {
-            setFecha(e.target.value);
-            setSaved(false);
-          }}
-        />
-      </label>
+      <div className="new-task-row">
+        <label className="cal-field-label" style={{ flex: 1 }}>
+          Fecha de inicio
+          <input
+            type="date"
+            className="field"
+            value={inicio}
+            onChange={(e) => {
+              setInicio(e.target.value);
+              touched();
+            }}
+          />
+        </label>
+        <label className="cal-field-label" style={{ flex: 1 }}>
+          Cumplimiento esperado
+          <input
+            type="date"
+            className="field"
+            value={fin}
+            onChange={(e) => {
+              setFin(e.target.value);
+              touched();
+            }}
+          />
+        </label>
+      </div>
       <div className="desc-editor-actions">
         <button type="button" className="btn-primary" onClick={save} disabled={pending}>
           {pending ? 'Guardando…' : 'Guardar'}

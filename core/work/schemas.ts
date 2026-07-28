@@ -26,13 +26,16 @@ export const GoalCreate = z.object({
   title: z.string().trim().min(1, 'El título es obligatorio').max(200),
   /** Factor cantidad (objetivo). Por defecto 1. */
   targetValue: z.number().positive().max(1_000_000_000).optional(),
-  /** Factor tiempo: fecha límite. Por defecto +1 año. */
+  /** Factor tiempo: fecha de inicio. Por defecto hoy. */
+  startDate: Ymd.optional(),
+  /** Factor tiempo: fecha de cumplimiento esperado. Por defecto +1 año. */
   deadline: Ymd.optional(),
 });
 export type GoalCreateInput = z.infer<typeof GoalCreate>;
 
 export const GoalUpdate = z.object({
   targetValue: z.number().positive().max(1_000_000_000).optional(),
+  startDate: Ymd.optional(),
   deadline: Ymd.optional(),
 });
 export type GoalUpdateInput = z.infer<typeof GoalUpdate>;

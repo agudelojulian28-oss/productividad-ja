@@ -111,13 +111,47 @@ describe('factores de la meta (cantidad + tiempo)', () => {
     }
   });
 
-  it('actualiza cantidad y fecha', async () => {
+  it('crea con inicio y cumplimiento esperado', async () => {
+    const repo = makeFakeRepo();
+    const p = await repo.insertProject({ title: 'P', areaId: AREA });
+    const r = await createGoal(ctx(), repo, {
+      projectId: p.id,
+      title: 'M',
+      startDate: '2026-08-01',
+      deadline: '2026-12-31',
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.periodStart).toBe('2026-08-01');
+      expect(r.value.periodEnd).toBe('2026-12-31');
+    }
+  });
+
+  it('rechaza inicio posterior al cumplimiento (RULE_VIOLATION)', async () => {
+    const repo = makeFakeRepo();
+    const p = await repo.insertProject({ title: 'P', areaId: AREA });
+    const r = await createGoal(ctx(), repo, {
+      projectId: p.id,
+      title: 'M',
+      startDate: '2026-12-31',
+      deadline: '2026-08-01',
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('RULE_VIOLATION');
+  });
+
+  it('actualiza cantidad y fechas', async () => {
     const repo = makeFakeRepo();
     const p = await repo.insertProject({ title: 'P', areaId: AREA });
     const g = await createGoal(ctx(), repo, { projectId: p.id, title: 'M' });
     if (!g.ok) throw new Error('setup');
-    const r = await updateGoal(ctx(), repo, g.value.id, { targetValue: 5, deadline: '2027-06-01' });
+    const r = await updateGoal(ctx(), repo, g.value.id, {
+      targetValue: 5,
+      startDate: '2026-09-01',
+      deadline: '2027-06-01',
+    });
     expect(r.ok && r.value.targetValue).toBe(5);
+    expect(r.ok && r.value.periodStart).toBe('2026-09-01');
     expect(r.ok && r.value.periodEnd).toBe('2027-06-01');
   });
 

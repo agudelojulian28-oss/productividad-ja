@@ -25,11 +25,15 @@ export async function createGoal(
   const project = await repo.getProject(parsed.data.projectId);
   if (!project) return err('NOT_FOUND', 'El proyecto no existe');
 
+  if (parsed.data.startDate && parsed.data.deadline && parsed.data.startDate > parsed.data.deadline) {
+    return err('RULE_VIOLATION', 'La fecha de inicio no puede ser posterior a la de cumplimiento');
+  }
   const row = await repo.insertGoal({
     projectId: parsed.data.projectId,
     title: parsed.data.title,
     tz: ctx.tz,
     targetValue: parsed.data.targetValue,
+    startDate: parsed.data.startDate,
     deadline: parsed.data.deadline,
   });
   return ok(row);
@@ -45,9 +49,18 @@ export async function updateGoal(
   if (!parsed.success) return err('INVALID_INPUT', 'Datos inválidos', parsed.error.issues);
   const goal = await repo.getGoal(id);
   if (!goal) return err('NOT_FOUND', 'La meta no existe');
+
+  // Validar orden contra el estado resultante (los que no cambian, se toman de la meta).
+  const start = parsed.data.startDate ?? goal.periodStart;
+  const end = parsed.data.deadline ?? goal.periodEnd;
+  if (start > end) {
+    return err('RULE_VIOLATION', 'La fecha de inicio no puede ser posterior a la de cumplimiento');
+  }
+
   return ok(
     await repo.updateGoal(id, {
       targetValue: parsed.data.targetValue,
+      periodStart: parsed.data.startDate,
       periodEnd: parsed.data.deadline,
     }),
   );

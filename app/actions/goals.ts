@@ -11,6 +11,7 @@ export async function createGoalAction(input: {
   projectId: string;
   title: string;
   targetValue?: number;
+  startDate?: string;
   deadline?: string;
 }): Promise<Result<GoalRow>> {
   const { supabase, ctx } = await requireContext();
@@ -22,7 +23,7 @@ export async function createGoalAction(input: {
 
 export async function updateGoalAction(
   id: string,
-  input: { targetValue?: number; deadline?: string },
+  input: { targetValue?: number; startDate?: string; deadline?: string },
 ): Promise<Result<GoalRow>> {
   const { supabase, ctx } = await requireContext();
   const repo = workRepo(supabase, ctx.userId);

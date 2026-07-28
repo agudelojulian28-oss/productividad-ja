@@ -72,13 +72,16 @@ export interface GoalInsert {
   tz: string;
   /** Factor cantidad; por defecto 1. */
   targetValue?: number;
-  /** Factor tiempo: fecha límite (YYYY-MM-DD); por defecto +1 año. */
+  /** Factor tiempo: fecha de inicio (YYYY-MM-DD); por defecto hoy. */
+  startDate?: string;
+  /** Factor tiempo: fecha de cumplimiento esperado (YYYY-MM-DD); por defecto +1 año. */
   deadline?: string;
 }
 
 export interface GoalPatch {
   description?: string | null;
   targetValue?: number;
+  periodStart?: string;
   periodEnd?: string;
 }
 

@@ -43,14 +43,20 @@ export default async function GoalDetailPage({
           <div className="goal-bar-fill" style={{ width: `${pct}%` }} />
         </div>
         <p className="muted" style={{ marginTop: 6 }}>
-          Fecha límite: {goal.periodEnd} · Cantidad objetivo: {goal.targetValue}
+          Cantidad objetivo: {goal.targetValue} · Inicio: {goal.periodStart} · Cumplimiento
+          esperado: {goal.periodEnd}
         </p>
       </div>
 
       <h2 className="section-title" style={{ marginTop: 20 }}>
         Cantidad y tiempo
       </h2>
-      <GoalFactorsForm goalId={goal.id} targetValue={goal.targetValue} deadline={goal.periodEnd} />
+      <GoalFactorsForm
+        goalId={goal.id}
+        targetValue={goal.targetValue}
+        startDate={goal.periodStart}
+        deadline={goal.periodEnd}
+      />
 
       <h2 className="section-title" style={{ marginTop: 20 }}>
         Descripción

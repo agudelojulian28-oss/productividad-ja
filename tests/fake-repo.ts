@@ -110,7 +110,7 @@ export function makeFakeRepo(): WorkRepo & {
         status: 'active',
         description: null,
         targetValue: input.targetValue ?? 1,
-        periodStart: '2026-01-01',
+        periodStart: input.startDate ?? '2026-01-01',
         periodEnd: input.deadline ?? '2027-01-01',
       };
       goals.set(row.id, row);

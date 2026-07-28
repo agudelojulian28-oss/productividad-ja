@@ -242,7 +242,7 @@ export function workRepo(supabase: SupabaseClient, userId: string): WorkRepo {
           metric: 'manual',
           target_value: input.targetValue ?? 1,
           manual_value: 0,
-          period_start: ymdInTz(input.tz),
+          period_start: input.startDate ?? ymdInTz(input.tz),
           period_end: input.deadline ?? ymdInTz(input.tz, 1),
           status: 'active',
         })
@@ -256,6 +256,7 @@ export function workRepo(supabase: SupabaseClient, userId: string): WorkRepo {
       const upd: Record<string, unknown> = {};
       if (patch.description !== undefined) upd.description = patch.description;
       if (patch.targetValue !== undefined) upd.target_value = patch.targetValue;
+      if (patch.periodStart !== undefined) upd.period_start = patch.periodStart;
       if (patch.periodEnd !== undefined) upd.period_end = patch.periodEnd;
       const { data, error } = await supabase
         .from('goals')
