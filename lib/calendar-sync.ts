@@ -9,6 +9,7 @@ import {
   updateEvent,
   deleteEvent,
   listEvents,
+  listEventsByProperty,
   getEvent,
   patchEvent,
   type GEvent,
@@ -50,6 +51,8 @@ export async function createCalendarEvent(
     colorId?: string;
     durationMin?: number;
     descripcion?: string;
+    projectId?: string;
+    goalId?: string;
   },
 ): Promise<string> {
   const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
@@ -65,8 +68,44 @@ export async function createCalendarEvent(
     tz: ctx.tz,
     colorId: input.colorId,
     description: input.descripcion,
+    projectId: input.projectId,
+    goalId: input.goalId,
   });
   return eventId;
+}
+
+/** Eventos de Google asociados a un proyecto (por extendedProperties). [] si falla. */
+export async function getEventsByProject(
+  supabase: ServerSupabase,
+  ctx: ActorContext,
+  projectId: string,
+): Promise<GEvent[]> {
+  try {
+    const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
+    if (!cipher) return [];
+    const { accessToken } = await refreshAccessToken(decryptToken(cipher));
+    return await listEventsByProperty(accessToken, 'project_id', projectId);
+  } catch (e) {
+    console.error('getEventsByProject:', e);
+    return [];
+  }
+}
+
+/** Eventos de Google asociados a una meta (por extendedProperties). [] si falla. */
+export async function getEventsByGoal(
+  supabase: ServerSupabase,
+  ctx: ActorContext,
+  goalId: string,
+): Promise<GEvent[]> {
+  try {
+    const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
+    if (!cipher) return [];
+    const { accessToken } = await refreshAccessToken(decryptToken(cipher));
+    return await listEventsByProperty(accessToken, 'goal_id', goalId);
+  } catch (e) {
+    console.error('getEventsByGoal:', e);
+    return [];
+  }
 }
 
 /** Edita un evento de Google (título / hora / color / duración / recurrencia).

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { requireContext } from '@/lib/auth';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { dayLabelInTz, todayInTz } from '@/lib/format';
+import { getEventsByGoal } from '@/lib/calendar-sync';
 import { DescriptionEditor } from '../../description-editor';
 import { GoalFactorsForm } from './goal-factors-form';
 import { setGoalDescriptionAction } from '@/app/actions/goals';
@@ -20,7 +21,10 @@ export default async function GoalDetailPage({
   const goal = await repo.getGoal(id);
   if (!goal) notFound();
 
-  const tasks = await repo.listTasks({ goalId: id });
+  const [tasks, events] = await Promise.all([
+    repo.listTasks({ goalId: id }),
+    getEventsByGoal(supabase, ctx, id),
+  ]);
   const total = tasks.length;
   const done = tasks.filter((t) => t.status === 'done').length;
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -87,6 +91,24 @@ export default async function GoalDetailPage({
               <span className="pill">
                 {t.status === 'done' ? 'hecha' : t.dueAt ? dayLabelInTz(t.dueAt, ctx.tz) : 'pendiente'}
               </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h2 className="section-title" style={{ marginTop: 20 }}>
+        Eventos · {events.length}
+      </h2>
+      {events.length === 0 ? (
+        <p className="muted" style={{ marginTop: 8 }}>
+          Sin eventos en esta meta.
+        </p>
+      ) : (
+        <ul style={{ marginTop: 8 }}>
+          {events.map((e) => (
+            <li key={e.id} className="row-card">
+              <span className="task-title">{e.summary}</span>
+              <span className="pill">{e.start ? dayLabelInTz(e.start, ctx.tz) : 'evento'}</span>
             </li>
           ))}
         </ul>

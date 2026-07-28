@@ -22,6 +22,8 @@ export interface AgentDeps {
     colorId?: string;
     durationMin?: number;
     descripcion?: string;
+    projectId?: string;
+    goalId?: string;
   }) => Promise<string>;
   editEvent?: (
     eventId: string,

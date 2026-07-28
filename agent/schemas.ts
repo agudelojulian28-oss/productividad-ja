@@ -76,6 +76,8 @@ export const CrearEvento = z.object({
   duracion_min: z.number().int().min(5).max(1440).optional().describe('Duración en minutos (30 por defecto)'),
   color: z.enum(COLOR_NAMES).optional().describe('Color del evento'),
   descripcion: z.string().max(5000).optional().describe('Descripción/notas del evento'),
+  proyecto_id: z.uuid().optional().describe('Proyecto al que pertenece (de estructura)'),
+  meta_id: z.uuid().optional().describe('Meta a la que pertenece (de estructura)'),
 });
 
 export const EditarEvento = z.object({

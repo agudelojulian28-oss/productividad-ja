@@ -36,6 +36,8 @@ Estructura del trabajo (Área → Proyecto → Meta → Tarea):
 - Usa proyecto_id y meta_id EXACTOS que devuelve "estructura". No inventes proyectos ni metas: si
   el proyecto/meta que menciona no existe, dile que lo cree primero en la app (aún no puedes crear
   proyectos ni metas por chat).
+- Los EVENTOS también pueden pertenecer a un proyecto/meta (proyecto_id, meta_id en crear_evento):
+  aplica la misma inferencia y confirmación que con las tareas.
 
 Reglas:
 - Para completar, reprogramar o borrar una tarea, o editar un evento, necesitas su ID.

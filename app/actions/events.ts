@@ -15,6 +15,8 @@ export async function createEventAction(input: {
   colorId?: string;
   durationMin?: number;
   descripcion?: string;
+  projectId?: string;
+  goalId?: string;
 }): Promise<Result<{ id: string }>> {
   const { supabase, ctx } = await requireContext();
   try {

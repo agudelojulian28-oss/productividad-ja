@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { requireContext } from '@/lib/auth';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { dayLabelInTz } from '@/lib/format';
+import { getEventsByProject } from '@/lib/calendar-sync';
 import { NewGoalForm } from './new-goal-form';
 import { DescriptionEditor } from '../../description-editor';
 import { setProjectDescriptionAction } from '@/app/actions/projects';
@@ -19,9 +20,10 @@ export default async function ProjectDetailPage({
   const repo = workRepo(supabase, ctx.userId);
   const project = await repo.getProject(id);
   if (!project) notFound();
-  const [goals, tasks] = await Promise.all([
+  const [goals, tasks, events] = await Promise.all([
     repo.listGoals(id),
     repo.listTasks({ projectId: id }),
+    getEventsByProject(supabase, ctx, id),
   ]);
   const goalName = new Map(goals.map((g) => [g.id, g.title] as const));
 
@@ -79,6 +81,26 @@ export default async function ProjectDetailPage({
                 </span>
               </div>
               <span className="pill">{t.status === 'done' ? 'hecha' : 'pendiente'}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h2 className="section-title" style={{ marginTop: 24 }}>
+        Eventos · {events.length}
+      </h2>
+      {events.length === 0 ? (
+        <p className="muted" style={{ marginTop: 8 }}>
+          Sin eventos en este proyecto. (Crea eventos desde el calendario o el chat y asígnalos aquí.)
+        </p>
+      ) : (
+        <ul style={{ marginTop: 8 }}>
+          {events.map((e) => (
+            <li key={e.id} className="row-card">
+              <span className="task-title">{e.summary}</span>
+              <span className="pill">
+                {e.start ? dayLabelInTz(e.start, ctx.tz) : 'evento'}
+              </span>
             </li>
           ))}
         </ul>

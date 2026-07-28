@@ -10,6 +10,9 @@ export interface CalEvent {
   colorId?: string;
   recurrence?: string[];
   description?: string;
+  /** Asociación al árbol de la app (se guarda en extendedProperties.private). */
+  projectId?: string;
+  goalId?: string;
 }
 
 export interface GEvent {
@@ -21,6 +24,9 @@ export interface GEvent {
   allDay: boolean;
   htmlLink: string;
   description: string | null;
+  /** Proyecto/meta asociados (de extendedProperties.private), si los hay. */
+  projectId: string | null;
+  goalId: string | null;
   /** Si es una instancia de una serie recurrente, el id del evento maestro. */
   recurringEventId: string | null;
   /** Reglas de recurrencia (RRULE) si el evento es la serie maestra. */
@@ -35,8 +41,26 @@ interface RawEvent {
   description?: string;
   recurringEventId?: string;
   recurrence?: string[];
+  extendedProperties?: { private?: Record<string, string> };
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
+}
+
+function mapEvent(e: RawEvent): GEvent {
+  return {
+    id: e.id,
+    summary: e.summary ?? '(sin título)',
+    start: e.start?.dateTime ?? e.start?.date ?? null,
+    end: e.end?.dateTime ?? e.end?.date ?? null,
+    colorId: e.colorId ?? null,
+    allDay: Boolean(e.start?.date),
+    htmlLink: e.htmlLink ?? '',
+    description: e.description ?? null,
+    projectId: e.extendedProperties?.private?.project_id ?? null,
+    goalId: e.extendedProperties?.private?.goal_id ?? null,
+    recurringEventId: e.recurringEventId ?? null,
+    recurrence: e.recurrence ?? null,
+  };
 }
 
 /** Lista los eventos del calendario primario en un rango (RFC3339). */
@@ -57,18 +81,31 @@ export async function listEvents(
   });
   if (!res.ok) throw new Error('listEvents: ' + (await res.text()));
   const j = (await res.json()) as { items?: RawEvent[] };
-  return (j.items ?? []).map((e) => ({
-    id: e.id,
-    summary: e.summary ?? '(sin título)',
-    start: e.start?.dateTime ?? e.start?.date ?? null,
-    end: e.end?.dateTime ?? e.end?.date ?? null,
-    colorId: e.colorId ?? null,
-    allDay: Boolean(e.start?.date),
-    htmlLink: e.htmlLink ?? '',
-    description: e.description ?? null,
-    recurringEventId: e.recurringEventId ?? null,
-    recurrence: e.recurrence ?? null,
-  }));
+  return (j.items ?? []).map(mapEvent);
+}
+
+/** Lista eventos con una privateExtendedProperty `key=value` (para colgar eventos
+ *  de un proyecto/meta). Ventana amplia: -90 días a +1 año. */
+export async function listEventsByProperty(
+  accessToken: string,
+  key: string,
+  value: string,
+): Promise<GEvent[]> {
+  const now = Date.now();
+  const p = new URLSearchParams({
+    privateExtendedProperty: `${key}=${value}`,
+    timeMin: new Date(now - 90 * 86_400_000).toISOString(),
+    timeMax: new Date(now + 365 * 86_400_000).toISOString(),
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: '100',
+  });
+  const res = await fetch(`${BASE}?${p.toString()}`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error('listEventsByProperty: ' + (await res.text()));
+  const j = (await res.json()) as { items?: RawEvent[] };
+  return (j.items ?? []).map(mapEvent);
 }
 
 function body(ev: CalEvent) {
@@ -79,6 +116,16 @@ function body(ev: CalEvent) {
     ...(ev.colorId ? { colorId: ev.colorId } : {}),
     ...(ev.recurrence ? { recurrence: ev.recurrence } : {}),
     ...(ev.description !== undefined ? { description: ev.description } : {}),
+    ...(ev.projectId || ev.goalId
+      ? {
+          extendedProperties: {
+            private: {
+              ...(ev.projectId ? { project_id: ev.projectId } : {}),
+              ...(ev.goalId ? { goal_id: ev.goalId } : {}),
+            },
+          },
+        }
+      : {}),
   });
 }
 
@@ -116,18 +163,7 @@ export async function getEvent(accessToken: string, eventId: string): Promise<GE
   if (res.status === 404 || res.status === 410) return null;
   if (!res.ok) throw new Error('getEvent: ' + (await res.text()));
   const e = (await res.json()) as RawEvent;
-  return {
-    id: e.id,
-    summary: e.summary ?? '(sin título)',
-    start: e.start?.dateTime ?? e.start?.date ?? null,
-    end: e.end?.dateTime ?? e.end?.date ?? null,
-    colorId: e.colorId ?? null,
-    allDay: Boolean(e.start?.date),
-    htmlLink: e.htmlLink ?? '',
-    description: e.description ?? null,
-    recurringEventId: e.recurringEventId ?? null,
-    recurrence: e.recurrence ?? null,
-  };
+  return mapEvent(e);
 }
 
 export interface EventPatch {

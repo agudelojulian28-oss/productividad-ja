@@ -35,6 +35,8 @@ export interface ToolDeps {
     colorId?: string;
     durationMin?: number;
     descripcion?: string;
+    projectId?: string;
+    goalId?: string;
   }) => Promise<string>;
   editEvent?: (
     eventId: string,
@@ -154,6 +156,8 @@ export async function runTool(
         colorId,
         durationMin: p.value.duracion_min,
         descripcion: p.value.descripcion,
+        projectId: p.value.proyecto_id,
+        goalId: p.value.meta_id,
       });
       return ok({ evento_id: id });
     }

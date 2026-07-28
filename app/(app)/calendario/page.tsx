@@ -1,4 +1,5 @@
 import { requireContext } from '@/lib/auth';
+import { workRepo } from '@/adapters/supabase/work-repo';
 import { getRangeEvents } from '@/lib/calendar-sync';
 import { todayInTz } from '@/lib/format';
 import { CalendarView, type CalItem, type CalView } from './calendar-view';
@@ -47,7 +48,20 @@ export default async function CalendarioPage({
   const rangeEnd = days[days.length - 1]!;
 
   // El calendario muestra SOLO eventos de Google (las tareas viven en la app, ADR-022).
-  const events = await getRangeEvents(supabase, ctx, rangeStart, rangeEnd);
+  const repo = workRepo(supabase, ctx.userId);
+  const [events, projects] = await Promise.all([
+    getRangeEvents(supabase, ctx, rangeStart, rangeEnd),
+    repo.listProjects(),
+  ]);
+
+  // Metas por proyecto, para el selector opcional al crear un evento.
+  const goalsByProject: Record<string, { id: string; title: string }[]> = {};
+  await Promise.all(
+    projects.map(async (p) => {
+      const gs = await repo.listGoals(p.id);
+      goalsByProject[p.id] = gs.map((g) => ({ id: g.id, title: g.title }));
+    }),
+  );
 
   const items: CalItem[] = events.map(
     (e): CalItem => ({
@@ -72,6 +86,8 @@ export default async function CalendarioPage({
         tz={ctx.tz}
         items={items}
         days={days}
+        projects={projects.map((p) => ({ id: p.id, title: p.title }))}
+        goalsByProject={goalsByProject}
       />
     </div>
   );

@@ -43,11 +43,15 @@ function durationOf(item: CalItem): number {
 
 export function EventEditor({
   target,
+  projects,
+  goalsByProject,
   onClose,
   onDone,
 }: {
   target: EditorTarget;
   tz: string;
+  projects: { id: string; title: string }[];
+  goalsByProject: Record<string, { id: string; title: string }[]>;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -65,7 +69,11 @@ export function EventEditor({
   const [durMin, setDurMin] = useState(item ? durationOf(item) : 30);
   const [colorId, setColorId] = useState<string | null>(item?.colorId ?? null);
   const [descripcion, setDescripcion] = useState(item?.description ?? '');
+  const [proyecto, setProyecto] = useState('');
+  const [meta, setMeta] = useState('');
   const [pending, startTransition] = useTransition();
+
+  const metasDelProyecto = proyecto ? (goalsByProject[proyecto] ?? []) : [];
 
   const iso = () => (when ? new Date(when).toISOString() : undefined);
 
@@ -79,6 +87,8 @@ export function EventEditor({
         colorId: colorId ?? undefined,
         durationMin: durMin,
         descripcion: descripcion.trim() || undefined,
+        projectId: proyecto || undefined,
+        goalId: meta || undefined,
       });
       onDone();
     });
@@ -238,6 +248,45 @@ export function EventEditor({
                 style={{ resize: 'vertical', fontFamily: 'inherit' }}
               />
             </label>
+            {target.mode === 'create' && projects.length > 0 && (
+              <>
+                <label className="cal-field-label">
+                  Proyecto (opcional)
+                  <select
+                    className="field"
+                    value={proyecto}
+                    onChange={(e) => {
+                      setProyecto(e.target.value);
+                      setMeta('');
+                    }}
+                  >
+                    <option value="">Sin proyecto</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {metasDelProyecto.length > 0 && (
+                  <label className="cal-field-label">
+                    Meta (opcional)
+                    <select
+                      className="field"
+                      value={meta}
+                      onChange={(e) => setMeta(e.target.value)}
+                    >
+                      <option value="">Sin meta</option>
+                      {metasDelProyecto.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </>
+            )}
             <div className="cal-modal-actions">
               {target.mode === 'create' ? (
                 <button

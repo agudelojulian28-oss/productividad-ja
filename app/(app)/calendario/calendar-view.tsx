@@ -50,6 +50,8 @@ export function CalendarView({
   tz,
   items,
   days,
+  projects,
+  goalsByProject,
 }: {
   view: CalView;
   date: string;
@@ -57,6 +59,8 @@ export function CalendarView({
   tz: string;
   items: CalItem[];
   days: string[];
+  projects: { id: string; title: string }[];
+  goalsByProject: Record<string, { id: string; title: string }[]>;
 }) {
   const router = useRouter();
   const [editor, setEditor] = useState<EditorTarget | null>(null);
@@ -217,6 +221,8 @@ export function CalendarView({
         <EventEditor
           target={editor}
           tz={tz}
+          projects={projects}
+          goalsByProject={goalsByProject}
           onClose={() => setEditor(null)}
           onDone={() => {
             setEditor(null);
