@@ -1,5 +1,5 @@
 import { ok, err, type Result, type ActorContext } from '@/core/types';
-import { GoalCreate } from './schemas';
+import { GoalCreate, GoalUpdate } from './schemas';
 import type { WorkRepo, GoalRow } from './ports';
 
 // Metas dentro de `work`: cuelgan de un proyecto (ADR-021). El progreso se calcula en la
@@ -29,8 +29,28 @@ export async function createGoal(
     projectId: parsed.data.projectId,
     title: parsed.data.title,
     tz: ctx.tz,
+    targetValue: parsed.data.targetValue,
+    deadline: parsed.data.deadline,
   });
   return ok(row);
+}
+
+export async function updateGoal(
+  _ctx: ActorContext,
+  repo: WorkRepo,
+  id: string,
+  raw: unknown,
+): Promise<Result<GoalRow>> {
+  const parsed = GoalUpdate.safeParse(raw);
+  if (!parsed.success) return err('INVALID_INPUT', 'Datos inválidos', parsed.error.issues);
+  const goal = await repo.getGoal(id);
+  if (!goal) return err('NOT_FOUND', 'La meta no existe');
+  return ok(
+    await repo.updateGoal(id, {
+      targetValue: parsed.data.targetValue,
+      periodEnd: parsed.data.deadline,
+    }),
+  );
 }
 
 export async function setGoalDescription(

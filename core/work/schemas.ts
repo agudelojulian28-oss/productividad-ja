@@ -19,11 +19,23 @@ export const TaskCreate = z.object({
 });
 export type TaskCreateInput = z.infer<typeof TaskCreate>;
 
+const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha YYYY-MM-DD');
+
 export const GoalCreate = z.object({
   projectId: z.uuid(),
   title: z.string().trim().min(1, 'El título es obligatorio').max(200),
+  /** Factor cantidad (objetivo). Por defecto 1. */
+  targetValue: z.number().positive().max(1_000_000_000).optional(),
+  /** Factor tiempo: fecha límite. Por defecto +1 año. */
+  deadline: Ymd.optional(),
 });
 export type GoalCreateInput = z.infer<typeof GoalCreate>;
+
+export const GoalUpdate = z.object({
+  targetValue: z.number().positive().max(1_000_000_000).optional(),
+  deadline: Ymd.optional(),
+});
+export type GoalUpdateInput = z.infer<typeof GoalUpdate>;
 
 export const TaskReschedule = z.object({
   id: z.uuid(),

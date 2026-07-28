@@ -41,6 +41,7 @@ export interface TaskFilter {
   status?: TaskStatus;
   dueFrom?: string; // ISO (inclusive)
   dueTo?: string; // ISO (inclusive)
+  goalId?: string;
 }
 
 export interface ProjectRow {
@@ -57,13 +58,28 @@ export interface GoalRow {
   title: string;
   status: 'active' | 'achieved' | 'missed' | 'archived';
   description: string | null;
+  /** Factor cantidad: objetivo propuesto. */
+  targetValue: number;
+  /** Factor tiempo (YYYY-MM-DD). */
+  periodStart: string;
+  periodEnd: string;
 }
 
 export interface GoalInsert {
   projectId: string;
   title: string;
-  /** Zona del usuario para fijar el periodo por defecto (YYYY-MM-DD calculado en el repo). */
+  /** Zona del usuario para fijar fechas por defecto (YYYY-MM-DD calculado en el repo). */
   tz: string;
+  /** Factor cantidad; por defecto 1. */
+  targetValue?: number;
+  /** Factor tiempo: fecha límite (YYYY-MM-DD); por defecto +1 año. */
+  deadline?: string;
+}
+
+export interface GoalPatch {
+  description?: string | null;
+  targetValue?: number;
+  periodEnd?: string;
 }
 
 export interface WorkRepo {
@@ -82,5 +98,5 @@ export interface WorkRepo {
   listGoals(projectId: string): Promise<GoalRow[]>;
   getGoal(id: string): Promise<GoalRow | null>;
   insertGoal(input: GoalInsert): Promise<GoalRow>;
-  updateGoal(id: string, patch: { description?: string | null }): Promise<GoalRow>;
+  updateGoal(id: string, patch: GoalPatch): Promise<GoalRow>;
 }

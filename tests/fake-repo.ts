@@ -10,6 +10,7 @@ import type {
   ProjectRow,
   GoalRow,
   GoalInsert,
+  GoalPatch,
 } from '@/core/work/ports';
 import type { ActorContext } from '@/core/types';
 
@@ -50,6 +51,7 @@ export function makeFakeRepo(): WorkRepo & {
         if (filter.status && t.status !== filter.status) return false;
         if (filter.dueFrom && (!t.dueAt || t.dueAt < filter.dueFrom)) return false;
         if (filter.dueTo && (!t.dueAt || t.dueAt > filter.dueTo)) return false;
+        if (filter.goalId && t.goalId !== filter.goalId) return false;
         return true;
       });
     },
@@ -107,11 +109,14 @@ export function makeFakeRepo(): WorkRepo & {
         title: input.title,
         status: 'active',
         description: null,
+        targetValue: input.targetValue ?? 1,
+        periodStart: '2026-01-01',
+        periodEnd: input.deadline ?? '2027-01-01',
       };
       goals.set(row.id, row);
       return row;
     },
-    async updateGoal(id: string, patch: { description?: string | null }): Promise<GoalRow> {
+    async updateGoal(id: string, patch: GoalPatch): Promise<GoalRow> {
       const cur = goals.get(id);
       if (!cur) throw new Error('updateGoal: no existe');
       const next: GoalRow = { ...cur, ...patch };

@@ -60,9 +60,12 @@ interface DbGoal {
   title: string;
   status: GoalRow['status'];
   description: string | null;
+  target_value: number | string;
+  period_start: string;
+  period_end: string;
 }
 
-const GOAL_COLS = 'id,project_id,title,status,description';
+const GOAL_COLS = 'id,project_id,title,status,description,target_value,period_start,period_end';
 
 function toGoal(r: DbGoal): GoalRow {
   return {
@@ -71,6 +74,9 @@ function toGoal(r: DbGoal): GoalRow {
     title: r.title,
     status: r.status,
     description: r.description,
+    targetValue: Number(r.target_value),
+    periodStart: r.period_start,
+    periodEnd: r.period_end,
   };
 }
 
@@ -108,6 +114,7 @@ export function workRepo(supabase: SupabaseClient, userId: string): WorkRepo {
       if (filter.status) q = q.eq('status', filter.status);
       if (filter.dueFrom) q = q.gte('due_at', filter.dueFrom);
       if (filter.dueTo) q = q.lte('due_at', filter.dueTo);
+      if (filter.goalId) q = q.eq('goal_id', filter.goalId);
       const { data, error } = await q.order('due_at', { ascending: true, nullsFirst: false });
       if (error) throw new Error(error.message);
       return ((data as DbTask[] | null) ?? []).map(toRow);
@@ -233,10 +240,10 @@ export function workRepo(supabase: SupabaseClient, userId: string): WorkRepo {
           project_id: input.projectId,
           title: input.title,
           metric: 'manual',
-          target_value: 1,
+          target_value: input.targetValue ?? 1,
           manual_value: 0,
           period_start: ymdInTz(input.tz),
-          period_end: ymdInTz(input.tz, 1),
+          period_end: input.deadline ?? ymdInTz(input.tz, 1),
           status: 'active',
         })
         .select(GOAL_COLS)
@@ -248,6 +255,8 @@ export function workRepo(supabase: SupabaseClient, userId: string): WorkRepo {
     async updateGoal(id, patch) {
       const upd: Record<string, unknown> = {};
       if (patch.description !== undefined) upd.description = patch.description;
+      if (patch.targetValue !== undefined) upd.target_value = patch.targetValue;
+      if (patch.periodEnd !== undefined) upd.period_end = patch.periodEnd;
       const { data, error } = await supabase
         .from('goals')
         .update(upd)

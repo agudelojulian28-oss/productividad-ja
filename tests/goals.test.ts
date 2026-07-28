@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createGoal, listGoals } from '@/core/work/goals';
-import { createTask } from '@/core/work/tasks';
+import { createGoal, listGoals, updateGoal } from '@/core/work/goals';
+import { createTask, completeTask } from '@/core/work/tasks';
 import { makeFakeRepo, ctx } from './fake-repo';
 
 const AREA = '00000000-0000-4000-8000-0000000000aa';
@@ -91,5 +91,49 @@ describe('createTask con meta', () => {
     const r = await createTask(ctx(), repo, { title: 'suelta' });
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value.goalId).toBeNull();
+  });
+});
+
+describe('factores de la meta (cantidad + tiempo)', () => {
+  it('crea con cantidad objetivo y fecha límite', async () => {
+    const repo = makeFakeRepo();
+    const p = await repo.insertProject({ title: 'P', areaId: AREA });
+    const r = await createGoal(ctx(), repo, {
+      projectId: p.id,
+      title: 'M',
+      targetValue: 10,
+      deadline: '2026-12-31',
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.targetValue).toBe(10);
+      expect(r.value.periodEnd).toBe('2026-12-31');
+    }
+  });
+
+  it('actualiza cantidad y fecha', async () => {
+    const repo = makeFakeRepo();
+    const p = await repo.insertProject({ title: 'P', areaId: AREA });
+    const g = await createGoal(ctx(), repo, { projectId: p.id, title: 'M' });
+    if (!g.ok) throw new Error('setup');
+    const r = await updateGoal(ctx(), repo, g.value.id, { targetValue: 5, deadline: '2027-06-01' });
+    expect(r.ok && r.value.targetValue).toBe(5);
+    expect(r.ok && r.value.periodEnd).toBe('2027-06-01');
+  });
+
+  it('progreso: tareas de la meta y cuántas hechas', async () => {
+    const repo = makeFakeRepo();
+    const p = await repo.insertProject({ title: 'P', areaId: AREA });
+    const g = await createGoal(ctx(), repo, { projectId: p.id, title: 'M' });
+    if (!g.ok) throw new Error('setup');
+    const t1 = await createTask(ctx(), repo, { title: 'a', goalId: g.value.id });
+    await createTask(ctx(), repo, { title: 'b', goalId: g.value.id });
+    if (!t1.ok) throw new Error('setup');
+    await completeTask(ctx(), repo, t1.value.id);
+
+    const all = await repo.listTasks({ goalId: g.value.id });
+    const done = all.filter((t) => t.status === 'done');
+    expect(all.length).toBe(2);
+    expect(done.length).toBe(1);
   });
 });

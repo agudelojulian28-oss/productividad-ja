@@ -871,3 +871,34 @@ ol {
   align-items: center;
   gap: 12px;
 }
+
+/* ── Meta: progreso por tareas + factores ───────────────────────────────── */
+.goal-progress {
+  margin-bottom: 8px;
+}
+.goal-progress-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.goal-bar {
+  height: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+.goal-bar-fill {
+  height: 100%;
+  background: var(--grad-accent);
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+.goal-factors {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
