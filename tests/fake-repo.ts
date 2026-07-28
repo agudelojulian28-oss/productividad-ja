@@ -8,16 +8,26 @@ import type {
   TaskPatch,
   TaskFilter,
   ProjectRow,
+  GoalRow,
+  GoalInsert,
 } from '@/core/work/ports';
 import type { ActorContext } from '@/core/types';
 
-export function makeFakeRepo(): WorkRepo & { _tasks: Map<string, TaskRow> } {
+export function makeFakeRepo(): WorkRepo & {
+  _tasks: Map<string, TaskRow>;
+  _projects: Map<string, ProjectRow>;
+  _goals: Map<string, GoalRow>;
+} {
   const tasks = new Map<string, TaskRow>();
+  const projects = new Map<string, ProjectRow>();
+  const goals = new Map<string, GoalRow>();
   let seq = 0;
   const uuid = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`;
 
   return {
     _tasks: tasks,
+    _projects: projects,
+    _goals: goals,
     async insertTask(input: TaskInsert): Promise<TaskRow> {
       const row: TaskRow = {
         id: uuid(),
@@ -27,6 +37,7 @@ export function makeFakeRepo(): WorkRepo & { _tasks: Map<string, TaskRow> } {
         dueAt: input.dueAt ?? null,
         completedAt: null,
         projectId: input.projectId ?? null,
+        goalId: input.goalId ?? null,
         origin: input.origin,
         googleCalendarId: null,
         googleEventId: null,
@@ -59,14 +70,53 @@ export function makeFakeRepo(): WorkRepo & { _tasks: Map<string, TaskRow> } {
       const q = text.toLowerCase();
       return [...tasks.values()].filter((t) => t.title.toLowerCase().includes(q));
     },
-    async listProjects(): Promise<ProjectRow[]> {
-      return [];
+    async listProjects(areaId?: string): Promise<ProjectRow[]> {
+      return [...projects.values()].filter((p) => !areaId || p.areaId === areaId);
     },
-    async getProject(): Promise<ProjectRow | null> {
-      return null;
+    async getProject(id: string): Promise<ProjectRow | null> {
+      return projects.get(id) ?? null;
     },
-    async insertProject(): Promise<ProjectRow> {
-      throw new Error('insertProject no implementado en el fake');
+    async insertProject(input: { title: string; areaId: string }): Promise<ProjectRow> {
+      const row: ProjectRow = {
+        id: uuid(),
+        title: input.title,
+        status: 'active',
+        areaId: input.areaId,
+        description: null,
+      };
+      projects.set(row.id, row);
+      return row;
+    },
+    async updateProject(id: string, patch: { description?: string | null }): Promise<ProjectRow> {
+      const cur = projects.get(id);
+      if (!cur) throw new Error('updateProject: no existe');
+      const next: ProjectRow = { ...cur, ...patch };
+      projects.set(id, next);
+      return next;
+    },
+    async listGoals(projectId: string): Promise<GoalRow[]> {
+      return [...goals.values()].filter((g) => g.projectId === projectId);
+    },
+    async getGoal(id: string): Promise<GoalRow | null> {
+      return goals.get(id) ?? null;
+    },
+    async insertGoal(input: GoalInsert): Promise<GoalRow> {
+      const row: GoalRow = {
+        id: uuid(),
+        projectId: input.projectId,
+        title: input.title,
+        status: 'active',
+        description: null,
+      };
+      goals.set(row.id, row);
+      return row;
+    },
+    async updateGoal(id: string, patch: { description?: string | null }): Promise<GoalRow> {
+      const cur = goals.get(id);
+      if (!cur) throw new Error('updateGoal: no existe');
+      const next: GoalRow = { ...cur, ...patch };
+      goals.set(id, next);
+      return next;
     },
   };
 }
