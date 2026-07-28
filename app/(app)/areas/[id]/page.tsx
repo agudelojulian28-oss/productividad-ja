@@ -18,7 +18,18 @@ export default async function AreaDetailPage({
   const { supabase, ctx } = await requireContext();
   const area = await structureRepo(supabase, ctx.userId).getArea(id);
   if (!area) notFound();
-  const projects = await workRepo(supabase, ctx.userId).listProjects(id);
+  const repo = workRepo(supabase, ctx.userId);
+  const projects = await repo.listProjects(id);
+
+  // Progreso por proyecto (tareas hechas / total).
+  const rows = await Promise.all(
+    projects.map(async (p) => {
+      const tasks = await repo.listTasks({ projectId: p.id });
+      const total = tasks.length;
+      const done = tasks.filter((t) => t.status === 'done').length;
+      return { p, total, done, pct: total ? Math.round((done / total) * 100) : 0 };
+    }),
+  );
 
   return (
     <div className="page">
@@ -36,17 +47,27 @@ export default async function AreaDetailPage({
       </h2>
       <NewProjectForm areaId={area.id} />
 
-      {projects.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="muted" style={{ marginTop: 24 }}>
           Sin proyectos todavía. Crea el primero arriba.
         </p>
       ) : (
         <ul style={{ marginTop: 16 }}>
-          {projects.map((p) => (
+          {rows.map(({ p, total, done, pct }) => (
             <li key={p.id} className="row-card">
-              <Link href={`/proyectos/${p.id}`} className="task-title">
-                {p.title}
-              </Link>
+              <div className="task-body">
+                <Link href={`/proyectos/${p.id}`} className="task-title">
+                  {p.title}
+                </Link>
+                <span className="task-meta">
+                  {total === 0 ? 'Sin tareas' : `${done}/${total} tareas · ${pct}%`}
+                </span>
+                {total > 0 && (
+                  <div className="goal-bar" style={{ marginTop: 6 }}>
+                    <div className="goal-bar-fill" style={{ width: `${pct}%` }} />
+                  </div>
+                )}
+              </div>
               <span className="pill">{p.status}</span>
             </li>
           ))}
