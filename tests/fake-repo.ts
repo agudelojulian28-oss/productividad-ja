@@ -52,6 +52,7 @@ export function makeFakeRepo(): WorkRepo & {
         if (filter.dueFrom && (!t.dueAt || t.dueAt < filter.dueFrom)) return false;
         if (filter.dueTo && (!t.dueAt || t.dueAt > filter.dueTo)) return false;
         if (filter.goalId && t.goalId !== filter.goalId) return false;
+        if (filter.projectId && t.projectId !== filter.projectId) return false;
         return true;
       });
     },

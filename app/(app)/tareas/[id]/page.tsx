@@ -19,6 +19,11 @@ export default async function TaskDetailPage({
   const task = await repo.getTask(id);
   if (!task) notFound();
 
+  const [project, goal] = await Promise.all([
+    task.projectId ? repo.getProject(task.projectId) : Promise.resolve(null),
+    task.goalId ? repo.getGoal(task.goalId) : Promise.resolve(null),
+  ]);
+
   const cuando = task.dueAt
     ? `${dayLabelInTz(task.dueAt, ctx.tz)} · ${timeInTz(task.dueAt, ctx.tz)}`
     : 'Sin fecha';
@@ -29,6 +34,21 @@ export default async function TaskDetailPage({
         ← Hoy
       </Link>
       <h1 className="page-title">{task.title}</h1>
+      {(project || goal) && (
+        <p className="muted" style={{ marginBottom: 4 }}>
+          {project && (
+            <Link href={`/proyectos/${project.id}`} className="crumb">
+              {project.title}
+            </Link>
+          )}
+          {project && goal && ' › '}
+          {goal && (
+            <Link href={`/metas/${goal.id}`} className="crumb">
+              {goal.title}
+            </Link>
+          )}
+        </p>
+      )}
       <p className="muted" style={{ marginBottom: 16 }}>
         {cuando} · {task.status}
       </p>

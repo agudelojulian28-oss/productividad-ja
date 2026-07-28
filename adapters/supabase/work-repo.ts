@@ -115,6 +115,7 @@ export function workRepo(supabase: SupabaseClient, userId: string): WorkRepo {
       if (filter.dueFrom) q = q.gte('due_at', filter.dueFrom);
       if (filter.dueTo) q = q.lte('due_at', filter.dueTo);
       if (filter.goalId) q = q.eq('goal_id', filter.goalId);
+      if (filter.projectId) q = q.eq('project_id', filter.projectId);
       const { data, error } = await q.order('due_at', { ascending: true, nullsFirst: false });
       if (error) throw new Error(error.message);
       return ((data as DbTask[] | null) ?? []).map(toRow);

@@ -42,6 +42,7 @@ export interface TaskFilter {
   dueFrom?: string; // ISO (inclusive)
   dueTo?: string; // ISO (inclusive)
   goalId?: string;
+  projectId?: string;
 }
 
 export interface ProjectRow {

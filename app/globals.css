@@ -902,3 +902,10 @@ ol {
   flex-direction: column;
   gap: 12px;
 }
+.crumb {
+  color: var(--accent);
+  text-decoration: none;
+}
+.crumb:hover {
+  text-decoration: underline;
+}

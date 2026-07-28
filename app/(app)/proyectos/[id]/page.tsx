@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireContext } from '@/lib/auth';
 import { workRepo } from '@/adapters/supabase/work-repo';
+import { dayLabelInTz } from '@/lib/format';
 import { NewGoalForm } from './new-goal-form';
 import { DescriptionEditor } from '../../description-editor';
 import { setProjectDescriptionAction } from '@/app/actions/projects';
@@ -18,7 +19,11 @@ export default async function ProjectDetailPage({
   const repo = workRepo(supabase, ctx.userId);
   const project = await repo.getProject(id);
   if (!project) notFound();
-  const goals = await repo.listGoals(id);
+  const [goals, tasks] = await Promise.all([
+    repo.listGoals(id),
+    repo.listTasks({ projectId: id }),
+  ]);
+  const goalName = new Map(goals.map((g) => [g.id, g.title] as const));
 
   return (
     <div className="page">
@@ -48,6 +53,32 @@ export default async function ProjectDetailPage({
                 {g.title}
               </Link>
               <span className="pill">{g.status}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h2 className="section-title" style={{ marginTop: 24 }}>
+        Tareas · {tasks.length}
+      </h2>
+      {tasks.length === 0 ? (
+        <p className="muted" style={{ marginTop: 8 }}>
+          Sin tareas en este proyecto todavía.
+        </p>
+      ) : (
+        <ul style={{ marginTop: 8 }}>
+          {tasks.map((t) => (
+            <li key={t.id} className="row-card">
+              <div className="task-body">
+                <Link href={`/tareas/${t.id}`} className="task-title">
+                  {t.title}
+                </Link>
+                <span className="task-meta">
+                  {t.goalId ? `Meta: ${goalName.get(t.goalId) ?? '—'}` : 'Sin meta'}
+                  {t.dueAt ? ` · ${dayLabelInTz(t.dueAt, ctx.tz)}` : ''}
+                </span>
+              </div>
+              <span className="pill">{t.status === 'done' ? 'hecha' : 'pendiente'}</span>
             </li>
           ))}
         </ul>
