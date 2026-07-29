@@ -7,7 +7,8 @@ import { registrarMovimiento } from '@/core/finance/transactions';
 import { resumenFinanciero, porFuente, topGastos } from '@/core/finance/queries';
 import { detectarChoques, huecosLibres } from '@/lib/agenda';
 import type { StructureRepo } from '@/core/structure/ports';
-import { createDocument, appendToDocument } from '@/core/structure/documents';
+import { createDocument, appendToDocument, updateDocument, deleteDocument } from '@/core/structure/documents';
+import { planUndo, type AuditEntry } from '@/lib/undo';
 import {
   CrearTarea,
   Completar,
@@ -61,6 +62,8 @@ export interface ToolDeps {
     },
   ) => Promise<void>;
   deleteEvent?: (eventId: string, opts?: { scope?: EventScope }) => Promise<void>;
+  /** Última mutación del usuario (de audit_log), para `deshacer`. */
+  lastAudit?: () => Promise<AuditEntry | null>;
 }
 
 function summarize(t: TaskRow) {
@@ -281,6 +284,42 @@ export async function runTool(
         'agente',
       );
       return r.ok ? ok({ documento_id: r.value.id, titulo: r.value.title }) : r;
+    }
+    case 'deshacer': {
+      if (!deps.lastAudit) return err('EXTERNAL_ERROR', 'Deshacer no está disponible');
+      const plan = planUndo(await deps.lastAudit(), Date.now());
+      if (!plan.ok) return ok({ deshecho: false, motivo: plan.motivo });
+
+      if (plan.entityType === 'tasks') {
+        if (plan.kind === 'delete') {
+          const r = await deleteTask(ctx, repo, plan.entityId);
+          return r.ok ? ok({ deshecho: true, detalle: 'Se borró la tarea creada.' }) : r;
+        }
+        const b = plan.before!;
+        await repo.updateTask(plan.entityId, {
+          title: b.title as string,
+          notes: (b.notes as string | null) ?? null,
+          status: b.status as TaskRow['status'],
+          dueAt: (b.due_at as string | null) ?? null,
+          completedAt: (b.completed_at as string | null) ?? null,
+          goalId: (b.goal_id as string | null) ?? null,
+        });
+        return ok({ deshecho: true, detalle: 'Se restauró la tarea a su estado anterior.' });
+      }
+
+      // documents
+      if (!deps.structure) return err('EXTERNAL_ERROR', 'La documentación no está disponible');
+      if (plan.kind === 'delete') {
+        const r = await deleteDocument(ctx, deps.structure, plan.entityId);
+        return r.ok ? ok({ deshecho: true, detalle: 'Se borró el documento creado.' }) : r;
+      }
+      const b = plan.before!;
+      const r = await updateDocument(ctx, deps.structure, plan.entityId, {
+        title: b.title as string,
+        content: b.content as string,
+        pinned: b.pinned as boolean,
+      });
+      return r.ok ? ok({ deshecho: true, detalle: 'Se restauró el documento a su estado anterior.' }) : r;
     }
     case 'ver_calendario': {
       const p = parse(VerCalendario, rawInput);

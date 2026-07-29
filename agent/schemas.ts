@@ -166,6 +166,10 @@ export const Documentar = z
     path: ['doc_id'],
   });
 
+// Deshacer la última acción (alcance acotado, v2 §6.5). Sin parámetros: siempre
+// opera sobre la última mutación del usuario.
+export const Deshacer = z.object({});
+
 export const toolSchemas = {
   crear_tarea: CrearTarea,
   completar: Completar,
@@ -179,6 +183,7 @@ export const toolSchemas = {
   borrar_evento: BorrarEvento,
   registrar_movimiento: RegistrarMovimiento,
   documentar: Documentar,
+  deshacer: Deshacer,
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;
@@ -204,6 +209,9 @@ const descriptions: Record<ToolName, string> = {
   documentar:
     'Documenta el método de Julián: crea un documento nuevo o anexa a uno existente ' +
     '(proceso, preferencia o nota). Aditivo; no borra.',
+  deshacer:
+    'Deshace la última acción reciente (crear/renombrar una tarea o documento, últimos ' +
+    '5 minutos). Si no es reversible, explica por qué.',
 };
 
 /** Definiciones de herramientas para la API de Anthropic (JSON Schema desde Zod). */

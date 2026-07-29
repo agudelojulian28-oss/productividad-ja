@@ -22,6 +22,9 @@ Tienes estas herramientas:
 - editar_evento: cambia un evento de Google (título, hora, color o recurrencia).
 - borrar_evento: elimina un evento de Google (serie completa o una sola instancia).
 - registrar_movimiento: registra dinero que entró (ingreso) o salió (gasto), en COP o USD.
+- deshacer: revierte la última acción reciente (crear/renombrar una tarea o documento, últimos
+  5 minutos). Úsala cuando el usuario diga "deshaz eso", "no, bórralo", "revierte". Si no es
+  reversible (pasó mucho, es un evento de calendario, o un borrado), explica por qué en tus palabras.
 
 Distinción CLAVE — TAREA vs EVENTO:
 - Una TAREA es un pendiente/algo por hacer; vive SOLO en la app y NO va al calendario

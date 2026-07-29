@@ -30,6 +30,31 @@ export function buildAgentDeps(supabase: ServerSupabase, ctx: ActorContext): Age
     createEvent: (input) => createCalendarEvent(supabase, ctx, input),
     editEvent: (eventId, patch) => patchCalendarEvent(supabase, ctx, eventId, patch),
     deleteEvent: (eventId, opts) => deleteCalendarEvent(supabase, ctx, eventId, opts),
+    async lastAudit() {
+      const { data } = await supabase
+        .from('audit_log')
+        .select('action,entity_type,entity_id,before,after,occurred_at')
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!data) return null;
+      const r = data as {
+        action: string;
+        entity_type: string;
+        entity_id: string | null;
+        before: Record<string, unknown> | null;
+        after: Record<string, unknown> | null;
+        occurred_at: string;
+      };
+      return {
+        action: r.action,
+        entityType: r.entity_type,
+        entityId: r.entity_id,
+        before: r.before,
+        after: r.after,
+        occurredAt: r.occurred_at,
+      };
+    },
     async getCachedResult(id) {
       const { data } = await supabase
         .from('tool_executions')

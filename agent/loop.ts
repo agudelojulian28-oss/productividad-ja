@@ -42,6 +42,8 @@ export interface AgentDeps {
     },
   ) => Promise<void>;
   deleteEvent?: (eventId: string, opts?: { scope?: 'serie' | 'instancia' }) => Promise<void>;
+  /** Última mutación del usuario (audit_log), para `deshacer`. */
+  lastAudit?: () => Promise<import('@/lib/undo').AuditEntry | null>;
   /** Idempotencia: resultado ya ejecutado para este tool_call_id, si existe. */
   getCachedResult: (toolCallId: string) => Promise<unknown | undefined>;
   saveResult: (toolCallId: string, action: string, result: unknown) => Promise<void>;
