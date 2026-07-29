@@ -984,3 +984,98 @@ ol {
 .fin-sources .row-card {
   flex-wrap: wrap;
 }
+
+/* Panel */
+.fin-stale {
+  background: var(--warning-weak);
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+  border-radius: var(--radius-input);
+  padding: 12px 14px;
+  font-size: 14px;
+  margin: 12px 0 20px;
+}
+.fin-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.fin-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.fin-card.fin-dim {
+  opacity: 0.45;
+}
+.fin-card-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.fin-figure {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.fin-card-sub {
+  font-size: 12px;
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+.fin-pos {
+  color: var(--positive);
+}
+.fin-neg {
+  color: var(--negative);
+}
+.fin-block {
+  margin-top: 24px;
+}
+.fin-block-empty {
+  opacity: 0.7;
+}
+.fin-chart {
+  margin: 0;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.fin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fin-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.fin-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fin-row-amt {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.fin-delta {
+  font-size: 12px;
+  color: var(--text-subtle);
+  min-width: 64px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
