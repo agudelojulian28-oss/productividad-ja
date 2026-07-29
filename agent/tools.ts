@@ -5,6 +5,8 @@ import { consultar, buscar } from '@/core/work/queries';
 import type { FinanceRepo } from '@/core/finance/ports';
 import { registrarMovimiento } from '@/core/finance/transactions';
 import { resumenFinanciero, porFuente, topGastos } from '@/core/finance/queries';
+import type { StructureRepo } from '@/core/structure/ports';
+import { createDocument, appendToDocument } from '@/core/structure/documents';
 import {
   CrearTarea,
   Completar,
@@ -17,6 +19,7 @@ import {
   EditarEvento,
   BorrarEvento,
   RegistrarMovimiento,
+  Documentar,
   type ToolName,
 } from './schemas';
 import type { ZodType } from 'zod';
@@ -33,6 +36,7 @@ export interface ToolDeps {
   ctx: ActorContext;
   repo: WorkRepo;
   finance?: FinanceRepo;
+  structure?: StructureRepo;
   listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
   createEvent?: (input: {
     titulo: string;
@@ -128,6 +132,23 @@ export async function runTool(
         }
         return ok(arbol);
       }
+      if (vista === 'documentacion') {
+        if (!deps.structure) return err('EXTERNAL_ERROR', 'La documentación no está disponible');
+        const docs = await deps.structure.listDocuments(
+          p.value.proyecto_id ? { projectId: p.value.proyecto_id } : undefined,
+        );
+        return ok(
+          docs.map((d) => ({
+            doc_id: d.id,
+            titulo: d.title,
+            tipo: d.kind,
+            autor: d.author,
+            fijado: d.pinned,
+            proyecto_id: d.projectId,
+            contenido: d.content,
+          })),
+        );
+      }
 
       // ── Dinero (mismas vistas que pinta el panel: una cifra, una fuente) ──
       if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
@@ -209,6 +230,32 @@ export async function runTool(
         monto: money(r.value.baseAmountMinor),
         moneda: r.value.currency,
       });
+    }
+    case 'documentar': {
+      const p = parse(Documentar, rawInput);
+      if (!p.ok) return p;
+      if (!deps.structure) return err('EXTERNAL_ERROR', 'La documentación no está disponible');
+      const v = p.value;
+      if (v.modo === 'anexar') {
+        const r = await appendToDocument(ctx, deps.structure, {
+          id: v.doc_id!,
+          content: v.contenido,
+        });
+        return r.ok ? ok({ anexado: r.value.id, titulo: r.value.title }) : r;
+      }
+      const r = await createDocument(
+        ctx,
+        deps.structure,
+        {
+          title: v.titulo!,
+          content: v.contenido,
+          kind: v.tipo ?? 'nota',
+          areaId: v.area_id,
+          projectId: v.proyecto_id,
+        },
+        'agente',
+      );
+      return r.ok ? ok({ documento_id: r.value.id, titulo: r.value.title }) : r;
     }
     case 'ver_calendario': {
       const p = parse(VerCalendario, rawInput);

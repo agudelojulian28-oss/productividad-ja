@@ -3,6 +3,7 @@ import type { ServerSupabase } from '@/adapters/supabase/server';
 import type { ActorContext } from '@/core/types';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { financeRepo } from '@/adapters/supabase/finance-repo';
+import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { anthropicClient } from '@/adapters/anthropic/client';
 import { runAgent, type AgentDeps } from '@/agent/loop';
 import {
@@ -22,6 +23,7 @@ export function buildAgentDeps(supabase: ServerSupabase, ctx: ActorContext): Age
     ctx,
     repo,
     finance: financeRepo(supabase, ctx.userId),
+    structure: structureRepo(supabase, ctx.userId),
     listCalendar: (dateYmd) => getDayEvents(supabase, ctx, dateYmd),
     createEvent: (input) => createCalendarEvent(supabase, ctx, input),
     editEvent: (eventId, patch) => patchCalendarEvent(supabase, ctx, eventId, patch),

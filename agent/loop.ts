@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { ActorContext } from '@/core/types';
 import type { WorkRepo } from '@/core/work/ports';
 import type { FinanceRepo } from '@/core/finance/ports';
+import type { StructureRepo } from '@/core/structure/ports';
 import type { GEvent } from '@/adapters/google/calendar';
 import type { Recurrencia } from '@/lib/recurrence';
 import { AGENT_MODEL, PRICE } from '@/adapters/anthropic/client';
@@ -16,6 +17,7 @@ export interface AgentDeps {
   ctx: ActorContext;
   repo: WorkRepo;
   finance: FinanceRepo;
+  structure: StructureRepo;
   /** Efectos de calendario. Las TAREAS no van al calendario (ADR-022): solo EVENTOS. */
   listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
   createEvent?: (input: {
@@ -129,6 +131,7 @@ export async function* runAgent(
             ctx: deps.ctx,
             repo: deps.repo,
             finance: deps.finance,
+            structure: deps.structure,
             listCalendar: deps.listCalendar,
             createEvent: deps.createEvent,
             editEvent: deps.editEvent,

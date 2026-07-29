@@ -31,6 +31,7 @@ export const Consultar = z.object({
       'agenda_hoy',
       'pendientes',
       'estructura',
+      'documentacion',
       'resumen_financiero',
       'por_fuente',
       'gastos',
@@ -38,10 +39,15 @@ export const Consultar = z.object({
       'pipeline',
     ])
     .describe(
-      'Qué consultar. Trabajo: agenda_hoy, pendientes (tareas), estructura (proyectos y metas). ' +
+      'Qué consultar. Trabajo: agenda_hoy, pendientes (tareas), estructura (proyectos y metas), ' +
+        'documentacion (el método de Julián: procesos, preferencias y notas). ' +
         'Dinero: resumen_financiero (entró/salió/neto del mes), por_fuente, gastos (top del mes), ' +
         'por_cobrar y pipeline (ventas, llegan en la Etapa 5).',
     ),
+  proyecto_id: z
+    .uuid()
+    .optional()
+    .describe('Solo para vista=documentacion: limita a los documentos de ese proyecto'),
 });
 
 // Dinero al agente: el monto va en la moneda indicada (pesos o dólares), no en centavos.
@@ -128,6 +134,27 @@ export const BorrarEvento = z.object({
   alcance: Alcance.optional().describe('Por defecto borra la serie completa si es recurrente'),
 });
 
+// Documentar el método: crear un documento nuevo o anexar a uno existente. El agente
+// documenta de forma aditiva; nunca borra. author='agente' lo fija el runtime, no el modelo.
+export const Documentar = z
+  .object({
+    modo: z.enum(['crear', 'anexar']).describe('crear un documento nuevo, o anexar a uno existente'),
+    contenido: z.string().trim().min(1).max(100_000).describe('El texto a documentar (markdown simple)'),
+    titulo: z.string().trim().min(1).max(200).optional().describe('Título (obligatorio si modo=crear)'),
+    tipo: z.enum(['proceso', 'preferencia', 'nota']).optional().describe('Tipo del documento nuevo'),
+    proyecto_id: z.uuid().optional().describe('Proyecto al que pertenece (de consultar estructura)'),
+    area_id: z.uuid().optional().describe('Área a la que pertenece'),
+    doc_id: z.uuid().optional().describe('ID del documento a anexar (obligatorio si modo=anexar)'),
+  })
+  .refine((d) => d.modo !== 'crear' || !!d.titulo, {
+    message: 'Crear un documento necesita título',
+    path: ['titulo'],
+  })
+  .refine((d) => d.modo !== 'anexar' || !!d.doc_id, {
+    message: 'Anexar necesita el doc_id',
+    path: ['doc_id'],
+  });
+
 export const toolSchemas = {
   crear_tarea: CrearTarea,
   completar: Completar,
@@ -140,6 +167,7 @@ export const toolSchemas = {
   editar_evento: EditarEvento,
   borrar_evento: BorrarEvento,
   registrar_movimiento: RegistrarMovimiento,
+  documentar: Documentar,
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;
@@ -161,6 +189,9 @@ const descriptions: Record<ToolName, string> = {
   registrar_movimiento:
     'Registra un movimiento de dinero (ingreso o gasto), en COP o USD (con tasa). ' +
     'El monto va en la moneda, no en centavos.',
+  documentar:
+    'Documenta el método de Julián: crea un documento nuevo o anexa a uno existente ' +
+    '(proceso, preferencia o nota). Aditivo; no borra.',
 };
 
 /** Definiciones de herramientas para la API de Anthropic (JSON Schema desde Zod). */
