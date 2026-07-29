@@ -34,7 +34,8 @@ export async function updateSession(request: NextRequest) {
     path.startsWith('/auth') ||
     path.startsWith('/api/channels') ||
     path.startsWith('/api/worker') ||
-    path.startsWith('/api/summary');
+    path.startsWith('/api/summary') ||
+    path.startsWith('/api/auth/passkey');
 
   if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
