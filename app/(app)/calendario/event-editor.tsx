@@ -69,8 +69,8 @@ export function EventEditor({
   const [durMin, setDurMin] = useState(item ? durationOf(item) : 30);
   const [colorId, setColorId] = useState<string | null>(item?.colorId ?? null);
   const [descripcion, setDescripcion] = useState(item?.description ?? '');
-  const [proyecto, setProyecto] = useState('');
-  const [meta, setMeta] = useState('');
+  const [proyecto, setProyecto] = useState(item?.projectId ?? '');
+  const [meta, setMeta] = useState(item?.goalId ?? '');
   const [pending, startTransition] = useTransition();
 
   const metasDelProyecto = proyecto ? (goalsByProject[proyecto] ?? []) : [];
@@ -103,6 +103,8 @@ export function EventEditor({
         colorId: colorId ?? undefined,
         durationMin: durMin,
         descripcion: descripcion.trim() || null,
+        projectId: proyecto || null,
+        goalId: meta || null,
       });
       onDone();
     });
@@ -248,7 +250,7 @@ export function EventEditor({
                 style={{ resize: 'vertical', fontFamily: 'inherit' }}
               />
             </label>
-            {target.mode === 'create' && projects.length > 0 && (
+            {projects.length > 0 && (
               <>
                 <label className="cal-field-label">
                   Proyecto (opcional)

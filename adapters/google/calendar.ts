@@ -173,6 +173,9 @@ export interface EventPatch {
   tz?: string;
   colorId?: string;
   description?: string | null;
+  /** Asociación al árbol; `null` quita la etiqueta (extendedProperties.private). */
+  projectId?: string | null;
+  goalId?: string | null;
   /** RRULE(s); `[]` quita la recurrencia (evento pasa a único). Solo en la serie maestra. */
   recurrence?: string[];
 }
@@ -186,6 +189,12 @@ export async function patchEvent(
   if (patch.summary !== undefined) body.summary = patch.summary;
   if (patch.colorId !== undefined) body.colorId = patch.colorId;
   if (patch.description !== undefined) body.description = patch.description;
+  if (patch.projectId !== undefined || patch.goalId !== undefined) {
+    const priv: Record<string, string | null> = {};
+    if (patch.projectId !== undefined) priv.project_id = patch.projectId; // null borra la clave
+    if (patch.goalId !== undefined) priv.goal_id = patch.goalId;
+    body.extendedProperties = { private: priv };
+  }
   if (patch.startIso) body.start = { dateTime: patch.startIso, timeZone: patch.tz };
   if (patch.endIso) body.end = { dateTime: patch.endIso, timeZone: patch.tz };
   if (patch.recurrence !== undefined) body.recurrence = patch.recurrence;

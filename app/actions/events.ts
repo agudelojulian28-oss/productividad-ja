@@ -38,6 +38,8 @@ export async function editEventAction(
     colorId?: string;
     durationMin?: number;
     descripcion?: string | null;
+    projectId?: string | null;
+    goalId?: string | null;
   },
 ): Promise<Result<{ id: string }>> {
   const { supabase, ctx } = await requireContext();

@@ -17,6 +17,8 @@ export type CalItem = {
   allDay: boolean;
   colorId: string | null;
   description: string | null;
+  projectId: string | null;
+  goalId: string | null;
 };
 
 function addDaysYmd(ymd: string, n: number): string {

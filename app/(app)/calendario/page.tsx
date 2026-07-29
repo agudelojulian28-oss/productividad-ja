@@ -73,6 +73,8 @@ export default async function CalendarioPage({
       allDay: e.allDay,
       colorId: e.colorId,
       description: e.description,
+      projectId: e.projectId,
+      goalId: e.goalId,
     }),
   );
 

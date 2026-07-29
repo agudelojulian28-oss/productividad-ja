@@ -127,6 +127,8 @@ export async function patchCalendarEvent(
     recurrencia?: Recurrencia;
     scope?: EventScope;
     descripcion?: string | null;
+    projectId?: string | null;
+    goalId?: string | null;
   },
 ): Promise<void> {
   const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
@@ -148,6 +150,8 @@ export async function patchCalendarEvent(
   if (patch.titulo !== undefined) fields.summary = patch.titulo;
   if (patch.colorId !== undefined) fields.colorId = patch.colorId;
   if (patch.descripcion !== undefined) fields.description = patch.descripcion;
+  if (patch.projectId !== undefined) fields.projectId = patch.projectId;
+  if (patch.goalId !== undefined) fields.goalId = patch.goalId;
   if (patch.recurrencia !== undefined) fields.recurrence = buildRecurrence(patch.recurrencia);
 
   if (patch.fecha || patch.durationMin !== undefined) {
