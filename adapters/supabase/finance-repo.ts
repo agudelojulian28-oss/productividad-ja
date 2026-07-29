@@ -1,0 +1,216 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type {
+  FinanceRepo,
+  IncomeSourceRow,
+  IncomeModel,
+  TransactionRow,
+  CashflowMonthRow,
+  BySourceRow,
+  ExpenseCategoryRow,
+  ReceivableRow,
+  PipelineRow,
+} from '@/core/finance/ports';
+
+// Los sum() de bigint pueden volver como string desde PostgREST → Number() siempre.
+const n = (v: unknown): number => Number(v ?? 0);
+
+interface DbIncomeSource {
+  id: string;
+  area_id: string;
+  name: string;
+  model: IncomeModel;
+  status: 'active' | 'paused' | 'archived';
+}
+
+const SOURCE_COLS = 'id,area_id,name,model,status';
+
+function toSource(r: DbIncomeSource): IncomeSourceRow {
+  return { id: r.id, areaId: r.area_id, name: r.name, model: r.model, status: r.status };
+}
+
+interface DbTransaction {
+  id: string;
+  direction: 'in' | 'out';
+  amount_minor: number | string;
+  currency: string;
+  base_amount_minor: number | string;
+  fx_rate: number | string;
+  occurred_on: string;
+  area_id: string;
+  income_source_id: string | null;
+  category: string | null;
+}
+
+const TX_COLS =
+  'id,direction,amount_minor,currency,base_amount_minor,fx_rate,occurred_on,area_id,income_source_id,category';
+
+function toTx(r: DbTransaction): TransactionRow {
+  return {
+    id: r.id,
+    direction: r.direction,
+    amountMinor: n(r.amount_minor),
+    currency: r.currency,
+    baseAmountMinor: n(r.base_amount_minor),
+    fxRate: n(r.fx_rate),
+    occurredOn: r.occurred_on,
+    areaId: r.area_id,
+    incomeSourceId: r.income_source_id,
+    category: r.category,
+  };
+}
+
+/** Implementación de FinanceRepo sobre Supabase. Usa la sesión del usuario:
+ *  RLS y las vistas (security_invoker) garantizan que solo ve sus propias filas. */
+export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRepo {
+  return {
+    async insertIncomeSource(input) {
+      const { data, error } = await supabase
+        .from('income_sources')
+        .insert({
+          user_id: userId,
+          area_id: input.areaId,
+          name: input.name,
+          model: input.model,
+        })
+        .select(SOURCE_COLS)
+        .single();
+      if (error) throw new Error(error.message);
+      return toSource(data as DbIncomeSource);
+    },
+
+    async listIncomeSources(areaId) {
+      let q = supabase.from('income_sources').select(SOURCE_COLS).neq('status', 'archived');
+      if (areaId) q = q.eq('area_id', areaId);
+      const { data, error } = await q.order('name', { ascending: true });
+      if (error) throw new Error(error.message);
+      return ((data as DbIncomeSource[] | null) ?? []).map(toSource);
+    },
+
+    async getIncomeSource(id) {
+      const { data, error } = await supabase
+        .from('income_sources')
+        .select(SOURCE_COLS)
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? toSource(data as DbIncomeSource) : null;
+    },
+
+    async archiveIncomeSource(id) {
+      const { error } = await supabase
+        .from('income_sources')
+        .update({ status: 'archived' })
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+
+    async insertTransaction(input) {
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: userId,
+          area_id: input.areaId,
+          income_source_id: input.incomeSourceId ?? null,
+          direction: input.direction,
+          amount_minor: input.amountMinor,
+          currency: input.currency,
+          base_amount_minor: input.baseAmountMinor,
+          fx_rate: input.fxRate,
+          occurred_on: input.occurredOn,
+          category: input.category ?? null,
+          description: input.description ?? null,
+        })
+        .select(TX_COLS)
+        .single();
+      if (error) throw new Error(error.message);
+      return toTx(data as DbTransaction);
+    },
+
+    async cashflowMonthly() {
+      const { data, error } = await supabase
+        .from('fin_cashflow_monthly')
+        .select('area_id,month,inflow_minor,outflow_minor,net_minor,movements,last_recorded_at')
+        .order('month', { ascending: true });
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map(
+        (r): CashflowMonthRow => ({
+          areaId: r.area_id as string,
+          month: r.month as string,
+          inflowMinor: n(r.inflow_minor),
+          outflowMinor: n(r.outflow_minor),
+          netMinor: n(r.net_minor),
+          movements: n(r.movements),
+          lastRecordedAt: (r.last_recorded_at as string | null) ?? null,
+        }),
+      );
+    },
+
+    async bySource() {
+      const { data, error } = await supabase
+        .from('fin_by_source')
+        .select('income_source_id,name,model,area,this_month_minor,last_month_minor,ttm_minor')
+        .order('this_month_minor', { ascending: false });
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map(
+        (r): BySourceRow => ({
+          incomeSourceId: r.income_source_id as string,
+          name: r.name as string,
+          model: r.model as string,
+          area: r.area as string,
+          thisMonthMinor: n(r.this_month_minor),
+          lastMonthMinor: n(r.last_month_minor),
+          ttmMinor: n(r.ttm_minor),
+        }),
+      );
+    },
+
+    async expensesByCategory() {
+      const { data, error } = await supabase
+        .from('fin_expenses_by_category')
+        .select('area_id,month,category,amount_minor,movements')
+        .order('amount_minor', { ascending: false });
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map(
+        (r): ExpenseCategoryRow => ({
+          areaId: r.area_id as string,
+          month: r.month as string,
+          category: r.category as string,
+          amountMinor: n(r.amount_minor),
+          movements: n(r.movements),
+        }),
+      );
+    },
+
+    async receivables() {
+      const { data, error } = await supabase
+        .from('fin_receivables')
+        .select('sale_id,client,offering,outstanding_minor,days_outstanding,aging_bucket,marked_paid');
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map(
+        (r): ReceivableRow => ({
+          saleId: r.sale_id as string,
+          client: (r.client as string | null) ?? null,
+          offering: r.offering as string,
+          outstandingMinor: n(r.outstanding_minor),
+          daysOutstanding: n(r.days_outstanding),
+          agingBucket: r.aging_bucket as string,
+          markedPaid: Boolean(r.marked_paid),
+        }),
+      );
+    },
+
+    async pipeline() {
+      const { data, error } = await supabase
+        .from('fin_pipeline')
+        .select('stage,deals,value_minor');
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map(
+        (r): PipelineRow => ({
+          stage: r.stage as string,
+          deals: n(r.deals),
+          valueMinor: n(r.value_minor),
+        }),
+      );
+    },
+  };
+}

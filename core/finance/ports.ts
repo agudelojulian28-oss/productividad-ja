@@ -1,0 +1,110 @@
+// Puerto de datos del módulo finance. Los montos son enteros en unidades menores
+// (× 100). Las lecturas salen de las vistas fin_* (una cifra, una vista).
+
+export type IncomeModel =
+  | 'servicio'
+  | 'producto'
+  | 'suscripcion'
+  | 'empleo'
+  | 'inversion'
+  | 'otro';
+
+export interface IncomeSourceRow {
+  id: string;
+  areaId: string;
+  name: string;
+  model: IncomeModel;
+  status: 'active' | 'paused' | 'archived';
+}
+
+export interface IncomeSourceInsert {
+  areaId: string;
+  name: string;
+  model: IncomeModel;
+}
+
+export interface TransactionRow {
+  id: string;
+  direction: 'in' | 'out';
+  amountMinor: number;
+  currency: string;
+  baseAmountMinor: number;
+  fxRate: number;
+  occurredOn: string; // YYYY-MM-DD
+  areaId: string;
+  incomeSourceId: string | null;
+  category: string | null;
+}
+
+export interface TransactionInsert {
+  areaId: string;
+  incomeSourceId?: string;
+  direction: 'in' | 'out';
+  amountMinor: number;
+  currency: string;
+  baseAmountMinor: number;
+  fxRate: number;
+  occurredOn: string;
+  category?: string;
+  description?: string;
+}
+
+// ── Filas de las vistas ────────────────────────────────────────────────────
+export interface CashflowMonthRow {
+  areaId: string;
+  month: string; // YYYY-MM-DD (primero del mes)
+  inflowMinor: number;
+  outflowMinor: number;
+  netMinor: number;
+  movements: number;
+  lastRecordedAt: string | null; // ISO
+}
+
+export interface BySourceRow {
+  incomeSourceId: string;
+  name: string;
+  model: string;
+  area: string;
+  thisMonthMinor: number;
+  lastMonthMinor: number;
+  ttmMinor: number;
+}
+
+export interface ExpenseCategoryRow {
+  areaId: string;
+  month: string;
+  category: string;
+  amountMinor: number;
+  movements: number;
+}
+
+export interface ReceivableRow {
+  saleId: string;
+  client: string | null;
+  offering: string;
+  outstandingMinor: number;
+  daysOutstanding: number;
+  agingBucket: string;
+  markedPaid: boolean;
+}
+
+export interface PipelineRow {
+  stage: string;
+  deals: number;
+  valueMinor: number;
+}
+
+export interface FinanceRepo {
+  insertIncomeSource(input: IncomeSourceInsert): Promise<IncomeSourceRow>;
+  listIncomeSources(areaId?: string): Promise<IncomeSourceRow[]>;
+  getIncomeSource(id: string): Promise<IncomeSourceRow | null>;
+  archiveIncomeSource(id: string): Promise<void>;
+
+  insertTransaction(input: TransactionInsert): Promise<TransactionRow>;
+
+  cashflowMonthly(): Promise<CashflowMonthRow[]>;
+  bySource(): Promise<BySourceRow[]>;
+  expensesByCategory(): Promise<ExpenseCategoryRow[]>;
+  receivables(): Promise<ReceivableRow[]>;
+  pipeline(): Promise<PipelineRow[]>;
+}
