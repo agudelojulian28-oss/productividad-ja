@@ -5,6 +5,7 @@ import { consultar, buscar } from '@/core/work/queries';
 import type { FinanceRepo } from '@/core/finance/ports';
 import { registrarMovimiento } from '@/core/finance/transactions';
 import { resumenFinanciero, porFuente, topGastos } from '@/core/finance/queries';
+import { detectarChoques, huecosLibres } from '@/lib/agenda';
 import type { StructureRepo } from '@/core/structure/ports';
 import { createDocument, appendToDocument } from '@/core/structure/documents';
 import {
@@ -38,6 +39,7 @@ export interface ToolDeps {
   finance?: FinanceRepo;
   structure?: StructureRepo;
   listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
+  listRange?: (startYmd: string, endYmd: string) => Promise<GEvent[]>;
   createEvent?: (input: {
     titulo: string;
     fecha: string;
@@ -148,6 +150,29 @@ export async function runTool(
             contenido: d.content,
           })),
         );
+      }
+
+      // ── Agenda (choques y huecos, sobre los eventos de Google) ───────────
+      if (vista === 'conflictos' || vista === 'huecos') {
+        if (!deps.listRange) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
+        const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz }).format(new Date());
+        const fin = new Date(new Date(`${hoy}T12:00:00Z`).getTime() + 7 * 86_400_000)
+          .toISOString()
+          .slice(0, 10);
+        const eventos = await deps.listRange(hoy, fin);
+        if (vista === 'conflictos') {
+          const ch = detectarChoques(eventos);
+          return ok(
+            ch.map((c) => ({ evento_a: c.a, evento_b: c.b, desde: c.startIso, hasta: c.endIso })),
+          );
+        }
+        const huecos = huecosLibres(eventos, {
+          fromIso: new Date().toISOString(),
+          toIso: `${fin}T23:59:59Z`,
+          duracionMin: p.value.duracion_min ?? 60,
+          tz: ctx.tz,
+        });
+        return ok(huecos.slice(0, 10).map((h) => ({ desde: h.startIso, hasta: h.endIso })));
       }
 
       // ── Dinero (mismas vistas que pinta el panel: una cifra, una fuente) ──

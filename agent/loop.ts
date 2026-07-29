@@ -20,6 +20,7 @@ export interface AgentDeps {
   structure: StructureRepo;
   /** Efectos de calendario. Las TAREAS no van al calendario (ADR-022): solo EVENTOS. */
   listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
+  listRange?: (startYmd: string, endYmd: string) => Promise<GEvent[]>;
   createEvent?: (input: {
     titulo: string;
     fecha: string;

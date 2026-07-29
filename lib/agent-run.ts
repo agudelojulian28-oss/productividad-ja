@@ -8,6 +8,7 @@ import { anthropicClient } from '@/adapters/anthropic/client';
 import { runAgent, type AgentDeps } from '@/agent/loop';
 import {
   getDayEvents,
+  getRangeEvents,
   createCalendarEvent,
   patchCalendarEvent,
   deleteCalendarEvent,
@@ -25,6 +26,7 @@ export function buildAgentDeps(supabase: ServerSupabase, ctx: ActorContext): Age
     finance: financeRepo(supabase, ctx.userId),
     structure: structureRepo(supabase, ctx.userId),
     listCalendar: (dateYmd) => getDayEvents(supabase, ctx, dateYmd),
+    listRange: (startYmd, endYmd) => getRangeEvents(supabase, ctx, startYmd, endYmd),
     createEvent: (input) => createCalendarEvent(supabase, ctx, input),
     editEvent: (eventId, patch) => patchCalendarEvent(supabase, ctx, eventId, patch),
     deleteEvent: (eventId, opts) => deleteCalendarEvent(supabase, ctx, eventId, opts),

@@ -37,17 +37,28 @@ export const Consultar = z.object({
       'gastos',
       'por_cobrar',
       'pipeline',
+      'conflictos',
+      'huecos',
     ])
     .describe(
       'Qué consultar. Trabajo: agenda_hoy, pendientes (tareas), estructura (proyectos y metas), ' +
         'documentacion (el método de Julián: procesos, preferencias y notas). ' +
         'Dinero: resumen_financiero (entró/salió/neto del mes), por_fuente, gastos (top del mes), ' +
-        'por_cobrar y pipeline (ventas, llegan en la Etapa 5).',
+        'por_cobrar y pipeline (ventas, llegan en la Etapa 5). ' +
+        'Agenda: conflictos (eventos que se solapan en los próximos 7 días), ' +
+        'huecos (ratos libres para agendar; usa duracion_min).',
     ),
   proyecto_id: z
     .uuid()
     .optional()
     .describe('Solo para vista=documentacion: limita a los documentos de ese proyecto'),
+  duracion_min: z
+    .number()
+    .int()
+    .min(15)
+    .max(480)
+    .optional()
+    .describe('Solo para vista=huecos: duración deseada del hueco en minutos (60 por defecto)'),
 });
 
 // Dinero al agente: el monto va en la moneda indicada (pesos o dólares), no en centavos.
@@ -179,8 +190,9 @@ const descriptions: Record<ToolName, string> = {
   reprogramar: 'Cambia la fecha/hora de una tarea.',
   borrar: 'Borra una tarea de forma permanente.',
   consultar:
-    'Consulta una vista: trabajo (agenda_hoy, pendientes, estructura=proyectos y metas) o ' +
-    'dinero (resumen_financiero, por_fuente, gastos, por_cobrar, pipeline).',
+    'Consulta una vista: trabajo (agenda_hoy, pendientes, estructura=proyectos y metas), ' +
+    'dinero (resumen_financiero, por_fuente, gastos, por_cobrar, pipeline) o ' +
+    'agenda (conflictos=solapes, huecos=ratos libres).',
   buscar: 'Busca por texto en las tareas.',
   ver_calendario: 'Lista los eventos de Google Calendar de un día (por defecto hoy).',
   crear_evento: 'Crea un EVENTO en Google Calendar (algo agendado con hora). No es una tarea.',

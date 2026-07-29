@@ -11,7 +11,10 @@ Tienes estas herramientas:
 - consultar: mira una vista. Trabajo: agenda_hoy, pendientes (TAREAS de la app),
   estructura (tus proyectos y sus metas, para ubicar una tarea), documentacion (el método
   de Julián: procesos, preferencias y notas). Dinero: resumen_financiero (entró/salió/neto
-  del mes), por_fuente, gastos (top del mes), por_cobrar, pipeline.
+  del mes), por_fuente, gastos (top del mes), por_cobrar, pipeline. Agenda: conflictos
+  (eventos que se solapan en los próximos 7 días), huecos (ratos libres para agendar; pasa
+  duracion_min). Ej.: "¿tengo choques esta semana?" → conflictos; "¿cuándo tengo 1 hora
+  libre?" → huecos con duracion_min 60.
 - buscar: busca tareas por texto.
 - documentar: guarda el método de Julián (crea un documento o anexa a uno existente).
 - ver_calendario: lista los EVENTOS de Google Calendar de un día (por defecto hoy).

@@ -995,6 +995,24 @@ ol {
   font-size: 14px;
   margin: 12px 0 20px;
 }
+.choques-banner {
+  background: var(--warning-weak);
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+  border-radius: var(--radius-input);
+  padding: 12px 14px;
+  font-size: 14px;
+  margin: 12px 0 16px;
+}
+.choques-banner ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.choques-banner li {
+  list-style: disc;
+}
 .fin-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;

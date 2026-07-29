@@ -2,8 +2,10 @@ import { requireContext } from '@/lib/auth';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { getRangeEvents } from '@/lib/calendar-sync';
 import { todayInTz } from '@/lib/format';
+import { detectarChoques } from '@/lib/agenda';
 import { CalendarView, type CalItem, type CalView } from './calendar-view';
 import { RealtimeRefresh } from '../realtime-refresh';
+import { ChoquesBanner } from '../choques-banner';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,6 +83,7 @@ export default async function CalendarioPage({
   return (
     <div className="page">
       <RealtimeRefresh tables={['tasks', 'projects']} />
+      <ChoquesBanner choques={detectarChoques(events)} tz={ctx.tz} />
       <CalendarView
         view={view}
         date={date}

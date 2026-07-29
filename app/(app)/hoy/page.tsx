@@ -3,10 +3,12 @@ import { workRepo } from '@/adapters/supabase/work-repo';
 import { getDayEvents } from '@/lib/calendar-sync';
 import { todayInTz, dateInTz } from '@/lib/format';
 import type { TaskRow } from '@/core/work/ports';
+import { detectarChoques } from '@/lib/agenda';
 import { NewTaskForm } from './new-task-form';
 import { TaskItem } from './task-item';
 import { EventItem } from './event-item';
 import { RealtimeRefresh } from '../realtime-refresh';
+import { ChoquesBanner } from '../choques-banner';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +67,7 @@ export default async function HoyPage() {
     <div className="page">
       <RealtimeRefresh tables={['tasks', 'projects']} />
       <h1 className="page-title">Hoy</h1>
+      <ChoquesBanner choques={detectarChoques(calEvents)} tz={ctx.tz} />
       <NewTaskForm
         projects={projects.map((p) => ({ id: p.id, title: p.title }))}
         goalsByProject={goalsByProject}
