@@ -547,3 +547,43 @@ sincronizadas antes del cambio conservan su evento viejo en Google (no se limpia
 El catálogo del agente llega a **11 herramientas** (el tope). La asociación evento↔proyecto/meta
 queda pendiente (los eventos aún no cuelgan del árbol); se abordará con `extendedProperties` de
 Google más adelante.
+
+## ADR-023 · Login con huella (passkeys/WebAuthn) y excepción acotada de `service_role`
+
+> Extiende el acceso (correo+contraseña) con un segundo camino de entrada. No supersede a nadie.
+
+**Contexto.** Julián quiere **entrar con huella en el móvil**. Eso es WebAuthn/passkeys: el
+autenticador de plataforma firma un reto que el servidor verifica. Supabase Auth no ofrece passkeys
+como primer factor de forma nativa. Además, el middleware valida la sesión con
+`supabase.auth.getUser()` **contra el servidor de Auth**, así que un JWT firmado por nosotros (como
+el efímero del worker, ADR-018) **no** basta para crear una sesión de navegador: `getUser` lo
+rechazaría por no existir una sesión de GoTrue. Hace falta mintear una sesión real.
+
+**Decisión.**
+- Se implementa WebAuthn con `@simplewebauthn/*`. Las credenciales (clave pública, contador,
+  transports) viven en la tabla `webauthn_credentials` (RLS, propiedad del usuario). El reto viaja en
+  una cookie httpOnly firmada (HMAC con `WORKER_SECRET`), de vida corta; no se crea tabla de retos.
+- La huella **convive** con la contraseña, no la reemplaza: la clave es el arranque para registrar el
+  passkey (endpoints de registro exigen sesión) y el respaldo en equipos nuevos.
+- **Puente a sesión real, sin correo:** tras `verifyAuthenticationResponse` exitosa, el endpoint
+  `app/api/auth/passkey/login/verify` usa `service_role` **solo** para
+  `admin.generateLink({type:'magiclink', email})` (que genera un `token_hash` sin enviar correo); el
+  cliente hace `supabase.auth.verifyOtp({ token_hash })` y obtiene una sesión GoTrue completa (con
+  refresh token), idéntica a la del login por contraseña.
+- **Excepción a la regla no negociable #1** (`service_role` solo en `app/api/channels/*`): se permite
+  `service_role` también en `app/api/auth/passkey/**`, **exclusivamente** para `generateLink` tras una
+  aserción WebAuthn ya verificada. La regla depcruise `admin-only-from-channels` se amplía para incluir
+  esa carpeta. Ningún otro uso de `service_role` se habilita.
+
+**Alternativas descartadas.**
+- *JWT propio (HS256) puesto como sesión:* `getUser` lo rechaza (no hay sesión GoTrue); frágil.
+- *Recovery/magic link por correo:* depende del correo (que a Julián le falla y tiene rate limit bajo).
+- *Guardar el `refresh_token` cifrado y restaurarlo tras la huella:* funciona pero guarda un secreto
+  de larga vida; `generateLink`+`verifyOtp` es más limpio y usa APIs soportadas.
+- *No hacer passkeys y quedarse con el autocompletado biométrico del navegador (Opción A):* válido y
+  gratis, pero no es "entrar con huella" real; Julián lo pidió explícito.
+
+**Consecuencias.** Aparece un endpoint público (`login/options`, `login/verify`) protegido por la
+aserción WebAuthn (criptográfica), acotado al `ALLOWED_USER_ID`. `service_role` gana un segundo lugar
+de uso, documentado y verificado por depcruise. Nueva dependencia y nueva tabla con su RLS. WebAuthn
+exige HTTPS y `rpID` = dominio (`WEBAUTHN_RP_ID`/`WEBAUTHN_ORIGIN` en el entorno).

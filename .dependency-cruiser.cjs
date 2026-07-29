@@ -21,9 +21,11 @@ module.exports = {
     },
     {
       name: 'admin-only-from-channels',
-      comment: 'service_role (admin.ts) solo desde app/api/channels/**.',
+      comment:
+        'service_role (admin.ts) solo desde app/api/channels/** y app/api/auth/passkey/** ' +
+        '(este último solo para generateLink tras WebAuthn verificado, ADR-023).',
       severity: 'error',
-      from: { pathNot: '^app/api/channels/' },
+      from: { pathNot: '^app/api/(channels|auth/passkey)/' },
       to: { path: '^adapters/supabase/admin\\.ts$' },
     },
     {
