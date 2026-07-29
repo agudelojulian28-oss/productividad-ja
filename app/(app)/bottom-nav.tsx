@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation';
 
 const items = [
   { href: '/hoy', label: 'Hoy' },
+  { href: '/finanzas', label: 'Finanzas' },
   { href: '/calendario', label: 'Calendario' },
   { href: '/chat', label: 'Chat' },
-  { href: '/areas', label: 'Áreas' },
 ] as const;
 
 export function BottomNav() {

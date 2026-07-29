@@ -913,3 +913,74 @@ ol {
 .crumb:hover {
   text-decoration: underline;
 }
+
+/* ── Finanzas ───────────────────────────────────────────────────────────── */
+.link {
+  color: var(--accent);
+  text-decoration: none;
+}
+.link:hover {
+  text-decoration: underline;
+}
+.ok-text {
+  color: var(--positive);
+  font-size: 14px;
+}
+.fin-section {
+  margin-top: 28px;
+}
+.fin-h2 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.fin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.seg {
+  display: flex;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  padding: 4px;
+}
+.seg-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  touch-action: manipulation;
+}
+.seg-btn.seg-on {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.fin-amount-row {
+  display: flex;
+  gap: 8px;
+}
+.fin-amount {
+  flex: 1;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.fin-cur {
+  width: 90px;
+}
+.fin-submit {
+  margin-top: 4px;
+  padding: 14px;
+  font-size: 16px;
+}
+.fin-sources .row-card {
+  flex-wrap: wrap;
+}

@@ -1,13 +1,19 @@
 // Formato de dinero y fechas. Una sola función por cosa: dos formateadores
 // distintos producen dos verdades distintas sobre el mismo número.
 
-export function money(minor: bigint | number, opts: { compact?: boolean } = {}): string {
+export function money(
+  minor: bigint | number,
+  opts: { compact?: boolean; currency?: 'COP' | 'USD' } = {},
+): string {
+  const currency = opts.currency ?? 'COP';
   const value = Number(minor) / 100;
+  // COP no usa centavos; USD sí (2 decimales).
+  const fractionDigits = currency === 'USD' ? 2 : 0;
   return new Intl.NumberFormat('es-CO', {
     style: 'currency',
-    currency: 'COP',
+    currency,
     notation: opts.compact ? 'compact' : 'standard',
-    maximumFractionDigits: opts.compact ? 1 : 0,
+    maximumFractionDigits: opts.compact ? 1 : fractionDigits,
   }).format(value);
 }
 

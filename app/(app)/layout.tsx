@@ -8,6 +8,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="shell-header">
         <span className="brand">Productividad</span>
         <div className="shell-header-actions">
+          <Link href="/areas" className="linkbtn">
+            Áreas
+          </Link>
           <Link href="/ajustes" className="linkbtn">
             Ajustes
           </Link>
