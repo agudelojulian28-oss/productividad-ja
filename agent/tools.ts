@@ -17,9 +17,7 @@ import {
   Consultar,
   Buscar,
   VerCalendario,
-  CrearEvento,
-  EditarEvento,
-  BorrarEvento,
+  GestionarEvento,
   RegistrarMovimiento,
   Documentar,
   type ToolName,
@@ -339,55 +337,51 @@ export async function runTool(
         })),
       );
     }
-    case 'crear_evento': {
-      const p = parse(CrearEvento, rawInput);
+    case 'gestionar_evento': {
+      const p = parse(GestionarEvento, rawInput);
       if (!p.ok) return p;
-      if (!deps.createEvent) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
-      const colorId = p.value.color ? nameToColorId[p.value.color] : undefined;
-      const id = await deps.createEvent({
-        titulo: p.value.titulo,
-        fecha: p.value.fecha,
-        colorId,
-        durationMin: p.value.duracion_min,
-        descripcion: p.value.descripcion,
-        projectId: p.value.proyecto_id,
-        goalId: p.value.meta_id,
-      });
-      return ok({ evento_id: id });
-    }
-    case 'editar_evento': {
-      const p = parse(EditarEvento, rawInput);
-      if (!p.ok) return p;
-      if (!deps.editEvent) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
-      const colorId = p.value.color ? nameToColorId[p.value.color] : undefined;
-      try {
-        await deps.editEvent(p.value.evento_id, {
-          titulo: p.value.titulo,
-          fecha: p.value.fecha,
+      const v = p.value;
+      const colorId = v.color ? nameToColorId[v.color] : undefined;
+      const noEncontrado = err(
+        'NOT_FOUND',
+        'No encontré ese evento con ese ID. Llama a ver_calendario para obtener el ID actual y reintenta.',
+      );
+
+      if (v.accion === 'crear') {
+        if (!deps.createEvent) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
+        const id = await deps.createEvent({
+          titulo: v.titulo!,
+          fecha: v.fecha!,
           colorId,
-          recurrencia: p.value.recurrencia,
-          scope: p.value.alcance,
+          durationMin: v.duracion_min,
+          descripcion: v.descripcion,
+          projectId: v.proyecto_id,
+          goalId: v.meta_id,
         });
-        return ok({ editado: p.value.evento_id });
-      } catch {
-        return err(
-          'NOT_FOUND',
-          'No encontré ese evento con ese ID. Llama a ver_calendario para obtener el ID actual y reintenta.',
-        );
+        return ok({ evento_id: id });
       }
-    }
-    case 'borrar_evento': {
-      const p = parse(BorrarEvento, rawInput);
-      if (!p.ok) return p;
+      if (v.accion === 'editar') {
+        if (!deps.editEvent) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
+        try {
+          await deps.editEvent(v.evento_id!, {
+            titulo: v.titulo,
+            fecha: v.fecha,
+            colorId,
+            recurrencia: v.recurrencia,
+            scope: v.alcance,
+          });
+          return ok({ editado: v.evento_id });
+        } catch {
+          return noEncontrado;
+        }
+      }
+      // borrar
       if (!deps.deleteEvent) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
       try {
-        await deps.deleteEvent(p.value.evento_id, { scope: p.value.alcance ?? 'serie' });
-        return ok({ borrado: p.value.evento_id });
+        await deps.deleteEvent(v.evento_id!, { scope: v.alcance ?? 'serie' });
+        return ok({ borrado: v.evento_id });
       } catch {
-        return err(
-          'NOT_FOUND',
-          'No encontré ese evento con ese ID. Llama a ver_calendario para obtener el ID actual y reintenta.',
-        );
+        return noEncontrado;
       }
     }
   }

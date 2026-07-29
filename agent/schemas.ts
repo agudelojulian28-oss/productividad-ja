@@ -121,29 +121,35 @@ export const Recurrencia = z.object({
   veces: z.number().int().min(1).optional().describe('Termina tras N repeticiones'),
 });
 
-export const CrearEvento = z.object({
-  titulo: z.string().trim().min(1).max(200).describe('Título del evento'),
-  fecha: Instant.describe('Inicio del evento, ISO-8601 con offset'),
-  duracion_min: z.number().int().min(5).max(1440).optional().describe('Duración en minutos (30 por defecto)'),
-  color: z.enum(COLOR_NAMES).optional().describe('Color del evento'),
-  descripcion: z.string().max(5000).optional().describe('Descripción/notas del evento'),
-  proyecto_id: z.uuid().optional().describe('Proyecto al que pertenece (de estructura)'),
-  meta_id: z.uuid().optional().describe('Meta a la que pertenece (de estructura)'),
-});
-
-export const EditarEvento = z.object({
-  evento_id: z.string().min(1).describe('ID del evento de Google (de ver_calendario)'),
-  titulo: z.string().trim().min(1).max(200).optional().describe('Nuevo título'),
-  fecha: Instant.optional().describe('Nueva hora de inicio, ISO con offset'),
-  color: z.enum(COLOR_NAMES).optional().describe('Nuevo color del evento'),
-  recurrencia: Recurrencia.optional().describe('Nueva regla de repetición del evento'),
-  alcance: Alcance.optional().describe('A qué aplica el cambio; por defecto la serie si tocas recurrencia'),
-});
-
-export const BorrarEvento = z.object({
-  evento_id: z.string().min(1).describe('ID del evento de Google (de ver_calendario)'),
-  alcance: Alcance.optional().describe('Por defecto borra la serie completa si es recurrente'),
-});
+// Una sola herramienta para EVENTOS de Google Calendar (crear/editar/borrar), según
+// `accion`. Reemplaza a crear_evento/editar_evento/borrar_evento para mantener el
+// catálogo en 11 (CLAUDE.md). Los campos requeridos se validan por acción con refine.
+export const GestionarEvento = z
+  .object({
+    accion: z.enum(['crear', 'editar', 'borrar']).describe('Qué hacer con el evento'),
+    evento_id: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('ID del evento de Google (de ver_calendario). Requerido para editar/borrar'),
+    titulo: z.string().trim().min(1).max(200).optional().describe('Título (requerido al crear)'),
+    fecha: Instant.optional().describe('Inicio del evento, ISO-8601 con offset (requerido al crear)'),
+    duracion_min: z.number().int().min(5).max(1440).optional().describe('Duración en minutos (30 por defecto)'),
+    color: z.enum(COLOR_NAMES).optional().describe('Color del evento'),
+    descripcion: z.string().max(5000).optional().describe('Descripción/notas del evento'),
+    proyecto_id: z.uuid().optional().describe('Proyecto al que pertenece (de estructura)'),
+    meta_id: z.uuid().optional().describe('Meta a la que pertenece (de estructura)'),
+    recurrencia: Recurrencia.optional().describe('Regla de repetición (al editar)'),
+    alcance: Alcance.optional().describe('serie o instancia; por defecto la serie'),
+  })
+  .refine((d) => d.accion !== 'crear' || (!!d.titulo && !!d.fecha), {
+    message: 'Crear un evento necesita titulo y fecha',
+    path: ['titulo'],
+  })
+  .refine((d) => d.accion === 'crear' || !!d.evento_id, {
+    message: 'Editar o borrar necesita evento_id',
+    path: ['evento_id'],
+  });
 
 // Documentar el método: crear un documento nuevo o anexar a uno existente. El agente
 // documenta de forma aditiva; nunca borra. author='agente' lo fija el runtime, no el modelo.
@@ -178,9 +184,7 @@ export const toolSchemas = {
   consultar: Consultar,
   buscar: Buscar,
   ver_calendario: VerCalendario,
-  crear_evento: CrearEvento,
-  editar_evento: EditarEvento,
-  borrar_evento: BorrarEvento,
+  gestionar_evento: GestionarEvento,
   registrar_movimiento: RegistrarMovimiento,
   documentar: Documentar,
   deshacer: Deshacer,
@@ -200,9 +204,9 @@ const descriptions: Record<ToolName, string> = {
     'agenda (conflictos=solapes, huecos=ratos libres).',
   buscar: 'Busca por texto en las tareas.',
   ver_calendario: 'Lista los eventos de Google Calendar de un día (por defecto hoy).',
-  crear_evento: 'Crea un EVENTO en Google Calendar (algo agendado con hora). No es una tarea.',
-  editar_evento: 'Edita un evento de Google Calendar: título, hora, color o recurrencia.',
-  borrar_evento: 'Borra un evento de Google Calendar (serie completa o una instancia).',
+  gestionar_evento:
+    'Gestiona un EVENTO de Google Calendar según accion: crear (algo agendado con hora), ' +
+    'editar (título, hora, color, recurrencia) o borrar (serie o instancia). No es una tarea.',
   registrar_movimiento:
     'Registra un movimiento de dinero (ingreso o gasto), en COP o USD (con tasa). ' +
     'El monto va en la moneda, no en centavos.',
