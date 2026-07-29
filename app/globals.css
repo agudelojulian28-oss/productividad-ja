@@ -1109,3 +1109,24 @@ ol {
 .meta-bar-fill.meta-done {
   background: var(--positive);
 }
+
+/* Documentación */
+.doc-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.doc-title-input {
+  font-size: 18px;
+  font-weight: 600;
+}
+.doc-content {
+  line-height: 1.5;
+}
+.doc-pin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 14px;
+}

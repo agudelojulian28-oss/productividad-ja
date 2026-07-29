@@ -6,7 +6,9 @@ import { dayLabelInTz } from '@/lib/format';
 import { getEventsByProject } from '@/lib/calendar-sync';
 import { NewGoalForm } from './new-goal-form';
 import { DescriptionEditor } from '../../description-editor';
+import { NewDocForm } from '../../docs/new-doc-form';
 import { setProjectDescriptionAction } from '@/app/actions/projects';
+import { structureRepo } from '@/adapters/supabase/structure-repo';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,12 +20,14 @@ export default async function ProjectDetailPage({
   const { id } = await params;
   const { supabase, ctx } = await requireContext();
   const repo = workRepo(supabase, ctx.userId);
+  const structure = structureRepo(supabase, ctx.userId);
   const project = await repo.getProject(id);
   if (!project) notFound();
-  const [goals, tasks, events] = await Promise.all([
+  const [goals, tasks, events, docs] = await Promise.all([
     repo.listGoals(id),
     repo.listTasks({ projectId: id }),
     getEventsByProject(supabase, ctx, id),
+    structure.listDocuments({ projectId: id }),
   ]);
   const goalName = new Map(goals.map((g) => [g.id, g.title] as const));
 
@@ -101,6 +105,28 @@ export default async function ProjectDetailPage({
               <span className="pill">
                 {e.start ? dayLabelInTz(e.start, ctx.tz) : 'evento'}
               </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h2 className="section-title" style={{ marginTop: 24 }}>
+        Documentación · {docs.length}
+      </h2>
+      <NewDocForm fixedProjectId={project.id} />
+      {docs.length === 0 ? (
+        <p className="muted" style={{ marginTop: 8 }}>
+          Sin documentación de este proyecto. Documenta aquí cómo se hace su trabajo.
+        </p>
+      ) : (
+        <ul style={{ marginTop: 8 }}>
+          {docs.map((d) => (
+            <li key={d.id} className="row-card">
+              <Link href={`/docs/${d.id}`} className="task-title">
+                {d.pinned ? '📌 ' : ''}
+                {d.title}
+              </Link>
+              <span className="pill">{d.author === 'agente' ? 'agente' : 'tú'}</span>
             </li>
           ))}
         </ul>
