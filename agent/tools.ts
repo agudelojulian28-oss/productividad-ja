@@ -2,6 +2,9 @@ import { ok, err, type Result, type ActorContext } from '@/core/types';
 import type { WorkRepo, TaskRow } from '@/core/work/ports';
 import { createTask, completeTask, rescheduleTask, deleteTask } from '@/core/work/tasks';
 import { consultar, buscar } from '@/core/work/queries';
+import type { FinanceRepo } from '@/core/finance/ports';
+import { registrarMovimiento } from '@/core/finance/transactions';
+import { resumenFinanciero, porFuente, topGastos } from '@/core/finance/queries';
 import {
   CrearTarea,
   Completar,
@@ -13,12 +16,13 @@ import {
   CrearEvento,
   EditarEvento,
   BorrarEvento,
-  Estructura,
+  RegistrarMovimiento,
   type ToolName,
 } from './schemas';
 import type { ZodType } from 'zod';
 import type { GEvent } from '@/adapters/google/calendar';
 import { nameToColorId } from '@/lib/calendar-colors';
+import { money } from '@/lib/format';
 import type { Recurrencia } from '@/lib/recurrence';
 
 type EventScope = 'serie' | 'instancia';
@@ -28,6 +32,7 @@ type EventScope = 'serie' | 'instancia';
 export interface ToolDeps {
   ctx: ActorContext;
   repo: WorkRepo;
+  finance?: FinanceRepo;
   listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
   createEvent?: (input: {
     titulo: string;
@@ -102,8 +107,79 @@ export async function runTool(
     case 'consultar': {
       const p = parse(Consultar, rawInput);
       if (!p.ok) return p;
-      const r = await consultar(ctx, repo, p.value.vista);
-      return r.ok ? ok(r.value.map(summarize)) : r;
+      const vista = p.value.vista;
+
+      // ── Trabajo ────────────────────────────────────────────────────────
+      if (vista === 'agenda_hoy' || vista === 'pendientes') {
+        const r = await consultar(ctx, repo, vista);
+        return r.ok ? ok(r.value.map(summarize)) : r;
+      }
+      if (vista === 'estructura') {
+        const projects = await repo.listProjects();
+        const arbol = [];
+        for (const proj of projects) {
+          const metas = await repo.listGoals(proj.id);
+          arbol.push({
+            proyecto_id: proj.id,
+            titulo: proj.title,
+            area_id: proj.areaId,
+            metas: metas.map((g) => ({ meta_id: g.id, titulo: g.title })),
+          });
+        }
+        return ok(arbol);
+      }
+
+      // ── Dinero (mismas vistas que pinta el panel: una cifra, una fuente) ──
+      if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+      const fin = deps.finance;
+      if (vista === 'resumen_financiero') {
+        const r = resumenFinanciero(await fin.cashflowMonthly(), ctx.tz);
+        return ok({
+          mes: r.monthKey,
+          ingresos: money(r.inflowMinor),
+          gastos: money(r.outflowMinor),
+          neto: money(r.netMinor),
+          movimientos: r.movements,
+          desactualizado: r.stale,
+          ultimo_registro_hace_dias: r.staleDays,
+        });
+      }
+      if (vista === 'por_fuente') {
+        return ok(
+          porFuente(await fin.bySource()).map((f) => ({
+            fuente: f.name,
+            area: f.area,
+            este_mes: money(f.thisMonthMinor),
+            ultimos_12_meses: money(f.ttmMinor),
+          })),
+        );
+      }
+      if (vista === 'gastos') {
+        return ok(
+          topGastos(await fin.expensesByCategory(), ctx.tz).map((g) => ({
+            categoria: g.category,
+            monto: money(g.amountMinor),
+          })),
+        );
+      }
+      if (vista === 'por_cobrar') {
+        const rows = await fin.receivables();
+        if (rows.length === 0)
+          return ok({ items: [], nota: 'Sin cuentas por cobrar (las ventas llegan en la Etapa 5).' });
+        return ok(
+          rows.map((r) => ({
+            cliente: r.client,
+            oferta: r.offering,
+            pendiente: money(r.outstandingMinor),
+            dias: r.daysOutstanding,
+          })),
+        );
+      }
+      // pipeline
+      const rows = await fin.pipeline();
+      if (rows.length === 0)
+        return ok({ items: [], nota: 'Pipeline vacío (las ventas llegan en la Etapa 5).' });
+      return ok(rows.map((r) => ({ etapa: r.stage, tratos: r.deals, valor: money(r.valueMinor) })));
     }
     case 'buscar': {
       const p = parse(Buscar, rawInput);
@@ -111,21 +187,28 @@ export async function runTool(
       const r = await buscar(ctx, repo, p.value.texto);
       return r.ok ? ok(r.value.map(summarize)) : r;
     }
-    case 'estructura': {
-      const p = parse(Estructura, rawInput);
+    case 'registrar_movimiento': {
+      const p = parse(RegistrarMovimiento, rawInput);
       if (!p.ok) return p;
-      const projects = await repo.listProjects();
-      const arbol = [];
-      for (const proj of projects) {
-        const metas = await repo.listGoals(proj.id);
-        arbol.push({
-          proyecto_id: proj.id,
-          titulo: proj.title,
-          area_id: proj.areaId,
-          metas: metas.map((g) => ({ meta_id: g.id, titulo: g.title })),
-        });
-      }
-      return ok(arbol);
+      if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+      const v = p.value;
+      const r = await registrarMovimiento(ctx, deps.finance, {
+        direction: v.tipo === 'ingreso' ? 'in' : 'out',
+        amountMinor: Math.round(v.monto * 100),
+        currency: v.moneda,
+        areaId: v.area_id,
+        incomeSourceId: v.fuente_id,
+        category: v.categoria,
+        occurredOn: v.fecha,
+        fxRate: v.tasa,
+      });
+      if (!r.ok) return r;
+      return ok({
+        registrado: r.value.id,
+        tipo: v.tipo,
+        monto: money(r.value.baseAmountMinor),
+        moneda: r.value.currency,
+      });
     }
     case 'ver_calendario': {
       const p = parse(VerCalendario, rawInput);

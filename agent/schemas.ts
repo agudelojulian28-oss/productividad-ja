@@ -16,8 +16,6 @@ export const CrearTarea = z.object({
   meta_id: z.uuid().optional().describe('ID de la meta, opcional (de estructura)'),
 });
 
-export const Estructura = z.object({});
-
 export const Completar = z.object({
   tarea_id: z.uuid().describe('ID de la tarea a completar'),
 });
@@ -29,8 +27,44 @@ export const Reprogramar = z.object({
 
 export const Consultar = z.object({
   vista: z
-    .enum(['agenda_hoy', 'pendientes'])
-    .describe('Qué consultar: agenda de hoy o pendientes'),
+    .enum([
+      'agenda_hoy',
+      'pendientes',
+      'estructura',
+      'resumen_financiero',
+      'por_fuente',
+      'gastos',
+      'por_cobrar',
+      'pipeline',
+    ])
+    .describe(
+      'Qué consultar. Trabajo: agenda_hoy, pendientes (tareas), estructura (proyectos y metas). ' +
+        'Dinero: resumen_financiero (entró/salió/neto del mes), por_fuente, gastos (top del mes), ' +
+        'por_cobrar y pipeline (ventas, llegan en la Etapa 5).',
+    ),
+});
+
+// Dinero al agente: el monto va en la moneda indicada (pesos o dólares), no en centavos.
+const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Día YYYY-MM-DD');
+export const RegistrarMovimiento = z.object({
+  tipo: z.enum(['ingreso', 'gasto']).describe('ingreso = entró plata; gasto = salió'),
+  monto: z
+    .number()
+    .positive()
+    .describe('Monto en la moneda indicada (pesos o dólares), NO en centavos. Ej. 50000, 12.5'),
+  moneda: z.enum(['COP', 'USD']).default('COP').describe('Moneda del monto'),
+  area_id: z.uuid().describe('Área a la que pertenece (usa consultar estructura para el ID)'),
+  fuente_id: z
+    .uuid()
+    .optional()
+    .describe('Fuente de ingreso (obligatoria si tipo=ingreso; usa consultar por_fuente)'),
+  categoria: z.string().trim().max(80).optional().describe('Categoría del gasto (ej. almuerzo)'),
+  fecha: Ymd.optional().describe('Día YYYY-MM-DD; por defecto hoy'),
+  tasa: z
+    .number()
+    .positive()
+    .optional()
+    .describe('COP por 1 USD (obligatoria si moneda=USD). Se congela al registrar.'),
 });
 
 export const Buscar = z.object({
@@ -105,7 +139,7 @@ export const toolSchemas = {
   crear_evento: CrearEvento,
   editar_evento: EditarEvento,
   borrar_evento: BorrarEvento,
-  estructura: Estructura,
+  registrar_movimiento: RegistrarMovimiento,
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;
@@ -116,13 +150,17 @@ const descriptions: Record<ToolName, string> = {
   completar: 'Marca una tarea como completada.',
   reprogramar: 'Cambia la fecha/hora de una tarea.',
   borrar: 'Borra una tarea de forma permanente.',
-  consultar: 'Consulta la agenda de hoy o la lista de pendientes (solo tareas).',
+  consultar:
+    'Consulta una vista: trabajo (agenda_hoy, pendientes, estructura=proyectos y metas) o ' +
+    'dinero (resumen_financiero, por_fuente, gastos, por_cobrar, pipeline).',
   buscar: 'Busca por texto en las tareas.',
   ver_calendario: 'Lista los eventos de Google Calendar de un día (por defecto hoy).',
   crear_evento: 'Crea un EVENTO en Google Calendar (algo agendado con hora). No es una tarea.',
   editar_evento: 'Edita un evento de Google Calendar: título, hora, color o recurrencia.',
   borrar_evento: 'Borra un evento de Google Calendar (serie completa o una instancia).',
-  estructura: 'Lista los proyectos del usuario y sus metas (para ubicar tareas). Sin parámetros.',
+  registrar_movimiento:
+    'Registra un movimiento de dinero (ingreso o gasto), en COP o USD (con tasa). ' +
+    'El monto va en la moneda, no en centavos.',
 };
 
 /** Definiciones de herramientas para la API de Anthropic (JSON Schema desde Zod). */

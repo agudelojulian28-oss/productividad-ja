@@ -59,13 +59,49 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
       return row;
     },
     async cashflowMonthly() {
-      return [];
+      // Agrega _txs por (área, mes) como la vista fin_cashflow_monthly.
+      const acc = new Map<string, { areaId: string; month: string; inflow: number; outflow: number; movs: number }>();
+      for (const t of txs) {
+        const month = `${t.occurredOn.slice(0, 7)}-01`;
+        const key = `${t.areaId}|${month}`;
+        const cur = acc.get(key) ?? { areaId: t.areaId, month, inflow: 0, outflow: 0, movs: 0 };
+        if (t.direction === 'in') cur.inflow += t.baseAmountMinor;
+        else cur.outflow += t.baseAmountMinor;
+        cur.movs += 1;
+        acc.set(key, cur);
+      }
+      return [...acc.values()].map((r) => ({
+        areaId: r.areaId,
+        month: r.month,
+        inflowMinor: r.inflow,
+        outflowMinor: r.outflow,
+        netMinor: r.inflow - r.outflow,
+        movements: r.movs,
+        lastRecordedAt: new Date().toISOString(),
+      }));
     },
     async bySource() {
       return [];
     },
     async expensesByCategory() {
-      return [];
+      const acc = new Map<string, { areaId: string; month: string; category: string; amount: number; movs: number }>();
+      for (const t of txs) {
+        if (t.direction !== 'out') continue;
+        const month = `${t.occurredOn.slice(0, 7)}-01`;
+        const category = t.category?.trim() || 'sin categoría';
+        const key = `${t.areaId}|${month}|${category}`;
+        const cur = acc.get(key) ?? { areaId: t.areaId, month, category, amount: 0, movs: 0 };
+        cur.amount += t.baseAmountMinor;
+        cur.movs += 1;
+        acc.set(key, cur);
+      }
+      return [...acc.values()].map((r) => ({
+        areaId: r.areaId,
+        month: r.month,
+        category: r.category,
+        amountMinor: r.amount,
+        movements: r.movs,
+      }));
     },
     async receivables() {
       return [];

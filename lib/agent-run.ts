@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { ServerSupabase } from '@/adapters/supabase/server';
 import type { ActorContext } from '@/core/types';
 import { workRepo } from '@/adapters/supabase/work-repo';
+import { financeRepo } from '@/adapters/supabase/finance-repo';
 import { anthropicClient } from '@/adapters/anthropic/client';
 import { runAgent, type AgentDeps } from '@/agent/loop';
 import {
@@ -20,6 +21,7 @@ export function buildAgentDeps(supabase: ServerSupabase, ctx: ActorContext): Age
     client: anthropicClient(),
     ctx,
     repo,
+    finance: financeRepo(supabase, ctx.userId),
     listCalendar: (dateYmd) => getDayEvents(supabase, ctx, dateYmd),
     createEvent: (input) => createCalendarEvent(supabase, ctx, input),
     editEvent: (eventId, patch) => patchCalendarEvent(supabase, ctx, eventId, patch),
