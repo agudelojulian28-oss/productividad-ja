@@ -13,6 +13,7 @@ import { RealtimeRefresh } from '../realtime-refresh';
 import { RegistrarMovimiento } from './registrar-movimiento';
 import { FuentesManager } from './fuentes-manager';
 import { CashflowChart } from './cashflow-chart';
+import { MetasDinero } from './metas-dinero';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,12 +29,13 @@ export default async function FinanzasPage() {
   const structure = structureRepo(supabase, ctx.userId);
   const finance = financeRepo(supabase, ctx.userId);
 
-  const [areas, sources, cashflow, bySrc, expenses] = await Promise.all([
+  const [areas, sources, cashflow, bySrc, expenses, metas] = await Promise.all([
     structure.listAreas(),
     finance.listIncomeSources(),
     finance.cashflowMonthly(),
     finance.bySource(),
     finance.expensesByCategory(),
+    finance.moneyGoalsProgress(),
   ]);
 
   const resumen = resumenFinanciero(cashflow, ctx.tz);
@@ -131,6 +133,25 @@ export default async function FinanzasPage() {
           </ul>
         )}
       </section>
+
+      {areas.length > 0 && (
+        <section className="fin-block">
+          <h2 className="fin-h2">Metas de dinero</h2>
+          <MetasDinero
+            areas={areaOpts}
+            sources={sourceOpts}
+            metas={metas.map((m) => ({
+              goalId: m.goalId,
+              title: m.title,
+              metric: m.metric,
+              targetValue: m.targetValue,
+              currentValue: m.currentValue,
+              periodEnd: m.periodEnd,
+            }))}
+            today={todayInTz(ctx.tz)}
+          />
+        </section>
+      )}
 
       {/* ⑥⑦ dependen de ventas (Etapa 5) */}
       <section className="fin-block fin-block-empty">

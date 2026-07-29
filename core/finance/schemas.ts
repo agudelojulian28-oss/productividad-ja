@@ -46,3 +46,29 @@ export const MovimientoCreate = z
     path: ['fxRate'],
   });
 export type MovimientoCreateInput = z.infer<typeof MovimientoCreate>;
+
+// Metas de dinero. Miden contra las transacciones vía la vista goal_progress:
+//  money_in = ingresos del periodo; money_net = ingresos − gastos. El objetivo va
+//  en pesos (COP base), acotado a un área o a una fuente. project_id queda null.
+export const MONEY_METRICS = ['money_in', 'money_net'] as const;
+
+export const MoneyGoalCreate = z
+  .object({
+    title: z.string().trim().min(1, 'El nombre es obligatorio').max(120),
+    metric: z.enum(MONEY_METRICS),
+    /** Objetivo en pesos (COP), no en centavos. */
+    targetValue: z.number().positive().max(1_000_000_000_000),
+    areaId: z.uuid().optional(),
+    incomeSourceId: z.uuid().optional(),
+    periodStart: Ymd,
+    periodEnd: Ymd,
+  })
+  .refine((d) => !!d.areaId || !!d.incomeSourceId, {
+    message: 'La meta necesita un área o una fuente',
+    path: ['areaId'],
+  })
+  .refine((d) => d.periodStart <= d.periodEnd, {
+    message: 'El inicio no puede ser posterior al cumplimiento',
+    path: ['periodEnd'],
+  });
+export type MoneyGoalCreateInput = z.infer<typeof MoneyGoalCreate>;

@@ -8,6 +8,7 @@ import {
   createIncomeSource,
   archiveIncomeSource,
 } from '@/core/finance/income-sources';
+import { createMoneyGoal } from '@/core/finance/goals';
 import type { Result } from '@/core/types';
 import type { IncomeSourceRow, TransactionRow, IncomeModel } from '@/core/finance/ports';
 
@@ -32,6 +33,21 @@ export async function archiveIncomeSourceAction(
 ): Promise<Result<{ id: string }>> {
   const { ctx, repo } = await deps();
   const result = await archiveIncomeSource(ctx, repo, id);
+  revalidatePath('/finanzas');
+  return result;
+}
+
+export async function createMoneyGoalAction(input: {
+  title: string;
+  metric: 'money_in' | 'money_net';
+  targetValue: number;
+  areaId?: string;
+  incomeSourceId?: string;
+  periodStart: string;
+  periodEnd: string;
+}): Promise<Result<{ id: string }>> {
+  const { ctx, repo } = await deps();
+  const result = await createMoneyGoal(ctx, repo, input);
   revalidatePath('/finanzas');
   return result;
 }

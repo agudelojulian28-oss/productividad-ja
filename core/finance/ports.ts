@@ -94,6 +94,28 @@ export interface PipelineRow {
   valueMinor: number;
 }
 
+export interface MoneyGoalInsert {
+  title: string;
+  metric: 'money_in' | 'money_net';
+  targetValue: number; // en pesos (COP)
+  areaId?: string;
+  incomeSourceId?: string;
+  periodStart: string;
+  periodEnd: string;
+}
+
+// Fila de la vista goal_progress, ya con el progreso calculado (en pesos).
+export interface MoneyGoalProgressRow {
+  goalId: string;
+  title: string;
+  metric: 'money_in' | 'money_net';
+  targetValue: number; // pesos
+  currentValue: number; // pesos
+  periodStart: string;
+  periodEnd: string;
+  status: string;
+}
+
 export interface FinanceRepo {
   insertIncomeSource(input: IncomeSourceInsert): Promise<IncomeSourceRow>;
   listIncomeSources(areaId?: string): Promise<IncomeSourceRow[]>;
@@ -101,6 +123,9 @@ export interface FinanceRepo {
   archiveIncomeSource(id: string): Promise<void>;
 
   insertTransaction(input: TransactionInsert): Promise<TransactionRow>;
+
+  insertMoneyGoal(input: MoneyGoalInsert): Promise<{ id: string }>;
+  moneyGoalsProgress(): Promise<MoneyGoalProgressRow[]>;
 
   cashflowMonthly(): Promise<CashflowMonthRow[]>;
   bySource(): Promise<BySourceRow[]>;

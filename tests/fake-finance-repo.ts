@@ -5,20 +5,42 @@ import type {
   IncomeSourceInsert,
   TransactionRow,
   TransactionInsert,
+  MoneyGoalInsert,
+  MoneyGoalProgressRow,
 } from '@/core/finance/ports';
 
 export function makeFakeFinanceRepo(): FinanceRepo & {
   _sources: Map<string, IncomeSourceRow>;
   _txs: TransactionRow[];
+  _goals: MoneyGoalProgressRow[];
 } {
   const sources = new Map<string, IncomeSourceRow>();
   const txs: TransactionRow[] = [];
+  const goals: MoneyGoalProgressRow[] = [];
   let seq = 0;
   const uuid = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`;
 
   return {
     _sources: sources,
     _txs: txs,
+    _goals: goals,
+    async insertMoneyGoal(input: MoneyGoalInsert): Promise<{ id: string }> {
+      const id = uuid();
+      goals.push({
+        goalId: id,
+        title: input.title,
+        metric: input.metric,
+        targetValue: input.targetValue,
+        currentValue: 0,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        status: 'active',
+      });
+      return { id };
+    },
+    async moneyGoalsProgress(): Promise<MoneyGoalProgressRow[]> {
+      return goals.filter((g) => g.status === 'active');
+    },
     async insertIncomeSource(input: IncomeSourceInsert): Promise<IncomeSourceRow> {
       const row: IncomeSourceRow = {
         id: uuid(),

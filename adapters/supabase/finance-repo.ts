@@ -9,6 +9,7 @@ import type {
   ExpenseCategoryRow,
   ReceivableRow,
   PipelineRow,
+  MoneyGoalProgressRow,
 } from '@/core/finance/ports';
 
 // Los sum() de bigint pueden volver como string desde PostgREST → Number() siempre.
@@ -124,6 +125,49 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
         .single();
       if (error) throw new Error(error.message);
       return toTx(data as DbTransaction);
+    },
+
+    async insertMoneyGoal(input) {
+      // Meta de dinero: metric money_in/money_net, en COP (base), sin proyecto.
+      const { data, error } = await supabase
+        .from('goals')
+        .insert({
+          user_id: userId,
+          project_id: null,
+          area_id: input.areaId ?? null,
+          income_source_id: input.incomeSourceId ?? null,
+          title: input.title,
+          metric: input.metric,
+          target_value: input.targetValue,
+          currency: 'COP',
+          manual_value: 0,
+          period_start: input.periodStart,
+          period_end: input.periodEnd,
+          status: 'active',
+        })
+        .select('id')
+        .single();
+      if (error) throw new Error(error.message);
+      return { id: (data as { id: string }).id };
+    },
+
+    async moneyGoalsProgress() {
+      const { data, error } = await supabase
+        .from('goal_progress')
+        .select('goal_id,title,metric,target_value,current_value,period_start,period_end,status')
+        .in('metric', ['money_in', 'money_net'])
+        .eq('status', 'active');
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map((r): MoneyGoalProgressRow => ({
+        goalId: r.goal_id as string,
+        title: r.title as string,
+        metric: r.metric as 'money_in' | 'money_net',
+        targetValue: n(r.target_value),
+        currentValue: n(r.current_value),
+        periodStart: r.period_start as string,
+        periodEnd: r.period_end as string,
+        status: r.status as string,
+      }));
     },
 
     async cashflowMonthly() {

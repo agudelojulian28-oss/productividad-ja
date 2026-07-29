@@ -1079,3 +1079,33 @@ ol {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+.meta-money {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.meta-money-head,
+.meta-money-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.meta-bar {
+  height: 8px;
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+.meta-bar-fill {
+  height: 100%;
+  background: var(--grad-accent);
+  border-radius: var(--radius-pill);
+}
+.meta-bar-fill.meta-done {
+  background: var(--positive);
+}
