@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { startAuthentication } from '@simplewebauthn/browser';
 import { createClient } from '@/adapters/supabase/client';
 
 export default function LoginPage() {
@@ -8,6 +9,38 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [supportsHuella, setSupportsHuella] = useState(false);
+
+  useEffect(() => {
+    setSupportsHuella(typeof window !== 'undefined' && !!window.PublicKeyCredential);
+  }, []);
+
+  async function entrarConHuella() {
+    setError(null);
+    setLoading(true);
+    try {
+      const optRes = await fetch('/api/auth/passkey/login/options', { method: 'POST' });
+      if (optRes.status === 404) throw new Error('Aún no has activado la huella en este dispositivo.');
+      if (!optRes.ok) throw new Error('No se pudo iniciar el acceso con huella.');
+      const optionsJSON = await optRes.json();
+      const asseResp = await startAuthentication({ optionsJSON });
+      const verifyRes = await fetch('/api/auth/passkey/login/verify', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(asseResp),
+      });
+      if (!verifyRes.ok) throw new Error('La huella no coincidió.');
+      const { token_hash } = (await verifyRes.json()) as { token_hash: string };
+      const supabase = createClient();
+      const { error } = await supabase.auth.verifyOtp({ token_hash, type: 'magiclink' });
+      if (error) throw new Error(error.message);
+      window.location.assign('/hoy');
+    } catch (e) {
+      setLoading(false);
+      const m = e instanceof Error ? e.message : 'Error con la huella';
+      setError(m.includes('NotAllowed') ? 'Cancelaste la huella.' : m);
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -86,6 +119,24 @@ export default function LoginPage() {
           >
             {loading ? 'Entrando…' : 'Entrar'}
           </button>
+          {supportsHuella && (
+            <button
+              type="button"
+              onClick={entrarConHuella}
+              disabled={loading}
+              style={{
+                background: 'transparent',
+                color: 'var(--text)',
+                border: '1px solid var(--border-strong)',
+                borderRadius: 'var(--radius-input)',
+                padding: '12px 14px',
+                fontWeight: 600,
+                opacity: loading ? 0.6 : 1,
+              }}
+            >
+              🔒 Entrar con huella
+            </button>
+          )}
           {error && <p style={{ color: 'var(--negative)', fontSize: 14 }}>{error}</p>}
         </form>
       </div>

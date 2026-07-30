@@ -1,4 +1,5 @@
 import { requireContext } from '@/lib/auth';
+import { PasskeyManager } from './passkey-manager';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,15 @@ export default async function AjustesPage({
     .eq('provider', 'google')
     .maybeSingle();
   const connected = Boolean(data);
+
+  const { data: credsRaw } = await supabase
+    .from('webauthn_credentials')
+    .select('credential_id,device_label,created_at')
+    .order('created_at', { ascending: false });
+  const credentials = (
+    (credsRaw as { credential_id: string; device_label: string | null; created_at: string }[] | null) ??
+    []
+  ).map((c) => ({ credentialId: c.credential_id, label: c.device_label, createdAt: c.created_at }));
 
   return (
     <div className="page">
@@ -52,6 +62,10 @@ export default async function AjustesPage({
             Conectar
           </a>
         )}
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <PasskeyManager credentials={credentials} />
       </div>
     </div>
   );
