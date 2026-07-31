@@ -12,6 +12,13 @@ import { SYSTEM_PROMPT } from './prompt';
 
 const MAX_ITERATIONS = 8; // corta bucles del modelo (causa de facturas sorpresa)
 
+/** Imagen adjunta al mensaje del usuario (base64). Claude la entiende de forma
+ *  nativa (visión). Los formatos que acepta la API son estos cuatro. */
+export interface InputImage {
+  mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+  data: string; // base64 sin el prefijo data:
+}
+
 export interface AgentDeps {
   client: Anthropic;
   ctx: ActorContext;
@@ -74,16 +81,30 @@ export async function* runAgent(
   deps: AgentDeps,
   history: Anthropic.MessageParam[],
   userMessage: string,
+  images: InputImage[] = [],
 ): AsyncGenerator<AgentEvent, void, unknown> {
   const now = new Date();
   const nowLine =
     `Ahora: ${now.toLocaleString('es-CO', { timeZone: deps.ctx.tz })} ` +
     `(zona ${deps.ctx.tz}). Hora ISO: ${now.toISOString()}`;
 
-  const messages: Anthropic.MessageParam[] = [
-    ...history,
-    { role: 'user', content: `${nowLine}\n\n${userMessage}` },
-  ];
+  const text = `${nowLine}\n\n${userMessage}`;
+  // Con imágenes, el contenido va como bloques (texto + imágenes). Sin imágenes,
+  // se mantiene como string para no alterar el layout de caché.
+  const userContent: Anthropic.MessageParam['content'] =
+    images.length > 0
+      ? [
+          { type: 'text', text },
+          ...images.map(
+            (img): Anthropic.ImageBlockParam => ({
+              type: 'image',
+              source: { type: 'base64', media_type: img.mediaType, data: img.data },
+            }),
+          ),
+        ]
+      : text;
+
+  const messages: Anthropic.MessageParam[] = [...history, { role: 'user', content: userContent }];
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const stream = deps.client.messages.stream({

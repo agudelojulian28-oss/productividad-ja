@@ -6,7 +6,7 @@ import { getGoogleTokenCipher } from '@/adapters/supabase/integrations';
 import { financeRepo } from '@/adapters/supabase/finance-repo';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { anthropicClient } from '@/adapters/anthropic/client';
-import { runAgent, type AgentDeps } from '@/agent/loop';
+import { runAgent, type AgentDeps, type InputImage } from '@/agent/loop';
 import {
   getDayEvents,
   getRangeEvents,
@@ -88,9 +88,10 @@ export async function runAgentToText(
   deps: AgentDeps,
   history: Anthropic.MessageParam[],
   message: string,
+  images: InputImage[] = [],
 ): Promise<string> {
   let text = '';
-  for await (const ev of runAgent(deps, history, message)) {
+  for await (const ev of runAgent(deps, history, message, images)) {
     if (ev.type === 'text') text += ev.text;
     else if (ev.type === 'error') text += (text ? '\n\n' : '') + `⚠️ ${ev.message}`;
   }

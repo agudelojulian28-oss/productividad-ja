@@ -437,9 +437,70 @@ ol {
   backdrop-filter: blur(8px);
 }
 
+.chat-attach {
+  flex: 0 0 auto;
+  width: 44px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: var(--radius-input);
+  font-size: 18px;
+  touch-action: manipulation;
+}
+.chat-attach:disabled {
+  opacity: 0.5;
+}
+.chat-img {
+  display: block;
+  max-width: 220px;
+  max-height: 220px;
+  width: auto;
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+}
+.chat-attachments {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(120px + var(--safe-bottom));
+  display: flex;
+  gap: 8px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px;
+  z-index: 1;
+}
+.chat-thumb {
+  position: relative;
+}
+.chat-thumb img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.chat-thumb button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: var(--negative);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  touch-action: manipulation;
+}
+
 @media (min-width: 768px) {
   .chat-input {
     bottom: calc(72px + var(--safe-bottom));
+  }
+  .chat-attachments {
+    bottom: calc(128px + var(--safe-bottom));
   }
   .bottom-nav {
     max-width: 720px;

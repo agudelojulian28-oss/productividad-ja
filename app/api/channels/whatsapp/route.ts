@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     user_id: userId,
     channel: 'whatsapp',
     external_id: inbound.messageId,
-    payload: { from: inbound.from, text: inbound.text },
+    payload: { from: inbound.from, text: inbound.text, media: inbound.media ?? null },
   });
   if (error && error.code !== '23505') {
     // Si el INSERT falla de verdad, 500 para que Meta reintente. Nunca perder el mensaje.

@@ -4,8 +4,11 @@ import type { ServerSupabase } from '@/adapters/supabase/server';
 import { createUserClient } from '@/adapters/supabase/as-user';
 import { buildAgentDeps, runAgentToText } from '@/lib/agent-run';
 import { getConversation, loadMessages, saveMessage } from '@/lib/chat';
-import { sendText } from '@/adapters/whatsapp/client';
+import { sendText, downloadMedia } from '@/adapters/whatsapp/client';
+import type { InputImage } from '@/agent/loop';
 import crypto from 'node:crypto';
+
+const IMG_TYPES: InputImage['mediaType'][] = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -16,7 +19,11 @@ interface InboxRow {
   id: number;
   external_id: string;
   attempts: number;
-  payload: { from?: string; text?: string };
+  payload: {
+    from?: string;
+    text?: string;
+    media?: { id: string; kind: 'image' | 'audio'; mime?: string } | null;
+  };
 }
 
 function secretOk(header: string | null): boolean {
@@ -77,7 +84,33 @@ export async function POST(req: Request) {
 async function handle(db: ServerSupabase, userId: string, row: InboxRow): Promise<void> {
   const from = String(row.payload?.from ?? '');
   const text = String(row.payload?.text ?? '');
-  if (!text.trim() || !from) return;
+  const media = row.payload?.media ?? null;
+  if (!from) return;
+
+  // Audio: aún no se transcribe (pendiente de proveedor). Responde con cortesía.
+  if (media?.kind === 'audio') {
+    await sendText(from, 'Por ahora no puedo procesar audios 🙏 Escríbeme el mensaje o mándame una foto.');
+    return;
+  }
+
+  // Imagen: la descargamos de Meta y se la pasamos a Claude (visión).
+  const images: InputImage[] = [];
+  if (media?.kind === 'image') {
+    try {
+      const { data, mime } = await downloadMedia(media.id);
+      const mediaType = (IMG_TYPES as string[]).includes(mime)
+        ? (mime as InputImage['mediaType'])
+        : 'image/jpeg';
+      images.push({ mediaType, data });
+    } catch (e) {
+      console.error('descarga de imagen:', e);
+      await sendText(from, 'No pude descargar la imagen 😕 ¿me la reenvías?');
+      return;
+    }
+  }
+
+  const userText = text.trim() || (images.length > 0 ? 'Mira esta imagen.' : '');
+  if (!userText && images.length === 0) return;
 
   const { data: prof } = await db
     .from('profiles')
@@ -91,8 +124,9 @@ async function handle(db: ServerSupabase, userId: string, row: InboxRow): Promis
   const prior = await loadMessages(db, conversationId);
   const history: Anthropic.MessageParam[] = prior.map((m) => ({ role: m.role, content: m.text }));
 
-  await saveMessage(db, conversationId, userId, 'user', text);
-  const reply = await runAgentToText(buildAgentDeps(db, ctx), history, text);
+  // El historial es de texto; la imagen va solo en este turno.
+  await saveMessage(db, conversationId, userId, 'user', text.trim() || '📷 (imagen)');
+  const reply = await runAgentToText(buildAgentDeps(db, ctx), history, userText, images);
   await saveMessage(db, conversationId, userId, 'assistant', reply);
   await sendText(from, reply);
 }

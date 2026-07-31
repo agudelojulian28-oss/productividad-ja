@@ -1,22 +1,37 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { requireContext } from '@/lib/auth';
 import { buildAgentDeps } from '@/lib/agent-run';
-import { runAgent } from '@/agent/loop';
+import { runAgent, type InputImage } from '@/agent/loop';
 import { getWebConversation, loadMessages, saveMessage } from '@/lib/chat';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+const IMG_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
 export async function POST(req: Request) {
   const { supabase, ctx } = await requireContext();
-  const body = (await req.json()) as { message: string };
-  if (!body.message?.trim()) return new Response('Falta el mensaje', { status: 400 });
+  const body = (await req.json()) as {
+    message?: string;
+    images?: { mediaType?: string; data?: string }[];
+  };
+  const message = (body.message ?? '').trim();
+  // Saneo las imágenes: solo formatos que Claude acepta, base64 no vacío, máx. 5.
+  const images: InputImage[] = (body.images ?? [])
+    .filter((i) => i?.data && IMG_TYPES.includes(i.mediaType ?? ''))
+    .slice(0, 5)
+    .map((i) => ({ mediaType: i.mediaType as InputImage['mediaType'], data: i.data! }));
+
+  if (!message && images.length === 0) return new Response('Falta el mensaje', { status: 400 });
 
   const conversationId = await getWebConversation(supabase, ctx.userId);
   const prior = await loadMessages(supabase, conversationId);
   const history: Anthropic.MessageParam[] = prior.map((m) => ({ role: m.role, content: m.text }));
 
-  await saveMessage(supabase, conversationId, ctx.userId, 'user', body.message);
+  // Las imágenes no se persisten en el historial (la tabla messages es texto);
+  // el agente las ve en este turno. Guardo el texto con una marca si hubo imagen.
+  const savedUser = message || (images.length > 0 ? '📷 (imagen)' : '');
+  await saveMessage(supabase, conversationId, ctx.userId, 'user', savedUser);
 
   const deps = buildAgentDeps(supabase, ctx);
 
@@ -25,7 +40,7 @@ export async function POST(req: Request) {
     async start(controller) {
       let assistantText = '';
       try {
-        for await (const ev of runAgent(deps, history, body.message)) {
+        for await (const ev of runAgent(deps, history, message || 'Mira esta imagen.', images)) {
           if (ev.type === 'text') assistantText += ev.text;
           controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n'));
         }
