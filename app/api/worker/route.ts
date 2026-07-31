@@ -5,6 +5,7 @@ import { createUserClient } from '@/adapters/supabase/as-user';
 import { buildAgentDeps, runAgentToText } from '@/lib/agent-run';
 import { getConversation, loadMessages, saveMessage } from '@/lib/chat';
 import { sendText, downloadMedia } from '@/adapters/whatsapp/client';
+import { transcribeAudio, transcripcionDisponible } from '@/lib/transcribe';
 import type { InputImage } from '@/agent/loop';
 import crypto from 'node:crypto';
 
@@ -83,14 +84,28 @@ export async function POST(req: Request) {
 
 async function handle(db: ServerSupabase, userId: string, row: InboxRow): Promise<void> {
   const from = String(row.payload?.from ?? '');
-  const text = String(row.payload?.text ?? '');
+  let text = String(row.payload?.text ?? '');
   const media = row.payload?.media ?? null;
   if (!from) return;
 
-  // Audio: aún no se transcribe (pendiente de proveedor). Responde con cortesía.
+  // Audio: se transcribe con Whisper si hay proveedor (GROQ_API_KEY); si no, cortesía.
   if (media?.kind === 'audio') {
-    await sendText(from, 'Por ahora no puedo procesar audios 🙏 Escríbeme el mensaje o mándame una foto.');
-    return;
+    if (!transcripcionDisponible()) {
+      await sendText(from, 'Por ahora no puedo procesar audios 🙏 Escríbeme el mensaje o mándame una foto.');
+      return;
+    }
+    try {
+      const { data, mime } = await downloadMedia(media.id);
+      text = await transcribeAudio(Buffer.from(data, 'base64'), mime);
+    } catch (e) {
+      console.error('transcripción:', e);
+      await sendText(from, 'No pude entender el audio 😕 ¿me lo reenvías o me lo escribes?');
+      return;
+    }
+    if (!text.trim()) {
+      await sendText(from, 'No alcancé a escuchar nada en el audio 🙏');
+      return;
+    }
   }
 
   // Imagen: la descargamos de Meta y se la pasamos a Claude (visión).
