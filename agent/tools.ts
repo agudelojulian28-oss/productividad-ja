@@ -39,6 +39,8 @@ export interface ToolDeps {
   structure?: StructureRepo;
   listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
   listRange?: (startYmd: string, endYmd: string) => Promise<GEvent[]>;
+  /** ¿Google Calendar está conectado? Distingue "sin conexión" de "agenda vacía". */
+  googleConnected?: () => Promise<boolean>;
   createEvent?: (input: {
     titulo: string;
     fecha: string;
@@ -155,7 +157,12 @@ export async function runTool(
 
       // ── Agenda (choques y huecos, sobre los eventos de Google) ───────────
       if (vista === 'conflictos' || vista === 'huecos') {
-        if (!deps.listRange) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
+        if (!deps.listRange || (deps.googleConnected && !(await deps.googleConnected()))) {
+          return err(
+            'EXTERNAL_ERROR',
+            'Tu Google Calendar no está conectado. Conéctalo en Ajustes para poder revisar la agenda.',
+          );
+        }
         const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz }).format(new Date());
         const fin = new Date(new Date(`${hoy}T12:00:00Z`).getTime() + 7 * 86_400_000)
           .toISOString()
@@ -322,7 +329,12 @@ export async function runTool(
     case 'ver_calendario': {
       const p = parse(VerCalendario, rawInput);
       if (!p.ok) return p;
-      if (!deps.listCalendar) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
+      if (!deps.listCalendar || (deps.googleConnected && !(await deps.googleConnected()))) {
+        return err(
+          'EXTERNAL_ERROR',
+          'Tu Google Calendar no está conectado. Conéctalo en Ajustes para ver tus eventos.',
+        );
+      }
       const dateYmd =
         p.value.fecha ?? new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz }).format(new Date());
       const events = await deps.listCalendar(dateYmd);

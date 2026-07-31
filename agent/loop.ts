@@ -21,6 +21,7 @@ export interface AgentDeps {
   /** Efectos de calendario. Las TAREAS no van al calendario (ADR-022): solo EVENTOS. */
   listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
   listRange?: (startYmd: string, endYmd: string) => Promise<GEvent[]>;
+  googleConnected?: () => Promise<boolean>;
   createEvent?: (input: {
     titulo: string;
     fecha: string;
@@ -136,9 +137,12 @@ export async function* runAgent(
             finance: deps.finance,
             structure: deps.structure,
             listCalendar: deps.listCalendar,
+            listRange: deps.listRange,
+            googleConnected: deps.googleConnected,
             createEvent: deps.createEvent,
             editEvent: deps.editEvent,
             deleteEvent: deps.deleteEvent,
+            lastAudit: deps.lastAudit,
           },
           block.name,
           block.input,

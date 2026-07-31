@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { ServerSupabase } from '@/adapters/supabase/server';
 import type { ActorContext } from '@/core/types';
 import { workRepo } from '@/adapters/supabase/work-repo';
+import { getGoogleTokenCipher } from '@/adapters/supabase/integrations';
 import { financeRepo } from '@/adapters/supabase/finance-repo';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { anthropicClient } from '@/adapters/anthropic/client';
@@ -27,6 +28,9 @@ export function buildAgentDeps(supabase: ServerSupabase, ctx: ActorContext): Age
     structure: structureRepo(supabase, ctx.userId),
     listCalendar: (dateYmd) => getDayEvents(supabase, ctx, dateYmd),
     listRange: (startYmd, endYmd) => getRangeEvents(supabase, ctx, startYmd, endYmd),
+    async googleConnected() {
+      return (await getGoogleTokenCipher(supabase, ctx.userId)) !== null;
+    },
     createEvent: (input) => createCalendarEvent(supabase, ctx, input),
     editEvent: (eventId, patch) => patchCalendarEvent(supabase, ctx, eventId, patch),
     deleteEvent: (eventId, opts) => deleteCalendarEvent(supabase, ctx, eventId, opts),
