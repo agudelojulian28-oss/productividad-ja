@@ -1,11 +1,18 @@
 # Productividad Julián Agudelo
 
 Sistema personal de productividad y finanzas. **Un solo usuario.** Gestiona metas, proyectos,
-tareas, agenda, fuentes de ingreso, ofertas, ventas y transacciones desde tres canales:
-app web, chat con LLM en la web, y WhatsApp/Telegram.
+tareas, agenda, fuentes de ingreso y transacciones desde tres canales:
+app web, chat con LLM en la web, y **WhatsApp** (ADR-020 reemplazó Telegram).
 
-**Etapa actual: 0 — Cimientos.** No construyas funcionalidad de etapas posteriores sin
-avisarme antes. El plan por etapas está en `docs/arquitectura-v3.md` §7.
+**Estado real (2026-07):** Etapas 0–4 completas y desplegadas en Vercel. La **Etapa 5 se
+reinterpretó**: en vez de comercio genérico (ofertas/ventas/playbooks — descartado por Julián,
+que hará sistemas por proyecto en apps aparte) es un módulo de **Documentación del método**
+(`/docs`, editable por el usuario y el agente). La **Etapa 6** se hizo parcial: resumen
+diario/semanal por WhatsApp, choques/huecos de agenda, y `deshacer`. Extras fuera del roadmap:
+**login por contraseña + huella (passkeys, ADR-023)** y **multimodal** (el agente entiende
+imágenes por chat y WhatsApp; audios por WhatsApp vía Groq Whisper si `GROQ_API_KEY` está puesto).
+El plan por etapas original está en `docs/arquitectura-v3.md` §7; para el estado vivo, la fuente
+es la memoria del proyecto (`project-estado`). **Antes de construir algo grande nuevo, avísame.**
 
 ## Documentos de arquitectura
 
