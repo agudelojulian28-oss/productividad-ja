@@ -63,62 +63,82 @@ export default async function HoyPage() {
     { label: 'Sin fecha', items: sinFecha },
   ];
 
+  const totalPend = tasks.length;
+
   return (
     <div className="page">
       <RealtimeRefresh tables={['tasks', 'projects']} />
       <h1 className="page-title">Hoy</h1>
       <ChoquesBanner choques={detectarChoques(calEvents)} tz={ctx.tz} />
-      <NewTaskForm
-        projects={projects.map((p) => ({ id: p.id, title: p.title }))}
-        goalsByProject={goalsByProject}
-      />
 
-      {calEvents.length > 0 && (
-        <section className="task-section">
-          <h2 className="section-title">Calendario · {calEvents.length}</h2>
-          <ul>
-            {calEvents.map((e) => (
-              <EventItem
-                key={e.id}
-                event={{
-                  id: e.id,
-                  summary: e.summary,
-                  start: e.start,
-                  allDay: e.allDay,
-                  colorId: e.colorId,
-                }}
-                tz={ctx.tz}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
+      <div className="hoy-grid">
+        {/* Rail: captura + agenda del día. En móvil va arriba (orden de captura). */}
+        <div className="hoy-rail">
+          <NewTaskForm
+            projects={projects.map((p) => ({ id: p.id, title: p.title }))}
+            goalsByProject={goalsByProject}
+          />
 
-      {tasks.length === 0 ? (
-        <p className="muted" style={{ marginTop: 24 }}>
-          No tienes pendientes. Agrega uno arriba.
-        </p>
-      ) : (
-        sections
-          .filter((s) => s.items.length > 0)
-          .map((s) => (
-            <section key={s.label} className="task-section">
-              <h2 className={`section-title${s.tone === 'danger' ? ' section-danger' : ''}`}>
-                {s.label} · {s.items.length}
-              </h2>
+          <div className="hoy-rail-card">
+            <div className="hoy-rail-head">
+              <span>Agenda de hoy</span>
+              <span className="hoy-rail-count">{calEvents.length}</span>
+            </div>
+            {calEvents.length === 0 ? (
+              <p className="muted hoy-rail-empty">Sin eventos en el calendario.</p>
+            ) : (
               <ul>
-                {s.items.map((t) => (
-                  <TaskItem
-                    key={t.id}
-                    task={t}
+                {calEvents.map((e) => (
+                  <EventItem
+                    key={e.id}
+                    event={{
+                      id: e.id,
+                      summary: e.summary,
+                      start: e.start,
+                      allDay: e.allDay,
+                      colorId: e.colorId,
+                    }}
                     tz={ctx.tz}
-                    projectName={t.projectId ? projectName.get(t.projectId) : undefined}
                   />
                 ))}
               </ul>
-            </section>
-          ))
-      )}
+            )}
+          </div>
+        </div>
+
+        {/* Main: las tareas, el foco del trabajo. En escritorio, columna izquierda. */}
+        <div className="hoy-main">
+          {totalPend === 0 ? (
+            <p className="muted" style={{ marginTop: 4 }}>
+              No tienes pendientes. Agrega uno en el capturador.
+            </p>
+          ) : (
+            sections
+              .filter((s) => s.items.length > 0)
+              .map((s) => (
+                <section key={s.label} className="task-section">
+                  <h2
+                    className={`section-title${s.tone === 'danger' ? ' section-danger' : ''}`}
+                  >
+                    {s.label} · {s.items.length}
+                  </h2>
+                  <ul>
+                    {s.items.map((t) => (
+                      <TaskItem
+                        key={t.id}
+                        task={t}
+                        tz={ctx.tz}
+                        projectName={
+                          t.projectId ? projectName.get(t.projectId) : undefined
+                        }
+                      />
+                    ))}
+                  </ul>
+                </section>
+              ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }

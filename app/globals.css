@@ -294,6 +294,28 @@ ol {
     max-width: none;
     padding: 0 34px;
   }
+  /* Hoy: command-center de 2 columnas. Tareas a la izquierda, rail pegajoso
+     (captura + agenda) a la derecha. Colocación explícita: el orden de origen
+     es rail→main (para que en móvil la captura vaya primero). */
+  .hoy-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 28px;
+    align-items: start;
+  }
+  .hoy-main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .hoy-main .task-section:first-child {
+    margin-top: 0;
+  }
+  .hoy-rail {
+    grid-column: 2;
+    grid-row: 1;
+    position: sticky;
+    top: 24px;
+  }
 }
 
 /* ── Página ─────────────────────────────────────────────────────────────── */
@@ -309,6 +331,50 @@ ol {
 }
 .muted {
   color: var(--text-muted);
+}
+
+/* ── Hoy: rail (captura + agenda) + main (tareas) ───────────────────────── */
+/* Móvil: apilado en orden de captura → agenda → tareas (sin cambios de flujo). */
+.hoy-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.hoy-rail .new-task {
+  margin-bottom: 0;
+}
+.hoy-rail-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 14px 14px 6px;
+}
+.hoy-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  margin-bottom: 8px;
+}
+.hoy-rail-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.hoy-rail-empty {
+  margin: 0 0 8px;
 }
 
 /* ── Nueva tarea ────────────────────────────────────────────────────────── */
@@ -1314,6 +1380,64 @@ ol {
   min-width: 64px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Barras horizontales (por fuente, gastos) — una serie, un solo tono */
+.barlist {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.barlist-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.barlist-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.barlist-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.barlist-val {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.barlist-val em {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+.barlist-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.barlist-fill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 2px;
+}
+.barlist-accent {
+  background: var(--accent);
+}
+.barlist-muted {
+  background: var(--text-subtle);
+  opacity: 0.55;
 }
 .meta-money {
   display: flex;

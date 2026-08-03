@@ -14,6 +14,7 @@ import { RegistrarMovimiento } from './registrar-movimiento';
 import { FuentesManager } from './fuentes-manager';
 import { CashflowChart } from './cashflow-chart';
 import { MetasDinero } from './metas-dinero';
+import { BarList } from './bar-list';
 
 export const dynamic = 'force-dynamic';
 
@@ -99,22 +100,18 @@ export default async function FinanzasPage() {
         {fuentes.length === 0 ? (
           <p className="muted">Sin fuentes con ingresos aún.</p>
         ) : (
-          <ul className="fin-list">
-            {fuentes.map((f) => {
+          <BarList
+            items={fuentes.map((f) => {
               const d = pctDelta(f.thisMonthMinor, f.lastMonthMinor);
-              return (
-                <li key={f.incomeSourceId} className="fin-row">
-                  <span className="fin-row-name">{f.name}</span>
-                  <span className="fin-row-amt">{money(f.thisMonthMinor)}</span>
-                  <span
-                    className={`fin-delta${d.up === true ? ' fin-pos' : d.up === false ? ' fin-neg' : ''}`}
-                  >
-                    {d.up === true ? '▲' : d.up === false ? '▼' : ''} {d.txt}
-                  </span>
-                </li>
-              );
+              return {
+                label: f.name,
+                value: f.thisMonthMinor,
+                valueLabel: money(f.thisMonthMinor),
+                delta: { text: d.txt, up: d.up },
+              };
             })}
-          </ul>
+            tone="accent"
+          />
         )}
       </section>
 
@@ -123,14 +120,14 @@ export default async function FinanzasPage() {
         {gastos.length === 0 ? (
           <p className="muted">Sin gastos registrados este mes.</p>
         ) : (
-          <ul className="fin-list">
-            {gastos.map((g) => (
-              <li key={g.category} className="fin-row">
-                <span className="fin-row-name">{g.category}</span>
-                <span className="fin-row-amt">{money(g.amountMinor)}</span>
-              </li>
-            ))}
-          </ul>
+          <BarList
+            items={gastos.map((g) => ({
+              label: g.category,
+              value: g.amountMinor,
+              valueLabel: money(g.amountMinor),
+            }))}
+            tone="muted"
+          />
         )}
       </section>
 
