@@ -619,3 +619,34 @@ peor que un objeto plano; se usa objeto plano + `tipo`/`accion` + `refine`, como
 no cambia (los casos de uso ya estaban probados); cambia la fachada de herramientas. `CLAUDE.md`,
 `docs/tools.md` y `.claude/rules/agente.md` se actualizan para reflejar los verbos generales. La regla
 de "confirmar antes de escribir" y la idempotencia por `tool_call_id` se mantienen.
+
+---
+
+## ADR-025 · Puerta de login solo-desarrollo para verificación visual local
+
+**Estado:** aceptado · **Fecha:** 2026-08-03
+
+**Contexto.** Toda la app está detrás del middleware de sesión (correo+contraseña, ADR anterior;
+huella, ADR-023). Para verificar cambios de UI de forma visual en local hace falta una sesión
+autenticada, pero teclear la contraseña del usuario no es una opción (el asistente no maneja
+credenciales; hacerlo a mano es tedioso y frágil). Sin sesión, ni el middleware ni `requireContext()`
+dejan renderizar las páginas privadas.
+
+**Decisión.**
+- Se añade `app/api/dev/login` (GET) que **siembra una sesión real** del usuario único
+  (`ALLOWED_USER_ID`) con el mismo mecanismo que el login por huella: `admin.generateLink`
+  (sin enviar correo) + `verifyOtp` para fijar las cookies. Redirige a `/hoy`.
+- **Blindaje a producción:** el handler responde `404` de inmediato si `NODE_ENV !== 'development'`,
+  y la exención pública del middleware para `/api/dev` **solo** se activa en desarrollo. En Vercel la
+  ruta es inerte: no siembra nada, no expone nada.
+- Se amplía la lista blanca de `admin-only-from-channels` en dependency-cruiser para permitir importar
+  `admin.ts` desde `app/api/dev/**` (junto a `channels` y `auth/passkey`).
+
+**Alternativas descartadas.** Un bypass que funcione también en producción (riesgo inaceptable: cualquiera
+entraría como el usuario único en la app pública). Pedir/teclear la contraseña (prohibido). Un cliente
+`service_role` inline que evada la regla de lint (peor: esconde el uso en vez de declararlo).
+
+**Consecuencias.** En `npm run dev`, abrir `/api/dev/login` autentica y permite ver la app real para
+verificar UI en escritorio y móvil. La regla no negociable #1 (nunca `service_role` fuera de sitios
+declarados) se respeta: el uso queda documentado aquí y acotado por lint + guard de entorno. La puerta
+puede quedarse en el repo de forma permanente sin abrir superficie de ataque en producción.

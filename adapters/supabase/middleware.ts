@@ -35,7 +35,9 @@ export async function updateSession(request: NextRequest) {
     path.startsWith('/api/channels') ||
     path.startsWith('/api/worker') ||
     path.startsWith('/api/summary') ||
-    path.startsWith('/api/auth/passkey');
+    path.startsWith('/api/auth/passkey') ||
+    // Solo local: la puerta de login de desarrollo (inerte en producción, ADR-025).
+    (process.env.NODE_ENV === 'development' && path.startsWith('/api/dev'));
 
   if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
