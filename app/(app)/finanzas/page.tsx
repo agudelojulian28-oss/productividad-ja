@@ -14,7 +14,7 @@ import { RegistrarMovimiento } from './registrar-movimiento';
 import { FuentesManager } from './fuentes-manager';
 import { CashflowChart } from './cashflow-chart';
 import { MetasDinero } from './metas-dinero';
-import { BarList } from './bar-list';
+import { FinStats } from './fin-stats';
 import { Disclosure } from '../disclosure';
 import { PageHero } from '../page-hero';
 
@@ -93,41 +93,24 @@ export default async function FinanzasPage() {
             <CashflowChart serie={serie} />
           </section>
 
-          <section className="fin-block">
-            <h2 className="fin-h2">Por fuente de ingreso</h2>
-            {fuentes.length === 0 ? (
-              <p className="muted">Sin fuentes con ingresos aún.</p>
-            ) : (
-              <BarList
-                items={fuentes.map((f) => {
-                  const d = pctDelta(f.thisMonthMinor, f.lastMonthMinor);
-                  return {
-                    label: f.name,
-                    value: f.thisMonthMinor,
-                    valueLabel: money(f.thisMonthMinor),
-                    delta: { text: d.txt, up: d.up },
-                  };
-                })}
-                tone="accent"
-              />
-            )}
-          </section>
-
-          <section className="fin-block">
-            <h2 className="fin-h2">Gastos — top 5 del mes</h2>
-            {gastos.length === 0 ? (
-              <p className="muted">Sin gastos registrados este mes.</p>
-            ) : (
-              <BarList
-                items={gastos.map((g) => ({
-                  label: g.category,
-                  value: g.amountMinor,
-                  valueLabel: money(g.amountMinor),
-                }))}
-                tone="muted"
-              />
-            )}
-          </section>
+          <FinStats
+            inflowLabel={money(resumen.inflowMinor, { compact: true })}
+            outflowLabel={money(resumen.outflowMinor, { compact: true })}
+            fuentes={fuentes.map((f) => {
+              const d = pctDelta(f.thisMonthMinor, f.lastMonthMinor);
+              return {
+                label: f.name,
+                value: f.thisMonthMinor,
+                valueLabel: money(f.thisMonthMinor),
+                delta: { text: d.txt, up: d.up },
+              };
+            })}
+            gastos={gastos.map((g) => ({
+              label: g.category,
+              value: g.amountMinor,
+              valueLabel: money(g.amountMinor),
+            }))}
+          />
 
           {/* Pipeline y discrepancias llegan con las ventas (Etapa 5). */}
           <p className="muted fin-soon">
