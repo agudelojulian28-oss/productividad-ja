@@ -159,12 +159,25 @@ ol {
 }
 .nav-item {
   flex: 1;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 10px;
   border-radius: var(--radius-sm);
   color: var(--text-subtle);
-  font-size: 13px;
-  font-weight: 500;
+}
+.nav-ic {
+  display: grid;
+  place-items: center;
+}
+.nav-item svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .nav-active {
   color: var(--accent);
