@@ -129,12 +129,17 @@ export async function runTool(
         ]);
         const arbol = [];
         for (const proj of projects) {
-          const metas = await repo.listGoals(proj.id);
+          const [metas, tareas] = await Promise.all([
+            repo.listGoals(proj.id),
+            repo.listTasks({ projectId: proj.id }),
+          ]);
           arbol.push({
             proyecto_id: proj.id,
             titulo: proj.title,
             area_id: proj.areaId,
             metas: metas.map((g) => ({ meta_id: g.id, titulo: g.title })),
+            // Ejemplos de tareas recientes → para inferir "esto suele ir aquí".
+            tareas_ejemplo: tareas.slice(0, 6).map((t) => t.title),
           });
         }
         return ok({
