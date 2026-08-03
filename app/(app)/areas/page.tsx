@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { requireContext } from '@/lib/auth';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { NewAreaForm } from './new-area-form';
+import { PageHero } from '../page-hero';
 import { RealtimeRefresh } from '../realtime-refresh';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +15,12 @@ export default async function AreasPage() {
   return (
     <div className="page">
       <RealtimeRefresh tables={['areas']} />
-      <h1 className="page-title">Áreas</h1>
+      <PageHero
+        eyebrow="Estructura"
+        title="Áreas"
+        subtitle="Tus contextos de trabajo y de vida. Los proyectos y el dinero cuelgan de aquí."
+        kpis={areas.length > 0 ? [{ label: 'Áreas', value: String(areas.length) }] : undefined}
+      />
       <NewAreaForm />
 
       {areas.length === 0 ? (

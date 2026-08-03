@@ -1,4 +1,5 @@
 import { requireContext } from '@/lib/auth';
+import { PageHero } from '../page-hero';
 import { PasskeyManager } from './passkey-manager';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,11 @@ export default async function AjustesPage({
 
   return (
     <div className="page">
-      <h1 className="page-title">Ajustes</h1>
+      <PageHero
+        eyebrow="Cuenta"
+        title="Ajustes"
+        subtitle="Conexiones y seguridad. Estas acciones viven solo en la app, no en el agente."
+      />
 
       {google === 'ok' && (
         <p style={{ color: 'var(--positive)', marginBottom: 12 }}>

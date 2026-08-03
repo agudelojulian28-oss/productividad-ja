@@ -6,6 +6,7 @@ import { dayLabelInTz, todayInTz } from '@/lib/format';
 import { getEventsByGoal } from '@/lib/calendar-sync';
 import { DescriptionEditor } from '../../description-editor';
 import { GoalFactorsForm } from './goal-factors-form';
+import { PageHero } from '../../page-hero';
 import { setGoalDescriptionAction } from '@/app/actions/goals';
 
 export const dynamic = 'force-dynamic';
@@ -36,7 +37,11 @@ export default async function GoalDetailPage({
       <Link href={goal.projectId ? `/proyectos/${goal.projectId}` : '/areas'} className="back-link">
         ← Volver
       </Link>
-      <h1 className="page-title">{goal.title}</h1>
+      <PageHero
+        eyebrow="Meta"
+        title={goal.title}
+        kpis={[{ label: 'Progreso', value: `${pct}%`, tone: completa ? 'pos' : 'acc' }]}
+      />
 
       <div className="goal-progress">
         <div className="goal-progress-head">

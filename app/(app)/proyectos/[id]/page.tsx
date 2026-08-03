@@ -7,6 +7,7 @@ import { getEventsByProject } from '@/lib/calendar-sync';
 import { NewGoalForm } from './new-goal-form';
 import { DescriptionEditor } from '../../description-editor';
 import { Disclosure } from '../../disclosure';
+import { PageHero } from '../../page-hero';
 import { NewDocForm } from '../../docs/new-doc-form';
 import { setProjectDescriptionAction } from '@/app/actions/projects';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
@@ -50,7 +51,11 @@ export default async function ProjectDetailPage({
       <Link href={project.areaId ? `/areas/${project.areaId}` : '/areas'} className="back-link">
         ← Volver
       </Link>
-      <h1 className="page-title">{project.title}</h1>
+      <PageHero
+        eyebrow="Proyecto"
+        title={project.title}
+        kpis={[{ label: 'Tareas', value: String(tasks.length) }]}
+      />
       <DescriptionEditor
         initial={project.description ?? ''}
         action={setProjectDescriptionAction.bind(null, project.id)}

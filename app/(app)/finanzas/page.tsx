@@ -16,6 +16,7 @@ import { CashflowChart } from './cashflow-chart';
 import { MetasDinero } from './metas-dinero';
 import { BarList } from './bar-list';
 import { Disclosure } from '../disclosure';
+import { PageHero } from '../page-hero';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +45,6 @@ export default async function FinanzasPage() {
   const serie = serieMensual(cashflow, 6);
   const gastos = topGastos(expenses, ctx.tz, 5);
   const fuentes = porFuente(bySrc);
-  const dim = resumen.stale ? ' fin-dim' : '';
 
   const areaOpts = areas.map((a) => ({ id: a.id, name: a.name }));
   const sourceOpts = sources.map((s) => ({
@@ -57,7 +57,26 @@ export default async function FinanzasPage() {
   return (
     <div className="page">
       <RealtimeRefresh tables={['transactions', 'income_sources']} />
-      <h1 className="page-title">Finanzas</h1>
+      <PageHero
+        eyebrow="Este mes"
+        title="Finanzas"
+        subtitle={`Entró ${money(resumen.inflowMinor, { compact: true })} · Salió ${money(
+          resumen.outflowMinor,
+          { compact: true },
+        )}`}
+        kpis={[
+          {
+            label: 'Neto del mes',
+            value: money(resumen.netMinor, { compact: true }),
+            tone: resumen.netMinor >= 0 ? 'pos' : 'neg',
+          },
+          {
+            label: 'Ingresos',
+            value: money(resumen.inflowMinor, { compact: true }),
+            tone: 'acc',
+          },
+        ]}
+      />
 
       {resumen.stale && (
         <div className="fin-stale" role="status">
@@ -66,30 +85,6 @@ export default async function FinanzasPage() {
         </div>
       )}
 
-      {/* ① Por cobrar — llega en la Etapa 5 (depende de ventas) */}
-      <section className="fin-block fin-block-empty">
-        <h2 className="fin-h2">① Por cobrar</h2>
-        <p className="muted">Llega en la Etapa 5, con las ventas.</p>
-      </section>
-
-      <div className="fin-cards">
-        <div className={`fin-card${dim}`}>
-          <span className="fin-card-label">② Este mes (ingresos)</span>
-          <span className="fin-figure">{money(resumen.inflowMinor, { compact: true })}</span>
-        </div>
-        <div className={`fin-card${dim}`}>
-          <span className="fin-card-label">③ Neto del mes</span>
-          <span
-            className={`fin-figure ${resumen.netMinor >= 0 ? 'fin-pos' : 'fin-neg'}`}
-          >
-            {money(resumen.netMinor, { compact: true })}
-          </span>
-          <span className="fin-card-sub">
-            Entró {money(resumen.inflowMinor, { compact: true })} · Salió{' '}
-            {money(resumen.outflowMinor, { compact: true })}
-          </span>
-        </div>
-      </div>
 
       <section className="fin-block">
         <h2 className="fin-h2">Flujo de caja (neto por mes)</h2>
@@ -97,7 +92,7 @@ export default async function FinanzasPage() {
       </section>
 
       <section className="fin-block">
-        <h2 className="fin-h2">④ Por fuente de ingreso</h2>
+        <h2 className="fin-h2">Por fuente de ingreso</h2>
         {fuentes.length === 0 ? (
           <p className="muted">Sin fuentes con ingresos aún.</p>
         ) : (
@@ -117,7 +112,7 @@ export default async function FinanzasPage() {
       </section>
 
       <section className="fin-block">
-        <h2 className="fin-h2">⑤ Gastos — top 5 del mes</h2>
+        <h2 className="fin-h2">Gastos — top 5 del mes</h2>
         {gastos.length === 0 ? (
           <p className="muted">Sin gastos registrados este mes.</p>
         ) : (
@@ -153,11 +148,11 @@ export default async function FinanzasPage() {
 
       {/* ⑥⑦ dependen de ventas (Etapa 5) */}
       <section className="fin-block fin-block-empty">
-        <h2 className="fin-h2">⑥ Pipeline abierto</h2>
+        <h2 className="fin-h2">Pipeline abierto</h2>
         <p className="muted">Llega en la Etapa 5, con las ventas.</p>
       </section>
       <section className="fin-block fin-block-empty">
-        <h2 className="fin-h2">⑦ Discrepancias</h2>
+        <h2 className="fin-h2">Discrepancias</h2>
         <p className="muted">Llega en la Etapa 5, con las ventas.</p>
       </section>
 

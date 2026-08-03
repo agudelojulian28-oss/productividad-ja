@@ -4,6 +4,7 @@ import { requireContext } from '@/lib/auth';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { timeInTz, dayLabelInTz } from '@/lib/format';
 import { DescriptionEditor } from '../../description-editor';
+import { PageHero } from '../../page-hero';
 import { setTaskDescriptionAction } from '@/app/actions/tasks';
 
 export const dynamic = 'force-dynamic';
@@ -33,9 +34,9 @@ export default async function TaskDetailPage({
       <Link href="/hoy" className="back-link">
         ← Hoy
       </Link>
-      <h1 className="page-title">{task.title}</h1>
+      <PageHero eyebrow="Tarea" title={task.title} subtitle={`${cuando} · ${task.status}`} />
       {(project || goal) && (
-        <p className="muted" style={{ marginBottom: 4 }}>
+        <p className="muted" style={{ marginBottom: 16 }}>
           {project && (
             <Link href={`/proyectos/${project.id}`} className="crumb">
               {project.title}
@@ -49,9 +50,6 @@ export default async function TaskDetailPage({
           )}
         </p>
       )}
-      <p className="muted" style={{ marginBottom: 16 }}>
-        {cuando} · {task.status}
-      </p>
       <DescriptionEditor
         initial={task.notes ?? ''}
         action={setTaskDescriptionAction.bind(null, task.id)}

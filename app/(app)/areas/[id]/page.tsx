@@ -5,6 +5,7 @@ import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { NewProjectForm } from './new-project-form';
 import { DescriptionEditor } from '../../description-editor';
+import { PageHero } from '../../page-hero';
 import { setAreaDescriptionAction } from '@/app/actions/areas';
 
 export const dynamic = 'force-dynamic';
@@ -39,7 +40,15 @@ export default async function AreaDetailPage({
       <Link href="/areas" className="back-link">
         ← Áreas
       </Link>
-      <h1 className="page-title">{area.name}</h1>
+      <PageHero
+        eyebrow="Área"
+        title={area.name}
+        kpis={
+          areaTotal > 0
+            ? [{ label: 'Progreso', value: `${areaPct}%`, tone: areaPct === 100 ? 'pos' : 'acc' }]
+            : undefined
+        }
+      />
       <DescriptionEditor
         initial={area.description ?? ''}
         action={setAreaDescriptionAction.bind(null, area.id)}

@@ -9,6 +9,7 @@ import { TaskItem } from './task-item';
 import { EventItem } from './event-item';
 import { RealtimeRefresh } from '../realtime-refresh';
 import { ChoquesBanner } from '../choques-banner';
+import { PageHero, type Kpi } from '../page-hero';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,10 +66,32 @@ export default async function HoyPage() {
 
   const totalPend = tasks.length;
 
+  const fechaRaw = new Intl.DateTimeFormat('es', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: ctx.tz,
+  }).format(new Date());
+  const fecha = fechaRaw.charAt(0).toUpperCase() + fechaRaw.slice(1);
+
+  const kpis: Kpi[] = [{ label: 'Por hacer hoy', value: String(hoy.length), tone: 'acc' }];
+  if (vencidas.length > 0)
+    kpis.push({ label: 'Vencidas', value: String(vencidas.length), tone: 'neg' });
+  if (calEvents.length > 0) kpis.push({ label: 'Eventos', value: String(calEvents.length) });
+
   return (
     <div className="page">
       <RealtimeRefresh tables={['tasks', 'projects']} />
-      <h1 className="page-title">Hoy</h1>
+      <PageHero
+        eyebrow={fecha}
+        title="Hoy"
+        subtitle={
+          totalPend === 0
+            ? 'Sin pendientes. Captura algo nuevo cuando quieras.'
+            : `${hoy.length} para hoy · ${vencidas.length} vencidas · ${calEvents.length} eventos`
+        }
+        kpis={kpis}
+      />
       <ChoquesBanner choques={detectarChoques(calEvents)} tz={ctx.tz} />
 
       <div className="hoy-grid">

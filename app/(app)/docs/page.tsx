@@ -4,6 +4,7 @@ import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import type { DocumentRow } from '@/core/structure/ports';
 import { RealtimeRefresh } from '../realtime-refresh';
+import { PageHero } from '../page-hero';
 import { NewDocForm } from './new-doc-form';
 
 export const dynamic = 'force-dynamic';
@@ -53,10 +54,12 @@ export default async function DocsPage() {
   return (
     <div className="page">
       <RealtimeRefresh tables={['documents']} />
-      <h1 className="page-title">Documentación</h1>
-      <p className="muted" style={{ marginBottom: 16 }}>
-        Tu método: cómo te gusta que se hagan las cosas. El agente lo consulta y lo alimenta.
-      </p>
+      <PageHero
+        eyebrow="Tu método"
+        title="Documentación"
+        subtitle="Cómo te gusta que se hagan las cosas. El agente lo consulta y lo alimenta."
+        kpis={docs.length > 0 ? [{ label: 'Documentos', value: String(docs.length) }] : undefined}
+      />
 
       <NewDocForm
         areas={areas.map((a) => ({ id: a.id, name: a.name }))}
