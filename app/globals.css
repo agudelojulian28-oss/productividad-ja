@@ -324,6 +324,22 @@ ol {
     position: sticky;
     top: 24px;
   }
+  /* Finanzas: gráficos a la izquierda, rail (captura + metas + fuentes) a la
+     derecha. Orden de origen main→rail, así que el flujo natural ya ubica bien. */
+  .fin-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 28px;
+    align-items: start;
+  }
+  .fin-rail {
+    position: sticky;
+    top: 24px;
+  }
+  .fin-main > .fin-block:first-child,
+  .fin-rail > .fin-block:first-child {
+    margin-top: 0;
+  }
 }
 
 /* ── Página ─────────────────────────────────────────────────────────────── */
@@ -550,6 +566,7 @@ ol {
   border-radius: var(--radius-input);
   padding: 12px 14px;
   width: 100%;
+  min-width: 0; /* deja que los inputs encojan en flex/grid (evita overflow móvil) */
 }
 .btn-primary {
   background: var(--grad-accent);
@@ -1242,6 +1259,7 @@ ol {
   gap: 6px;
   font-size: 13px;
   color: var(--text-muted);
+  min-width: 0; /* deja encoger los campos de fecha en filas flex (evita overflow) */
 }
 .cal-modal-actions {
   display: flex;
@@ -1497,6 +1515,10 @@ ol {
 }
 .fin-block-empty {
   opacity: 0.7;
+}
+.fin-soon {
+  margin-top: 24px;
+  font-size: 13px;
 }
 .fin-chart {
   margin: 0;
