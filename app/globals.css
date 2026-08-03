@@ -333,6 +333,81 @@ ol {
   color: var(--text-muted);
 }
 
+/* ── Disclosure: divulgación progresiva (móvil colapsa, escritorio abre) ── */
+.disc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  margin-top: 12px;
+  overflow: hidden;
+}
+.disc-sum {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 14px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+.disc-sum::-webkit-details-marker {
+  display: none;
+}
+.disc-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+.disc-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.disc-chev {
+  color: var(--text-muted);
+  font-size: 22px;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 0.15s ease;
+}
+.disc[open] .disc-chev {
+  transform: rotate(-90deg);
+}
+.disc-body {
+  padding: 0 14px 14px;
+}
+
+@media (min-width: 1024px) {
+  /* Regla de autor > UA: fuerza el cuerpo visible aunque no esté [open]. */
+  .disc {
+    background: transparent;
+    border: none;
+    margin-top: 24px;
+    overflow: visible;
+  }
+  .disc > .disc-sum {
+    display: none;
+  }
+  .disc > .disc-body {
+    display: block;
+    padding: 0;
+  }
+}
+
 /* ── Hoy: rail (captura + agenda) + main (tareas) ───────────────────────── */
 /* Móvil: apilado en orden de captura → agenda → tareas (sin cambios de flujo). */
 .hoy-rail {

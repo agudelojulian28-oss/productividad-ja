@@ -15,6 +15,7 @@ import { FuentesManager } from './fuentes-manager';
 import { CashflowChart } from './cashflow-chart';
 import { MetasDinero } from './metas-dinero';
 import { BarList } from './bar-list';
+import { Disclosure } from '../disclosure';
 
 export const dynamic = 'force-dynamic';
 
@@ -179,10 +180,9 @@ export default async function FinanzasPage() {
             />
           </section>
 
-          <section className="fin-section">
-            <h2 className="fin-h2">Fuentes de ingreso</h2>
+          <Disclosure title="Fuentes de ingreso" count={sourceOpts.length}>
             <FuentesManager areas={areaOpts} sources={sourceOpts} />
-          </section>
+          </Disclosure>
         </>
       )}
     </div>

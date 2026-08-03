@@ -6,6 +6,7 @@ import { dayLabelInTz } from '@/lib/format';
 import { getEventsByProject } from '@/lib/calendar-sync';
 import { NewGoalForm } from './new-goal-form';
 import { DescriptionEditor } from '../../description-editor';
+import { Disclosure } from '../../disclosure';
 import { NewDocForm } from '../../docs/new-doc-form';
 import { setProjectDescriptionAction } from '@/app/actions/projects';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
@@ -55,27 +56,25 @@ export default async function ProjectDetailPage({
         action={setProjectDescriptionAction.bind(null, project.id)}
       />
 
-      <h2 className="section-title" style={{ marginTop: 20 }}>
-        Metas
-      </h2>
-      <NewGoalForm projectId={project.id} />
-
-      {goals.length === 0 ? (
-        <p className="muted" style={{ marginTop: 24 }}>
-          Sin metas todavía. Las tareas pueden ir sin meta.
-        </p>
-      ) : (
-        <ul style={{ marginTop: 16 }}>
-          {goals.map((g) => (
-            <li key={g.id} className="row-card">
-              <Link href={`/metas/${g.id}`} className="task-title">
-                {g.title}
-              </Link>
-              <span className="pill">{g.status}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <Disclosure title="Metas" count={goals.length}>
+        <NewGoalForm projectId={project.id} />
+        {goals.length === 0 ? (
+          <p className="muted" style={{ marginTop: 16 }}>
+            Sin metas todavía. Las tareas pueden ir sin meta.
+          </p>
+        ) : (
+          <ul style={{ marginTop: 16 }}>
+            {goals.map((g) => (
+              <li key={g.id} className="row-card">
+                <Link href={`/metas/${g.id}`} className="task-title">
+                  {g.title}
+                </Link>
+                <span className="pill">{g.status}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Disclosure>
 
       <h2 className="section-title" style={{ marginTop: 24 }}>
         Tareas · {tasks.length}
@@ -103,31 +102,28 @@ export default async function ProjectDetailPage({
         </ul>
       )}
 
-      <h2 className="section-title" style={{ marginTop: 24 }}>
-        Eventos · {events.length}
-      </h2>
-      {events.length === 0 ? (
-        <p className="muted" style={{ marginTop: 8 }}>
-          Sin eventos en este proyecto. (Crea eventos desde el calendario o el chat y asígnalos aquí.)
-        </p>
-      ) : (
-        <ul style={{ marginTop: 8 }}>
-          {events.map((e) => (
-            <li key={e.id} className="row-card">
-              <span className="task-title">{e.summary}</span>
-              <span className="pill">
-                {e.start ? dayLabelInTz(e.start, ctx.tz) : 'evento'}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <Disclosure title="Eventos" count={events.length}>
+        {events.length === 0 ? (
+          <p className="muted" style={{ marginTop: 8 }}>
+            Sin eventos en este proyecto. (Crea eventos desde el calendario o el chat y
+            asígnalos aquí.)
+          </p>
+        ) : (
+          <ul style={{ marginTop: 8 }}>
+            {events.map((e) => (
+              <li key={e.id} className="row-card">
+                <span className="task-title">{e.summary}</span>
+                <span className="pill">
+                  {e.start ? dayLabelInTz(e.start, ctx.tz) : 'evento'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Disclosure>
 
       {fotos.length > 0 && (
-        <>
-          <h2 className="section-title" style={{ marginTop: 24 }}>
-            Fotos · {fotos.length}
-          </h2>
+        <Disclosure title="Fotos" count={fotos.length}>
           <div className="foto-grid">
             {fotos.map((f) => (
               <figure key={f.id} className="foto">
@@ -137,30 +133,29 @@ export default async function ProjectDetailPage({
               </figure>
             ))}
           </div>
-        </>
+        </Disclosure>
       )}
 
-      <h2 className="section-title" style={{ marginTop: 24 }}>
-        Documentación · {docs.length}
-      </h2>
-      <NewDocForm fixedProjectId={project.id} />
-      {docs.length === 0 ? (
-        <p className="muted" style={{ marginTop: 8 }}>
-          Sin documentación de este proyecto. Documenta aquí cómo se hace su trabajo.
-        </p>
-      ) : (
-        <ul style={{ marginTop: 8 }}>
-          {docs.map((d) => (
-            <li key={d.id} className="row-card">
-              <Link href={`/docs/${d.id}`} className="task-title">
-                {d.pinned ? '📌 ' : ''}
-                {d.title}
-              </Link>
-              <span className="pill">{d.author === 'agente' ? 'agente' : 'tú'}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <Disclosure title="Documentación" count={docs.length}>
+        <NewDocForm fixedProjectId={project.id} />
+        {docs.length === 0 ? (
+          <p className="muted" style={{ marginTop: 8 }}>
+            Sin documentación de este proyecto. Documenta aquí cómo se hace su trabajo.
+          </p>
+        ) : (
+          <ul style={{ marginTop: 8 }}>
+            {docs.map((d) => (
+              <li key={d.id} className="row-card">
+                <Link href={`/docs/${d.id}`} className="task-title">
+                  {d.pinned ? '📌 ' : ''}
+                  {d.title}
+                </Link>
+                <span className="pill">{d.author === 'agente' ? 'agente' : 'tú'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Disclosure>
     </div>
   );
 }
