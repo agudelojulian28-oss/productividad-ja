@@ -1,29 +1,28 @@
 import { ok, err, type Result, type ActorContext } from '@/core/types';
 import type { WorkRepo, TaskRow } from '@/core/work/ports';
-import { createTask, completeTask, rescheduleTask, deleteTask } from '@/core/work/tasks';
+import {
+  createTask,
+  completeTask,
+  reopenTask,
+  rescheduleTask,
+  setTaskDescription,
+  deleteTask,
+} from '@/core/work/tasks';
+import { createProject, setProjectDescription } from '@/core/work/projects';
+import { createGoal, updateGoal, setGoalDescription } from '@/core/work/goals';
 import { consultar, buscar } from '@/core/work/queries';
 import type { FinanceRepo } from '@/core/finance/ports';
 import { registrarMovimiento } from '@/core/finance/transactions';
+import { createIncomeSource, archiveIncomeSource } from '@/core/finance/income-sources';
+import { createMoneyGoal } from '@/core/finance/goals';
 import { resumenFinanciero, porFuente, topGastos } from '@/core/finance/queries';
 import { detectarChoques, huecosLibres } from '@/lib/agenda';
 import type { StructureRepo } from '@/core/structure/ports';
+import { createArea, archiveArea, setAreaDescription } from '@/core/structure/areas';
 import { createDocument, appendToDocument, updateDocument, deleteDocument } from '@/core/structure/documents';
 import { saveAttachment } from '@/core/structure/attachments';
 import { planUndo, type AuditEntry } from '@/lib/undo';
-import {
-  CrearTarea,
-  Completar,
-  Reprogramar,
-  Borrar,
-  Consultar,
-  Buscar,
-  VerCalendario,
-  GestionarEvento,
-  GuardarImagen,
-  RegistrarMovimiento,
-  Documentar,
-  type ToolName,
-} from './schemas';
+import { Consultar, Buscar, Crear, Actualizar, Archivar, GuardarImagen, type ToolName } from './schemas';
 import type { ZodType } from 'zod';
 import type { GEvent } from '@/adapters/google/calendar';
 import { nameToColorId } from '@/lib/calendar-colors';
@@ -77,8 +76,20 @@ function parse<T>(schema: ZodType<T>, raw: unknown): Result<T> {
   return p.success ? ok(p.data) : err('INVALID_INPUT', 'Entrada inválida', p.error.issues);
 }
 
+const CAL_OFF = 'Tu Google Calendar no está conectado. Conéctalo en Ajustes.';
+const noEvento = err(
+  'NOT_FOUND',
+  'No encontré ese evento. Llama a consultar (vista agenda) para obtener el ID actual y reintenta.',
+);
+
+async function calendarReady(deps: ToolDeps): Promise<boolean> {
+  if (deps.googleConnected) return deps.googleConnected();
+  return true;
+}
+
 /** Ejecuta una herramienta: valida (Zod), llama al caso de uso de /core, y aplica
- *  los efectos de calendario — el MISMO camino que los botones de la app. */
+ *  los efectos de calendario — el MISMO camino que los botones de la app.
+ *  Verbos generales (ADR-024): crear/actualizar/archivar despachan por `tipo`. */
 export async function runTool(
   deps: ToolDeps,
   name: ToolName,
@@ -86,47 +97,36 @@ export async function runTool(
 ): Promise<Result<unknown>> {
   const { ctx, repo } = deps;
   switch (name) {
-    case 'crear_tarea': {
-      const p = parse(CrearTarea, rawInput);
-      if (!p.ok) return p;
-      const r = await createTask(ctx, repo, {
-        title: p.value.titulo,
-        dueAt: p.value.fecha,
-        projectId: p.value.proyecto_id,
-        goalId: p.value.meta_id,
-      });
-      return r.ok ? ok(summarize(r.value)) : r;
-    }
-    case 'completar': {
-      const p = parse(Completar, rawInput);
-      if (!p.ok) return p;
-      const r = await completeTask(ctx, repo, p.value.tarea_id);
-      return r.ok ? ok(summarize(r.value)) : r;
-    }
-    case 'reprogramar': {
-      const p = parse(Reprogramar, rawInput);
-      if (!p.ok) return p;
-      const r = await rescheduleTask(ctx, repo, { id: p.value.tarea_id, dueAt: p.value.fecha });
-      return r.ok ? ok(summarize(r.value)) : r;
-    }
-    case 'borrar': {
-      const p = parse(Borrar, rawInput);
-      if (!p.ok) return p;
-      const r = await deleteTask(ctx, repo, p.value.tarea_id);
-      return r.ok ? ok({ borrada: p.value.tarea_id }) : r;
-    }
+    // ── consultar (lecturas) ─────────────────────────────────────────────
     case 'consultar': {
       const p = parse(Consultar, rawInput);
       if (!p.ok) return p;
       const vista = p.value.vista;
 
-      // ── Trabajo ────────────────────────────────────────────────────────
       if (vista === 'agenda_hoy' || vista === 'pendientes') {
         const r = await consultar(ctx, repo, vista);
         return r.ok ? ok(r.value.map(summarize)) : r;
       }
+      if (vista === 'agenda') {
+        if (!deps.listCalendar || !(await calendarReady(deps))) return err('EXTERNAL_ERROR', CAL_OFF);
+        const dia = p.value.fecha ?? new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz }).format(new Date());
+        const events = await deps.listCalendar(dia);
+        return ok(
+          events.map((e) => ({
+            id: e.id,
+            titulo: e.summary,
+            inicio: e.start,
+            todo_el_dia: e.allDay,
+            es_recurrente: Boolean(e.recurringEventId || e.recurrence),
+            serie_id: e.recurringEventId,
+          })),
+        );
+      }
       if (vista === 'estructura') {
-        const projects = await repo.listProjects();
+        const [areas, projects] = await Promise.all([
+          deps.structure ? deps.structure.listAreas() : Promise.resolve([]),
+          repo.listProjects(),
+        ]);
         const arbol = [];
         for (const proj of projects) {
           const metas = await repo.listGoals(proj.id);
@@ -137,7 +137,10 @@ export async function runTool(
             metas: metas.map((g) => ({ meta_id: g.id, titulo: g.title })),
           });
         }
-        return ok(arbol);
+        return ok({
+          areas: areas.map((a) => ({ area_id: a.id, nombre: a.name, clase: a.kind })),
+          proyectos: arbol,
+        });
       }
       if (vista === 'documentacion') {
         if (!deps.structure) return err('EXTERNAL_ERROR', 'La documentación no está disponible');
@@ -156,24 +159,21 @@ export async function runTool(
           })),
         );
       }
-
-      // ── Agenda (choques y huecos, sobre los eventos de Google) ───────────
       if (vista === 'conflictos' || vista === 'huecos') {
-        if (!deps.listRange || (deps.googleConnected && !(await deps.googleConnected()))) {
-          return err(
-            'EXTERNAL_ERROR',
-            'Tu Google Calendar no está conectado. Conéctalo en Ajustes para poder revisar la agenda.',
-          );
-        }
+        if (!deps.listRange || !(await calendarReady(deps))) return err('EXTERNAL_ERROR', CAL_OFF);
         const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz }).format(new Date());
         const fin = new Date(new Date(`${hoy}T12:00:00Z`).getTime() + 7 * 86_400_000)
           .toISOString()
           .slice(0, 10);
         const eventos = await deps.listRange(hoy, fin);
         if (vista === 'conflictos') {
-          const ch = detectarChoques(eventos);
           return ok(
-            ch.map((c) => ({ evento_a: c.a, evento_b: c.b, desde: c.startIso, hasta: c.endIso })),
+            detectarChoques(eventos).map((c) => ({
+              evento_a: c.a,
+              evento_b: c.b,
+              desde: c.startIso,
+              hasta: c.endIso,
+            })),
           );
         }
         const huecos = huecosLibres(eventos, {
@@ -185,7 +185,7 @@ export async function runTool(
         return ok(huecos.slice(0, 10).map((h) => ({ desde: h.startIso, hasta: h.endIso })));
       }
 
-      // ── Dinero (mismas vistas que pinta el panel: una cifra, una fuente) ──
+      // Dinero
       if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
       const fin = deps.finance;
       if (vista === 'resumen_financiero') {
@@ -231,67 +231,266 @@ export async function runTool(
           })),
         );
       }
-      // pipeline
       const rows = await fin.pipeline();
       if (rows.length === 0)
         return ok({ items: [], nota: 'Pipeline vacío (las ventas llegan en la Etapa 5).' });
       return ok(rows.map((r) => ({ etapa: r.stage, tratos: r.deals, valor: money(r.valueMinor) })));
     }
+
     case 'buscar': {
       const p = parse(Buscar, rawInput);
       if (!p.ok) return p;
       const r = await buscar(ctx, repo, p.value.texto);
       return r.ok ? ok(r.value.map(summarize)) : r;
     }
-    case 'registrar_movimiento': {
-      const p = parse(RegistrarMovimiento, rawInput);
+
+    // ── crear (unión por tipo) ───────────────────────────────────────────
+    case 'crear': {
+      const p = parse(Crear, rawInput);
       if (!p.ok) return p;
-      if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
       const v = p.value;
-      const r = await registrarMovimiento(ctx, deps.finance, {
-        direction: v.tipo === 'ingreso' ? 'in' : 'out',
-        amountMinor: Math.round(v.monto * 100),
-        currency: v.moneda,
-        areaId: v.area_id,
-        incomeSourceId: v.fuente_id,
-        category: v.categoria,
-        occurredOn: v.fecha,
-        fxRate: v.tasa,
-      });
-      if (!r.ok) return r;
-      return ok({
-        registrado: r.value.id,
-        tipo: v.tipo,
-        monto: money(r.value.baseAmountMinor),
-        moneda: r.value.currency,
-      });
-    }
-    case 'documentar': {
-      const p = parse(Documentar, rawInput);
-      if (!p.ok) return p;
-      if (!deps.structure) return err('EXTERNAL_ERROR', 'La documentación no está disponible');
-      const v = p.value;
-      if (v.modo === 'anexar') {
-        const r = await appendToDocument(ctx, deps.structure, {
-          id: v.doc_id!,
-          content: v.contenido,
-        });
-        return r.ok ? ok({ anexado: r.value.id, titulo: r.value.title }) : r;
+      switch (v.tipo) {
+        case 'tarea': {
+          const r = await createTask(ctx, repo, {
+            title: v.titulo!,
+            dueAt: v.fecha,
+            projectId: v.proyecto_id,
+            goalId: v.meta_id,
+          });
+          return r.ok ? ok(summarize(r.value)) : r;
+        }
+        case 'evento': {
+          if (!deps.createEvent || !(await calendarReady(deps))) return err('EXTERNAL_ERROR', CAL_OFF);
+          const id = await deps.createEvent({
+            titulo: v.titulo!,
+            fecha: v.fecha!,
+            colorId: v.color ? nameToColorId[v.color] : undefined,
+            durationMin: v.duracion_min,
+            descripcion: v.descripcion,
+            projectId: v.proyecto_id,
+            goalId: v.meta_id,
+          });
+          return ok({ evento_id: id });
+        }
+        case 'proyecto': {
+          const r = await createProject(ctx, repo, { title: v.titulo!, areaId: v.area_id! });
+          return r.ok ? ok({ proyecto_id: r.value.id, titulo: r.value.title }) : r;
+        }
+        case 'meta': {
+          const r = await createGoal(ctx, repo, {
+            projectId: v.proyecto_id!,
+            title: v.titulo!,
+            targetValue: v.objetivo,
+            startDate: v.desde,
+            deadline: v.hasta,
+          });
+          return r.ok ? ok({ meta_id: r.value.id, titulo: r.value.title }) : r;
+        }
+        case 'area': {
+          if (!deps.structure) return err('EXTERNAL_ERROR', 'No disponible');
+          const r = await createArea(ctx, deps.structure, { name: v.titulo!, kind: v.clase! });
+          return r.ok ? ok({ area_id: r.value.id, nombre: r.value.name }) : r;
+        }
+        case 'fuente': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          const r = await createIncomeSource(ctx, deps.finance, {
+            areaId: v.area_id!,
+            name: v.titulo!,
+            model: v.modelo!,
+          });
+          return r.ok ? ok({ fuente_id: r.value.id, nombre: r.value.name }) : r;
+        }
+        case 'meta_dinero': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          const r = await createMoneyGoal(ctx, deps.finance, {
+            title: v.titulo!,
+            metric: v.metrica!,
+            targetValue: v.objetivo!,
+            areaId: v.area_id,
+            incomeSourceId: v.fuente_id,
+            periodStart: v.desde!,
+            periodEnd: v.hasta!,
+          });
+          return r.ok ? ok({ meta_dinero_id: r.value.id }) : r;
+        }
+        case 'documento': {
+          if (!deps.structure) return err('EXTERNAL_ERROR', 'La documentación no está disponible');
+          const r = await createDocument(
+            ctx,
+            deps.structure,
+            {
+              title: v.titulo!,
+              content: v.contenido,
+              kind: v.clase_doc ?? 'nota',
+              areaId: v.area_id,
+              projectId: v.proyecto_id,
+            },
+            'agente',
+          );
+          return r.ok ? ok({ documento_id: r.value.id, titulo: r.value.title }) : r;
+        }
+        case 'movimiento': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          const r = await registrarMovimiento(ctx, deps.finance, {
+            direction: v.direccion === 'ingreso' ? 'in' : 'out',
+            amountMinor: Math.round(v.monto! * 100),
+            currency: v.moneda ?? 'COP',
+            areaId: v.area_id!,
+            incomeSourceId: v.fuente_id,
+            category: v.categoria,
+            occurredOn: v.desde, // opcional; el core usa hoy si falta
+            fxRate: v.tasa,
+          });
+          return r.ok
+            ? ok({ registrado: r.value.id, monto: money(r.value.baseAmountMinor), moneda: r.value.currency })
+            : r;
+        }
       }
-      const r = await createDocument(
-        ctx,
-        deps.structure,
-        {
-          title: v.titulo!,
-          content: v.contenido,
-          kind: v.tipo ?? 'nota',
-          areaId: v.area_id,
-          projectId: v.proyecto_id,
-        },
-        'agente',
-      );
-      return r.ok ? ok({ documento_id: r.value.id, titulo: r.value.title }) : r;
+      return err('INVALID_INPUT', 'Tipo desconocido');
     }
+
+    // ── actualizar (unión por tipo) ──────────────────────────────────────
+    case 'actualizar': {
+      const p = parse(Actualizar, rawInput);
+      if (!p.ok) return p;
+      const v = p.value;
+      switch (v.tipo) {
+        case 'tarea': {
+          if (v.accion === 'completar') {
+            const r = await completeTask(ctx, repo, v.id);
+            return r.ok ? ok(summarize(r.value)) : r;
+          }
+          if (v.accion === 'reabrir') {
+            const r = await reopenTask(ctx, repo, v.id);
+            return r.ok ? ok(summarize(r.value)) : r;
+          }
+          if (v.accion === 'reprogramar') {
+            if (!v.fecha) return err('INVALID_INPUT', 'Reprogramar necesita fecha');
+            const r = await rescheduleTask(ctx, repo, { id: v.id, dueAt: v.fecha });
+            return r.ok ? ok(summarize(r.value)) : r;
+          }
+          if (v.accion === 'descripcion') {
+            const r = await setTaskDescription(ctx, repo, v.id, v.descripcion ?? null);
+            return r.ok ? ok(summarize(r.value)) : r;
+          }
+          // mover
+          const task = await repo.getTask(v.id);
+          if (!task) return err('NOT_FOUND', 'La tarea no existe');
+          const row = await repo.updateTask(v.id, {
+            projectId: v.proyecto_id ?? undefined,
+            goalId: v.meta_id ?? undefined,
+          });
+          return ok(summarize(row));
+        }
+        case 'meta': {
+          if (v.accion === 'descripcion') {
+            const r = await setGoalDescription(ctx, repo, v.id, v.descripcion ?? null);
+            return r.ok ? ok({ meta_id: r.value.id }) : r;
+          }
+          const r = await updateGoal(ctx, repo, v.id, {
+            targetValue: v.objetivo,
+            startDate: v.desde,
+            deadline: v.hasta,
+          });
+          return r.ok ? ok({ meta_id: r.value.id, objetivo: r.value.targetValue }) : r;
+        }
+        case 'proyecto': {
+          const r = await setProjectDescription(ctx, repo, v.id, v.descripcion ?? null);
+          return r.ok ? ok({ proyecto_id: r.value.id }) : r;
+        }
+        case 'area': {
+          if (!deps.structure) return err('EXTERNAL_ERROR', 'No disponible');
+          const r = await setAreaDescription(ctx, deps.structure, v.id, v.descripcion ?? null);
+          return r.ok ? ok({ area_id: r.value.id }) : r;
+        }
+        case 'documento': {
+          if (!deps.structure) return err('EXTERNAL_ERROR', 'La documentación no está disponible');
+          if (v.accion === 'anexar') {
+            if (!v.descripcion) return err('INVALID_INPUT', 'Anexar necesita el texto en descripcion');
+            const r = await appendToDocument(ctx, deps.structure, { id: v.id, content: v.descripcion });
+            return r.ok ? ok({ doc_id: r.value.id }) : r;
+          }
+          if (v.accion === 'fijar') {
+            const r = await updateDocument(ctx, deps.structure, v.id, { pinned: v.fijado ?? true });
+            return r.ok ? ok({ doc_id: r.value.id, fijado: r.value.pinned }) : r;
+          }
+          // editar
+          const r = await updateDocument(ctx, deps.structure, v.id, {
+            title: v.titulo,
+            content: v.descripcion,
+            pinned: v.fijado,
+          });
+          return r.ok ? ok({ doc_id: r.value.id }) : r;
+        }
+        case 'evento': {
+          if (!deps.editEvent || !(await calendarReady(deps))) return err('EXTERNAL_ERROR', CAL_OFF);
+          try {
+            await deps.editEvent(v.id, {
+              titulo: v.titulo,
+              fecha: v.fecha,
+              colorId: v.color ? nameToColorId[v.color] : undefined,
+              recurrencia: v.recurrencia,
+              scope: v.alcance,
+            });
+            return ok({ editado: v.id });
+          } catch {
+            return noEvento;
+          }
+        }
+      }
+      return err('INVALID_INPUT', 'Tipo desconocido');
+    }
+
+    // ── archivar / borrar (unión por tipo) ───────────────────────────────
+    case 'archivar': {
+      const p = parse(Archivar, rawInput);
+      if (!p.ok) return p;
+      const v = p.value;
+      switch (v.tipo) {
+        case 'tarea': {
+          const r = await deleteTask(ctx, repo, v.id);
+          return r.ok ? ok({ borrada: v.id }) : r;
+        }
+        case 'documento': {
+          if (!deps.structure) return err('EXTERNAL_ERROR', 'La documentación no está disponible');
+          const r = await deleteDocument(ctx, deps.structure, v.id);
+          return r.ok ? ok({ borrado: v.id }) : r;
+        }
+        case 'area': {
+          if (!deps.structure) return err('EXTERNAL_ERROR', 'No disponible');
+          const r = await archiveArea(ctx, deps.structure, v.id);
+          return r.ok ? ok({ archivada: v.id }) : r;
+        }
+        case 'fuente': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          const r = await archiveIncomeSource(ctx, deps.finance, v.id);
+          return r.ok ? ok({ archivada: v.id }) : r;
+        }
+        case 'evento': {
+          if (!deps.deleteEvent || !(await calendarReady(deps))) return err('EXTERNAL_ERROR', CAL_OFF);
+          try {
+            await deps.deleteEvent(v.id, { scope: v.alcance ?? 'serie' });
+            return ok({ borrado: v.id });
+          } catch {
+            return noEvento;
+          }
+        }
+      }
+      return err('INVALID_INPUT', 'Tipo desconocido');
+    }
+
+    case 'guardar_imagen': {
+      const p = parse(GuardarImagen, rawInput);
+      if (!p.ok) return p;
+      if (!deps.structure) return err('EXTERNAL_ERROR', 'No disponible');
+      const r = await saveAttachment(ctx, deps.structure, {
+        id: p.value.adjunto_id,
+        projectId: p.value.proyecto_id,
+        description: p.value.descripcion,
+      });
+      return r.ok ? ok({ guardada: r.value.id, proyecto_id: r.value.projectId }) : r;
+    }
+
     case 'deshacer': {
       if (!deps.lastAudit) return err('EXTERNAL_ERROR', 'Deshacer no está disponible');
       const plan = planUndo(await deps.lastAudit(), Date.now());
@@ -314,7 +513,6 @@ export async function runTool(
         return ok({ deshecho: true, detalle: 'Se restauró la tarea a su estado anterior.' });
       }
 
-      // documents
       if (!deps.structure) return err('EXTERNAL_ERROR', 'La documentación no está disponible');
       if (plan.kind === 'delete') {
         const r = await deleteDocument(ctx, deps.structure, plan.entityId);
@@ -327,87 +525,6 @@ export async function runTool(
         pinned: b.pinned as boolean,
       });
       return r.ok ? ok({ deshecho: true, detalle: 'Se restauró el documento a su estado anterior.' }) : r;
-    }
-    case 'guardar_imagen': {
-      const p = parse(GuardarImagen, rawInput);
-      if (!p.ok) return p;
-      if (!deps.structure) return err('EXTERNAL_ERROR', 'No disponible');
-      const r = await saveAttachment(ctx, deps.structure, {
-        id: p.value.adjunto_id,
-        projectId: p.value.proyecto_id,
-        description: p.value.descripcion,
-      });
-      return r.ok ? ok({ guardada: r.value.id, proyecto_id: r.value.projectId }) : r;
-    }
-    case 'ver_calendario': {
-      const p = parse(VerCalendario, rawInput);
-      if (!p.ok) return p;
-      if (!deps.listCalendar || (deps.googleConnected && !(await deps.googleConnected()))) {
-        return err(
-          'EXTERNAL_ERROR',
-          'Tu Google Calendar no está conectado. Conéctalo en Ajustes para ver tus eventos.',
-        );
-      }
-      const dateYmd =
-        p.value.fecha ?? new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz }).format(new Date());
-      const events = await deps.listCalendar(dateYmd);
-      return ok(
-        events.map((e) => ({
-          id: e.id,
-          titulo: e.summary,
-          inicio: e.start,
-          todo_el_dia: e.allDay,
-          es_recurrente: Boolean(e.recurringEventId || e.recurrence),
-          serie_id: e.recurringEventId,
-        })),
-      );
-    }
-    case 'gestionar_evento': {
-      const p = parse(GestionarEvento, rawInput);
-      if (!p.ok) return p;
-      const v = p.value;
-      const colorId = v.color ? nameToColorId[v.color] : undefined;
-      const noEncontrado = err(
-        'NOT_FOUND',
-        'No encontré ese evento con ese ID. Llama a ver_calendario para obtener el ID actual y reintenta.',
-      );
-
-      if (v.accion === 'crear') {
-        if (!deps.createEvent) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
-        const id = await deps.createEvent({
-          titulo: v.titulo!,
-          fecha: v.fecha!,
-          colorId,
-          durationMin: v.duracion_min,
-          descripcion: v.descripcion,
-          projectId: v.proyecto_id,
-          goalId: v.meta_id,
-        });
-        return ok({ evento_id: id });
-      }
-      if (v.accion === 'editar') {
-        if (!deps.editEvent) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
-        try {
-          await deps.editEvent(v.evento_id!, {
-            titulo: v.titulo,
-            fecha: v.fecha,
-            colorId,
-            recurrencia: v.recurrencia,
-            scope: v.alcance,
-          });
-          return ok({ editado: v.evento_id });
-        } catch {
-          return noEncontrado;
-        }
-      }
-      // borrar
-      if (!deps.deleteEvent) return err('EXTERNAL_ERROR', 'Google Calendar no está conectado');
-      try {
-        await deps.deleteEvent(v.evento_id!, { scope: v.alcance ?? 'serie' });
-        return ok({ borrado: v.evento_id });
-      } catch {
-        return noEncontrado;
-      }
     }
   }
 }

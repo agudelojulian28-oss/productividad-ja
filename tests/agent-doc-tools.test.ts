@@ -10,14 +10,14 @@ function deps(): ToolDeps & { st: ReturnType<typeof makeFakeStructureRepo> } {
   return { ctx: ctx(), repo: makeFakeRepo(), structure: st, st };
 }
 
-describe('runTool · documentar', () => {
+describe('runTool · crear documento', () => {
   it('crea un documento con autor agente', async () => {
     const d = deps();
-    const r = await runTool(d, 'documentar', {
-      modo: 'crear',
+    const r = await runTool(d, 'crear', {
+      tipo: 'documento',
       titulo: 'Preferencia de informes',
       contenido: 'Los informes van los viernes.',
-      tipo: 'preferencia',
+      clase_doc: 'preferencia',
       proyecto_id: PROJ,
     });
     expect(r.ok).toBe(true);
@@ -29,31 +29,23 @@ describe('runTool · documentar', () => {
 
   it('anexa a un documento existente (aditivo)', async () => {
     const d = deps();
-    const created = await runTool(d, 'documentar', {
-      modo: 'crear',
-      titulo: 'Bitácora',
-      contenido: 'Uno',
-    });
+    const created = await runTool(d, 'crear', { tipo: 'documento', titulo: 'Bitácora', contenido: 'Uno' });
     if (!created.ok) throw new Error('setup');
     const docId = (created.value as { documento_id: string }).documento_id;
-    const r = await runTool(d, 'documentar', {
-      modo: 'anexar',
-      doc_id: docId,
-      contenido: 'Dos',
-    });
+    const r = await runTool(d, 'actualizar', { tipo: 'documento', id: docId, accion: 'anexar', descripcion: 'Dos' });
     expect(r.ok).toBe(true);
     expect(d.st._docs.get(docId)!.content).toBe('Uno\n\nDos');
   });
 
   it('crear sin título → error (schema)', async () => {
     const d = deps();
-    const r = await runTool(d, 'documentar', { modo: 'crear', contenido: 'x' });
+    const r = await runTool(d, 'crear', { tipo: 'documento', contenido: 'x' });
     expect(r.ok).toBe(false);
   });
 
-  it('anexar sin doc_id → error (schema)', async () => {
+  it('anexar sin id → error (schema)', async () => {
     const d = deps();
-    const r = await runTool(d, 'documentar', { modo: 'anexar', contenido: 'x' });
+    const r = await runTool(d, 'actualizar', { tipo: 'documento', accion: 'anexar', descripcion: 'x' });
     expect(r.ok).toBe(false);
   });
 });
@@ -61,19 +53,11 @@ describe('runTool · documentar', () => {
 describe('runTool · consultar documentacion', () => {
   it('lista documentos, filtrando por proyecto', async () => {
     const d = deps();
-    await runTool(d, 'documentar', { modo: 'crear', titulo: 'Global', contenido: 'g' });
-    await runTool(d, 'documentar', {
-      modo: 'crear',
-      titulo: 'De proyecto',
-      contenido: 'p',
-      proyecto_id: PROJ,
-    });
+    await runTool(d, 'crear', { tipo: 'documento', titulo: 'Global', contenido: 'g' });
+    await runTool(d, 'crear', { tipo: 'documento', titulo: 'De proyecto', contenido: 'p', proyecto_id: PROJ });
     const all = await runTool(d, 'consultar', { vista: 'documentacion' });
     expect(all.ok && (all.value as unknown[]).length).toBe(2);
-    const delProy = await runTool(d, 'consultar', {
-      vista: 'documentacion',
-      proyecto_id: PROJ,
-    });
+    const delProy = await runTool(d, 'consultar', { vista: 'documentacion', proyecto_id: PROJ });
     expect(delProy.ok && (delProy.value as unknown[]).length).toBe(1);
     if (delProy.ok) {
       expect((delProy.value as { titulo: string }[])[0]!.titulo).toBe('De proyecto');

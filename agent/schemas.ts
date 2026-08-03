@@ -2,103 +2,11 @@ import { z } from 'zod';
 import { COLOR_NAMES } from '@/lib/calendar-colors';
 
 // Fechas: ISO-8601 con offset explícito (acepta milisegundos). Nunca z.coerce.date().
-const ISO_WITH_OFFSET =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?([+-]\d{2}:\d{2}|Z)$/;
-const Instant = z
-  .string()
-  .regex(ISO_WITH_OFFSET, 'ISO-8601 con offset (ej. 2026-07-24T16:00:00-05:00)');
-
-// Las 5 herramientas de la Etapa 2. Un schema por herramienta.
-export const CrearTarea = z.object({
-  titulo: z.string().trim().min(1).max(200).describe('Título de la tarea'),
-  fecha: Instant.optional().describe('Fecha y hora con offset, opcional'),
-  proyecto_id: z.uuid().optional().describe('ID del proyecto (de estructura)'),
-  meta_id: z.uuid().optional().describe('ID de la meta, opcional (de estructura)'),
-});
-
-export const Completar = z.object({
-  tarea_id: z.uuid().describe('ID de la tarea a completar'),
-});
-
-export const Reprogramar = z.object({
-  tarea_id: z.uuid().describe('ID de la tarea'),
-  fecha: Instant.describe('Nueva fecha y hora con offset'),
-});
-
-export const Consultar = z.object({
-  vista: z
-    .enum([
-      'agenda_hoy',
-      'pendientes',
-      'estructura',
-      'documentacion',
-      'resumen_financiero',
-      'por_fuente',
-      'gastos',
-      'por_cobrar',
-      'pipeline',
-      'conflictos',
-      'huecos',
-    ])
-    .describe(
-      'Qué consultar. Trabajo: agenda_hoy, pendientes (tareas), estructura (proyectos y metas), ' +
-        'documentacion (el método de Julián: procesos, preferencias y notas). ' +
-        'Dinero: resumen_financiero (entró/salió/neto del mes), por_fuente, gastos (top del mes), ' +
-        'por_cobrar y pipeline (ventas, llegan en la Etapa 5). ' +
-        'Agenda: conflictos (eventos que se solapan en los próximos 7 días), ' +
-        'huecos (ratos libres para agendar; usa duracion_min).',
-    ),
-  proyecto_id: z
-    .uuid()
-    .optional()
-    .describe('Solo para vista=documentacion: limita a los documentos de ese proyecto'),
-  duracion_min: z
-    .number()
-    .int()
-    .min(15)
-    .max(480)
-    .optional()
-    .describe('Solo para vista=huecos: duración deseada del hueco en minutos (60 por defecto)'),
-});
-
-// Dinero al agente: el monto va en la moneda indicada (pesos o dólares), no en centavos.
+const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?([+-]\d{2}:\d{2}|Z)$/;
+const Instant = z.string().regex(ISO_WITH_OFFSET, 'ISO-8601 con offset (ej. 2026-07-24T16:00:00-05:00)');
 const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Día YYYY-MM-DD');
-export const RegistrarMovimiento = z.object({
-  tipo: z.enum(['ingreso', 'gasto']).describe('ingreso = entró plata; gasto = salió'),
-  monto: z
-    .number()
-    .positive()
-    .describe('Monto en la moneda indicada (pesos o dólares), NO en centavos. Ej. 50000, 12.5'),
-  moneda: z.enum(['COP', 'USD']).default('COP').describe('Moneda del monto'),
-  area_id: z.uuid().describe('Área a la que pertenece (usa consultar estructura para el ID)'),
-  fuente_id: z
-    .uuid()
-    .optional()
-    .describe('Fuente de ingreso (obligatoria si tipo=ingreso; usa consultar por_fuente)'),
-  categoria: z.string().trim().max(80).optional().describe('Categoría del gasto (ej. almuerzo)'),
-  fecha: Ymd.optional().describe('Día YYYY-MM-DD; por defecto hoy'),
-  tasa: z
-    .number()
-    .positive()
-    .optional()
-    .describe('COP por 1 USD (obligatoria si moneda=USD). Se congela al registrar.'),
-});
 
-export const Buscar = z.object({
-  texto: z.string().trim().min(1).max(100).describe('Texto a buscar'),
-});
-
-export const Borrar = z.object({
-  tarea_id: z.uuid().describe('ID de la tarea a borrar'),
-});
-
-export const VerCalendario = z.object({
-  fecha: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional()
-    .describe('Día YYYY-MM-DD; por defecto hoy'),
-});
+const INCOME_MODELS = ['servicio', 'producto', 'suscripcion', 'empleo', 'inversion', 'otro'] as const;
 
 const Alcance = z
   .enum(['serie', 'instancia'])
@@ -112,72 +20,173 @@ export const Recurrencia = z.object({
   dias_semana: z
     .array(z.enum(['LU', 'MA', 'MI', 'JU', 'VI', 'SA', 'DO']))
     .optional()
-    .describe('Días de la semana (solo para frecuencia semanal)'),
-  hasta: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional()
-    .describe('Termina en esta fecha YYYY-MM-DD'),
+    .describe('Días de la semana (solo frecuencia semanal)'),
+  hasta: Ymd.optional().describe('Termina en esta fecha YYYY-MM-DD'),
   veces: z.number().int().min(1).optional().describe('Termina tras N repeticiones'),
 });
 
-// Una sola herramienta para EVENTOS de Google Calendar (crear/editar/borrar), según
-// `accion`. Reemplaza a crear_evento/editar_evento/borrar_evento para mantener el
-// catálogo en 11 (CLAUDE.md). Los campos requeridos se validan por acción con refine.
-export const GestionarEvento = z
+// ── consultar (lecturas) ────────────────────────────────────────────────────
+export const Consultar = z.object({
+  vista: z
+    .enum([
+      'agenda_hoy',
+      'agenda',
+      'pendientes',
+      'estructura',
+      'documentacion',
+      'resumen_financiero',
+      'por_fuente',
+      'gastos',
+      'por_cobrar',
+      'pipeline',
+      'conflictos',
+      'huecos',
+    ])
+    .describe(
+      'Qué consultar. Trabajo: agenda_hoy (tareas+eventos de hoy), agenda (eventos de un día, usa fecha), ' +
+        'pendientes (tareas), estructura (áreas, proyectos y metas con sus IDs), documentacion (el método). ' +
+        'Dinero: resumen_financiero, por_fuente, gastos, por_cobrar, pipeline. ' +
+        'Agenda: conflictos (solapes próximos 7 días), huecos (ratos libres; usa duracion_min).',
+    ),
+  fecha: Ymd.optional().describe('Solo vista=agenda: día YYYY-MM-DD (por defecto hoy)'),
+  proyecto_id: z.uuid().optional().describe('Solo vista=documentacion: limita a ese proyecto'),
+  duracion_min: z.number().int().min(15).max(480).optional().describe('Solo vista=huecos: minutos (60 def)'),
+});
+
+export const Buscar = z.object({
+  texto: z.string().trim().min(1).max(100).describe('Texto a buscar (tareas)'),
+});
+
+// ── crear (unión por tipo) ──────────────────────────────────────────────────
+export const Crear = z
   .object({
-    accion: z.enum(['crear', 'editar', 'borrar']).describe('Qué hacer con el evento'),
-    evento_id: z
+    tipo: z
+      .enum([
+        'tarea',
+        'evento',
+        'proyecto',
+        'meta',
+        'area',
+        'fuente',
+        'meta_dinero',
+        'documento',
+        'movimiento',
+      ])
+      .describe('Qué crear'),
+    titulo: z
       .string()
+      .trim()
       .min(1)
+      .max(200)
       .optional()
-      .describe('ID del evento de Google (de ver_calendario). Requerido para editar/borrar'),
-    titulo: z.string().trim().min(1).max(200).optional().describe('Título (requerido al crear)'),
-    fecha: Instant.optional().describe('Inicio del evento, ISO-8601 con offset (requerido al crear)'),
-    duracion_min: z.number().int().min(5).max(1440).optional().describe('Duración en minutos (30 por defecto)'),
-    color: z.enum(COLOR_NAMES).optional().describe('Color del evento'),
-    descripcion: z.string().max(5000).optional().describe('Descripción/notas del evento'),
-    proyecto_id: z.uuid().optional().describe('Proyecto al que pertenece (de estructura)'),
-    meta_id: z.uuid().optional().describe('Meta a la que pertenece (de estructura)'),
-    recurrencia: Recurrencia.optional().describe('Regla de repetición (al editar)'),
-    alcance: Alcance.optional().describe('serie o instancia; por defecto la serie'),
+      .describe('Título/nombre. Requerido para: tarea, evento, proyecto, meta, area, fuente, documento'),
+    area_id: z.uuid().optional().describe('Área. Requerido: proyecto, fuente. Opcional: meta_dinero, documento, movimiento'),
+    proyecto_id: z.uuid().optional().describe('Proyecto. Requerido: meta. Opcional: tarea, evento, documento'),
+    meta_id: z.uuid().optional().describe('Meta. Opcional: tarea, evento'),
+    fuente_id: z.uuid().optional().describe('Fuente de ingreso. meta_dinero (alcance) / movimiento (ingreso)'),
+    fecha: Instant.optional().describe('Inicio con offset. tarea (vence, opcional), evento (inicio, requerido)'),
+    desde: Ymd.optional().describe('Inicio YYYY-MM-DD. meta / meta_dinero'),
+    hasta: Ymd.optional().describe('Fin/cumplimiento YYYY-MM-DD. meta / meta_dinero'),
+    objetivo: z.number().positive().optional().describe('Cantidad objetivo. meta (nº) / meta_dinero (pesos)'),
+    metrica: z.enum(['money_in', 'money_net']).optional().describe('Solo meta_dinero: ingresos o neto'),
+    clase: z.enum(['negocio', 'personal']).optional().describe('Solo area: negocio o personal'),
+    modelo: z.enum(INCOME_MODELS).optional().describe('Solo fuente: servicio/producto/suscripcion/empleo/inversion/otro'),
+    direccion: z.enum(['ingreso', 'gasto']).optional().describe('Solo movimiento'),
+    monto: z.number().positive().optional().describe('Solo movimiento: en la moneda, NO centavos (ej. 50000, 12.5)'),
+    moneda: z.enum(['COP', 'USD']).optional().describe('Solo movimiento (por defecto COP)'),
+    tasa: z.number().positive().optional().describe('Solo movimiento en USD: COP por 1 USD'),
+    categoria: z.string().trim().max(80).optional().describe('Solo movimiento gasto (ej. almuerzo)'),
+    contenido: z.string().max(100_000).optional().describe('Solo documento: cuerpo (markdown)'),
+    clase_doc: z.enum(['proceso', 'preferencia', 'nota']).optional().describe('Solo documento (por defecto nota)'),
+    descripcion: z.string().max(5000).optional().describe('Solo evento: notas'),
+    color: z.enum(COLOR_NAMES).optional().describe('Solo evento'),
+    duracion_min: z.number().int().min(5).max(1440).optional().describe('Solo evento: minutos (30 def)'),
   })
-  .refine((d) => d.accion !== 'crear' || (!!d.titulo && !!d.fecha), {
-    message: 'Crear un evento necesita titulo y fecha',
-    path: ['titulo'],
-  })
-  .refine((d) => d.accion === 'crear' || !!d.evento_id, {
-    message: 'Editar o borrar necesita evento_id',
-    path: ['evento_id'],
-  });
+  .refine(
+    (d) => {
+      switch (d.tipo) {
+        case 'tarea':
+          return !!d.titulo;
+        case 'evento':
+          return !!d.titulo && !!d.fecha;
+        case 'proyecto':
+          return !!d.titulo && !!d.area_id;
+        case 'meta':
+          return !!d.titulo && !!d.proyecto_id;
+        case 'area':
+          return !!d.titulo && !!d.clase;
+        case 'fuente':
+          return !!d.titulo && !!d.area_id && !!d.modelo;
+        case 'meta_dinero':
+          return (
+            !!d.titulo &&
+            !!d.metrica &&
+            d.objetivo != null &&
+            (!!d.area_id || !!d.fuente_id) &&
+            !!d.desde &&
+            !!d.hasta
+          );
+        case 'documento':
+          return !!d.titulo;
+        case 'movimiento':
+          return !!d.direccion && d.monto != null && !!d.area_id && (d.direccion === 'gasto' || !!d.fuente_id);
+        default:
+          return false;
+      }
+    },
+    { message: 'Faltan campos obligatorios para ese tipo (revisa los marcados como requeridos).' },
+  );
 
-// Documentar el método: crear un documento nuevo o anexar a uno existente. El agente
-// documenta de forma aditiva; nunca borra. author='agente' lo fija el runtime, no el modelo.
-export const Documentar = z
+// ── actualizar (unión por tipo + acción) ────────────────────────────────────
+export const Actualizar = z
   .object({
-    modo: z.enum(['crear', 'anexar']).describe('crear un documento nuevo, o anexar a uno existente'),
-    contenido: z.string().trim().min(1).max(100_000).describe('El texto a documentar (markdown simple)'),
-    titulo: z.string().trim().min(1).max(200).optional().describe('Título (obligatorio si modo=crear)'),
-    tipo: z.enum(['proceso', 'preferencia', 'nota']).optional().describe('Tipo del documento nuevo'),
-    proyecto_id: z.uuid().optional().describe('Proyecto al que pertenece (de consultar estructura)'),
-    area_id: z.uuid().optional().describe('Área a la que pertenece'),
-    doc_id: z.uuid().optional().describe('ID del documento a anexar (obligatorio si modo=anexar)'),
+    tipo: z.enum(['tarea', 'evento', 'meta', 'proyecto', 'area', 'documento']).describe('Qué actualizar'),
+    id: z.string().min(1).describe('ID de la entidad (uuid; para evento es el id de Google de consultar agenda)'),
+    accion: z
+      .enum(['completar', 'reabrir', 'reprogramar', 'descripcion', 'mover', 'factores', 'editar', 'anexar', 'fijar'])
+      .optional()
+      .describe(
+        'tarea: completar|reabrir|reprogramar|descripcion|mover · meta: factores|descripcion · ' +
+          'proyecto/area: descripcion · documento: editar|anexar|fijar · evento: editar',
+      ),
+    titulo: z.string().trim().min(1).max(200).optional().describe('Nuevo título (documento editar / evento)'),
+    descripcion: z
+      .string()
+      .max(100_000)
+      .optional()
+      .describe('Texto: descripción (tarea/proyecto/area/meta) o contenido (documento editar/anexar) o notas (evento)'),
+    fecha: Instant.optional().describe('tarea reprogramar / evento nueva hora, ISO con offset'),
+    proyecto_id: z.uuid().optional().describe('tarea mover'),
+    meta_id: z.uuid().optional().describe('tarea mover'),
+    objetivo: z.number().positive().optional().describe('meta factores: cantidad objetivo'),
+    desde: Ymd.optional().describe('meta factores: inicio'),
+    hasta: Ymd.optional().describe('meta factores: cumplimiento'),
+    fijado: z.boolean().optional().describe('documento: fijar/desfijar'),
+    color: z.enum(COLOR_NAMES).optional().describe('evento'),
+    recurrencia: Recurrencia.optional().describe('evento'),
+    alcance: Alcance.optional().describe('evento: serie o instancia'),
   })
-  .refine((d) => d.modo !== 'crear' || !!d.titulo, {
-    message: 'Crear un documento necesita título',
-    path: ['titulo'],
+  .refine((d) => d.tipo !== 'tarea' || !!d.accion, {
+    message: 'Para tipo=tarea indica accion (completar/reabrir/reprogramar/descripcion/mover)',
+    path: ['accion'],
   })
-  .refine((d) => d.modo !== 'anexar' || !!d.doc_id, {
-    message: 'Anexar necesita el doc_id',
-    path: ['doc_id'],
+  .refine((d) => d.tipo !== 'documento' || !!d.accion, {
+    message: 'Para tipo=documento indica accion (editar/anexar/fijar)',
+    path: ['accion'],
   });
 
-// Deshacer la última acción (alcance acotado, v2 §6.5). Sin parámetros: siempre
-// opera sobre la última mutación del usuario.
+// ── archivar / borrar (unión por tipo) ──────────────────────────────────────
+export const Archivar = z.object({
+  tipo: z
+    .enum(['tarea', 'evento', 'documento', 'area', 'fuente'])
+    .describe('Qué eliminar/archivar. tarea/evento/documento se borran; area/fuente se archivan'),
+  id: z.string().min(1).describe('ID (uuid; para evento el id de Google)'),
+  alcance: Alcance.optional().describe('Solo evento: serie o instancia (por defecto serie)'),
+});
+
+// ── deshacer / guardar_imagen ───────────────────────────────────────────────
 export const Deshacer = z.object({});
 
-// Guardar una imagen que el usuario adjuntó. El adjunto_id viene EXACTO en el
-// mensaje ("[imágenes adjuntas · adjunto_id: ...]"); no lo inventes.
 export const GuardarImagen = z.object({
   adjunto_id: z.uuid().describe('El adjunto_id EXACTO que aparece en el mensaje del usuario'),
   proyecto_id: z.uuid().optional().describe('Proyecto donde guardarla (usa consultar estructura)'),
@@ -185,49 +194,35 @@ export const GuardarImagen = z.object({
 });
 
 export const toolSchemas = {
-  crear_tarea: CrearTarea,
-  completar: Completar,
-  reprogramar: Reprogramar,
-  borrar: Borrar,
   consultar: Consultar,
   buscar: Buscar,
-  ver_calendario: VerCalendario,
-  gestionar_evento: GestionarEvento,
-  registrar_movimiento: RegistrarMovimiento,
-  documentar: Documentar,
-  deshacer: Deshacer,
+  crear: Crear,
+  actualizar: Actualizar,
+  archivar: Archivar,
   guardar_imagen: GuardarImagen,
+  deshacer: Deshacer,
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;
 export const isToolName = (n: string): n is ToolName => n in toolSchemas;
 
 const descriptions: Record<ToolName, string> = {
-  crear_tarea: 'Crea una tarea. Acepta fecha/hora y proyecto opcionales.',
-  completar: 'Marca una tarea como completada.',
-  reprogramar: 'Cambia la fecha/hora de una tarea.',
-  borrar: 'Borra una tarea de forma permanente.',
   consultar:
-    'Consulta una vista: trabajo (agenda_hoy, pendientes, estructura=proyectos y metas), ' +
-    'dinero (resumen_financiero, por_fuente, gastos, por_cobrar, pipeline) o ' +
-    'agenda (conflictos=solapes, huecos=ratos libres).',
+    'Lee información: agenda_hoy, agenda (día), pendientes, estructura (IDs de áreas/proyectos/metas), ' +
+    'documentacion, resumen_financiero, por_fuente, gastos, por_cobrar, pipeline, conflictos, huecos.',
   buscar: 'Busca por texto en las tareas.',
-  ver_calendario: 'Lista los eventos de Google Calendar de un día (por defecto hoy).',
-  gestionar_evento:
-    'Gestiona un EVENTO de Google Calendar según accion: crear (algo agendado con hora), ' +
-    'editar (título, hora, color, recurrencia) o borrar (serie o instancia). No es una tarea.',
-  registrar_movimiento:
-    'Registra un movimiento de dinero (ingreso o gasto), en COP o USD (con tasa). ' +
-    'El monto va en la moneda, no en centavos.',
-  documentar:
-    'Documenta el método de Julián: crea un documento nuevo o anexa a uno existente ' +
-    '(proceso, preferencia o nota). Aditivo; no borra.',
-  deshacer:
-    'Deshace la última acción reciente (crear/renombrar una tarea o documento, últimos ' +
-    '5 minutos). Si no es reversible, explica por qué.',
+  crear:
+    'Crea CUALQUIER cosa del dominio según tipo: tarea, evento (Google Calendar), proyecto, meta, ' +
+    'area, fuente (de ingreso), meta_dinero, documento (del método) o movimiento (ingreso/gasto).',
+  actualizar:
+    'Actualiza según tipo: tarea (completar/reabrir/reprogramar/descripción/mover), meta (factores/' +
+    'descripción), proyecto/area (descripción), documento (editar/anexar/fijar), evento (título/hora/color/recurrencia).',
+  archivar:
+    'Elimina o archiva según tipo: tarea/evento/documento se borran; area/fuente se archivan.',
   guardar_imagen:
-    'Guarda una imagen que el usuario adjuntó (usa el adjunto_id EXACTO del mensaje); ' +
-    'opcionalmente la enlaza a un proyecto con una descripción.',
+    'Guarda una imagen que el usuario adjuntó (usa el adjunto_id EXACTO del mensaje); opcional: enlazar a proyecto.',
+  deshacer:
+    'Deshace la última acción reciente (crear/renombrar tarea o documento, últimos 5 min). Si no es reversible, explica.',
 };
 
 /** Definiciones de herramientas para la API de Anthropic (JSON Schema desde Zod). */

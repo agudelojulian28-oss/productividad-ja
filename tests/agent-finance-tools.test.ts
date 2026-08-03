@@ -10,11 +10,12 @@ function deps(): ToolDeps & { fin: ReturnType<typeof makeFakeFinanceRepo> } {
   return { ctx: ctx(), repo: makeFakeRepo(), finance: fin, fin };
 }
 
-describe('runTool · registrar_movimiento', () => {
+describe('runTool · crear movimiento', () => {
   it('registra un gasto en COP', async () => {
     const d = deps();
-    const r = await runTool(d, 'registrar_movimiento', {
-      tipo: 'gasto',
+    const r = await runTool(d, 'crear', {
+      tipo: 'movimiento',
+      direccion: 'gasto',
       monto: 50000,
       moneda: 'COP',
       area_id: AREA,
@@ -28,8 +29,9 @@ describe('runTool · registrar_movimiento', () => {
   it('convierte el monto de moneda a centavos (12.5 USD → base con tasa)', async () => {
     const d = deps();
     const src = await d.fin.insertIncomeSource({ areaId: AREA, name: 'C', model: 'servicio' });
-    const r = await runTool(d, 'registrar_movimiento', {
-      tipo: 'ingreso',
+    const r = await runTool(d, 'crear', {
+      tipo: 'movimiento',
+      direccion: 'ingreso',
       monto: 12.5,
       moneda: 'USD',
       area_id: AREA,
@@ -44,8 +46,9 @@ describe('runTool · registrar_movimiento', () => {
 
   it('ingreso sin fuente → error (no escribe)', async () => {
     const d = deps();
-    const r = await runTool(d, 'registrar_movimiento', {
-      tipo: 'ingreso',
+    const r = await runTool(d, 'crear', {
+      tipo: 'movimiento',
+      direccion: 'ingreso',
       monto: 1000,
       moneda: 'COP',
       area_id: AREA,
@@ -58,8 +61,9 @@ describe('runTool · registrar_movimiento', () => {
 describe('runTool · consultar dinero', () => {
   it('resumen_financiero suma lo registrado este mes', async () => {
     const d = deps();
-    await runTool(d, 'registrar_movimiento', {
-      tipo: 'gasto',
+    await runTool(d, 'crear', {
+      tipo: 'movimiento',
+      direccion: 'gasto',
       monto: 30000,
       moneda: 'COP',
       area_id: AREA,

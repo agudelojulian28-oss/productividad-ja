@@ -587,3 +587,35 @@ rechazaría por no existir una sesión de GoTrue. Hace falta mintear una sesión
 aserción WebAuthn (criptográfica), acotado al `ALLOWED_USER_ID`. `service_role` gana un segundo lugar
 de uso, documentado y verificado por depcruise. Nueva dependencia y nueva tabla con su RLS. WebAuthn
 exige HTTPS y `rpID` = dominio (`WEBAUTHN_RP_ID`/`WEBAUTHN_ORIGIN` en el entorno).
+
+## ADR-024 · El agente cubre todo el dominio con verbos generales
+
+> Revisa la decisión D3 (v2/v3 §5): "configuración = UI, no herramienta" y el tope fijo de 11.
+
+**Contexto.** El catálogo se diseñó para que el agente hiciera solo lo frecuente (capturar tareas,
+dinero, consultar) y dejara la "configuración" (crear áreas, proyectos, metas, fuentes) a la UI, con un
+tope de 11 herramientas porque demasiadas degradan la precisión de selección del modelo. En el uso real
+Julián quiere que el agente **haga por chat/WhatsApp todo lo que él hace en la app**. Casi todos los
+casos de uso ya existen en `/core`; lo único que faltaba era exponerlos.
+
+**Decisión.**
+- El agente cubre **todo el dominio** mediante **verbos generales**: `crear`, `actualizar`, `archivar`,
+  cada uno una **unión por `tipo`** (tarea, evento, proyecto, meta, área, fuente, meta_dinero, documento,
+  movimiento) que despacha a los casos de uso existentes de `/core`. Lecturas siguen en `consultar`
+  (unión por `vista`, que absorbe `ver_calendario`), más `buscar`, `guardar_imagen`, `deshacer`.
+- Se reemplaza "config = UI, tope 11 fijo" por: **el catálogo se mantiene chico por consolidación, no
+  por exclusión**. Resultado: ~7 herramientas cubriendo más superficie que las 12 anteriores. La regla
+  operativa pasa a ser "no una herramienta por acción; agrupa por verbo con `tipo`".
+- **Fuera del agente (siguen solo en la app):** autenticación (contraseña/huella), conexión de Google,
+  y ajustes de cuenta. Son acciones sensibles o irreversibles que no deben dispararse por chat.
+
+**Alternativas descartadas.** Una herramienta por acción (infla el catálogo a 20+, peor selección,
+contradice el espíritu de §5). Dejar la config solo en UI (es justo la limitación que Julián reporta).
+Uniones discriminadas con `anyOf` de nivel superior en el `input_schema` (la API de tools las maneja
+peor que un objeto plano; se usa objeto plano + `tipo`/`accion` + `refine`, como ya hacían
+`consultar`/`gestionar_evento`).
+
+**Consecuencias.** El agente puede crear/editar/archivar toda la estructura y las finanzas. El dominio
+no cambia (los casos de uso ya estaban probados); cambia la fachada de herramientas. `CLAUDE.md`,
+`docs/tools.md` y `.claude/rules/agente.md` se actualizan para reflejar los verbos generales. La regla
+de "confirmar antes de escribir" y la idempotencia por `tool_call_id` se mantienen.

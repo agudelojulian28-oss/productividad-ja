@@ -69,9 +69,12 @@ correcta en el papel y fallaba en la implementación. No las relajes sin escribi
 
 ## Límites del diseño
 
-- **El catálogo del agente son 11 herramientas.** No añadas herramientas nuevas sin
-  discutirlo conmigo. Regla: una funcionalidad necesita herramienta propia solo si se va a
-  pedir por chat más de una vez por semana. Configuración = UI, no herramienta.
+- **El catálogo del agente se mantiene chico por consolidación, no por exclusión (ADR-024).**
+  El agente cubre TODO el dominio con **verbos generales**: `consultar`/`buscar` (lecturas),
+  `crear`/`actualizar`/`archivar` (uniones por `tipo`: tarea, evento, proyecto, meta, área, fuente,
+  meta_dinero, documento, movimiento), más `guardar_imagen` y `deshacer` (~7 en total). No añadas
+  "una herramienta por acción": agrupa por verbo con `tipo`. Fuera del agente (solo UI):
+  autenticación, conexión de Google y ajustes de cuenta.
 - `core/**` no importa de `app/`, `agent/`, `adapters/`, ni de `next`.
 - `agent/**` no importa de `adapters/supabase/**`.
 - Entre módulos de core: `structure` ← `work` ← `commerce`; `structure` ← `finance`;

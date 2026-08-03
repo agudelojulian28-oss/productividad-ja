@@ -32,6 +32,7 @@ export interface TaskPatch {
   status?: TaskStatus;
   dueAt?: string | null;
   completedAt?: string | null;
+  projectId?: string | null;
   goalId?: string | null;
   googleCalendarId?: string | null;
   googleEventId?: string | null;

@@ -138,6 +138,7 @@ export function workRepo(supabase: SupabaseClient, userId: string): WorkRepo {
       if (patch.status !== undefined) upd.status = patch.status;
       if (patch.dueAt !== undefined) upd.due_at = patch.dueAt;
       if (patch.completedAt !== undefined) upd.completed_at = patch.completedAt;
+      if (patch.projectId !== undefined) upd.project_id = patch.projectId;
       if (patch.goalId !== undefined) upd.goal_id = patch.goalId;
       if (patch.googleCalendarId !== undefined) upd.google_calendar_id = patch.googleCalendarId;
       if (patch.googleEventId !== undefined) upd.google_event_id = patch.googleEventId;

@@ -8,14 +8,12 @@ type Event = { type: string; text?: string; message?: string; name?: string };
 type Attached = { mediaType: 'image/jpeg'; data: string; preview: string };
 
 const toolLabels: Record<string, string> = {
-  crear_tarea: 'creó una tarea',
-  completar: 'completó una tarea',
-  reprogramar: 'reprogramó una tarea',
   consultar: 'consultó tu información',
   buscar: 'buscó',
-  registrar_movimiento: 'registró un movimiento',
-  documentar: 'documentó',
-  gestionar_evento: 'gestionó un evento',
+  crear: 'creó algo',
+  actualizar: 'actualizó algo',
+  archivar: 'archivó algo',
+  guardar_imagen: 'guardó una imagen',
   deshacer: 'deshizo la última acción',
 };
 

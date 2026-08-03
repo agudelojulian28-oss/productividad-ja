@@ -8,8 +8,10 @@ paths:
 El agente **propone** acciones; `/core` las autoriza y ejecuta. No tiene credenciales de
 base de datos, no ejecuta SQL, no hace HTTP genérico.
 
-- **11 herramientas.** No añadas una sin discutirlo. Configuración = UI.
-- Cada herramienta es un envoltorio de ~15 líneas sobre un caso de uso de `/core`.
+- **Verbos generales (ADR-024).** Catálogo chico por consolidación: `consultar`/`buscar` +
+  `crear`/`actualizar`/`archivar` (uniones por `tipo`) + `guardar_imagen`/`deshacer`. No añadas
+  una herramienta por acción; agrupa por verbo. Auth/Google/ajustes se quedan en la UI.
+- Cada caso (o rama de `tipo`) es un envoltorio de ~15 líneas sobre un caso de uso de `/core`.
 - Toda herramienta de escritura consulta `tool_executions` por `tool_call_id` antes
   de ejecutar. Los reintentos del inbox son reales.
 - Operaciones destructivas: crean fila en `pending_actions` y esperan `confirmar`.
