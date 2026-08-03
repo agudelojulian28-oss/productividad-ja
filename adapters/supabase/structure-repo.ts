@@ -6,7 +6,32 @@ import type {
   DocumentRow,
   DocumentKind,
   DocumentAuthor,
+  AttachmentRow,
 } from '@/core/structure/ports';
+
+interface DbAttachment {
+  id: string;
+  storage_path: string;
+  mime: string;
+  project_id: string | null;
+  description: string | null;
+  saved: boolean;
+  created_at: string;
+}
+
+const ATT_COLS = 'id,storage_path,mime,project_id,description,saved,created_at';
+
+function toAttachment(r: DbAttachment): AttachmentRow {
+  return {
+    id: r.id,
+    storagePath: r.storage_path,
+    mime: r.mime,
+    projectId: r.project_id,
+    description: r.description,
+    saved: r.saved,
+    createdAt: r.created_at,
+  };
+}
 
 interface DbArea {
   id: string;
@@ -159,6 +184,52 @@ export function structureRepo(supabase: SupabaseClient, userId: string): Structu
     async deleteDocument(id) {
       const { error } = await supabase.from('documents').delete().eq('id', id);
       if (error) throw new Error(error.message);
+    },
+
+    async insertAttachment(input) {
+      const { data, error } = await supabase
+        .from('attachments')
+        .insert({ user_id: userId, storage_path: input.storagePath, mime: input.mime })
+        .select(ATT_COLS)
+        .single();
+      if (error) throw new Error(error.message);
+      return toAttachment(data as DbAttachment);
+    },
+
+    async getAttachment(id) {
+      const { data, error } = await supabase
+        .from('attachments')
+        .select(ATT_COLS)
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? toAttachment(data as DbAttachment) : null;
+    },
+
+    async updateAttachment(id, patch) {
+      const upd: Record<string, unknown> = {};
+      if (patch.saved !== undefined) upd.saved = patch.saved;
+      if (patch.projectId !== undefined) upd.project_id = patch.projectId;
+      if (patch.description !== undefined) upd.description = patch.description;
+      const { data, error } = await supabase
+        .from('attachments')
+        .update(upd)
+        .eq('id', id)
+        .select(ATT_COLS)
+        .single();
+      if (error) throw new Error(error.message);
+      return toAttachment(data as DbAttachment);
+    },
+
+    async listSavedAttachments(projectId) {
+      const { data, error } = await supabase
+        .from('attachments')
+        .select(ATT_COLS)
+        .eq('project_id', projectId)
+        .eq('saved', true)
+        .order('created_at', { ascending: false });
+      if (error) throw new Error(error.message);
+      return ((data as DbAttachment[] | null) ?? []).map(toAttachment);
     },
   };
 }

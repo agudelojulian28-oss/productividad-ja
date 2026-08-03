@@ -39,6 +39,16 @@ export interface DocumentPatch {
   pinned?: boolean;
 }
 
+export interface AttachmentRow {
+  id: string;
+  storagePath: string;
+  mime: string;
+  projectId: string | null;
+  description: string | null;
+  saved: boolean;
+  createdAt: string;
+}
+
 export interface StructureRepo {
   listAreas(includeArchived?: boolean): Promise<AreaRow[]>;
   getArea(id: string): Promise<AreaRow | null>;
@@ -53,4 +63,12 @@ export interface StructureRepo {
   listDocuments(filter?: { projectId?: string }): Promise<DocumentRow[]>;
   updateDocument(id: string, patch: DocumentPatch): Promise<DocumentRow>;
   deleteDocument(id: string): Promise<void>;
+
+  insertAttachment(input: { storagePath: string; mime: string }): Promise<AttachmentRow>;
+  getAttachment(id: string): Promise<AttachmentRow | null>;
+  updateAttachment(
+    id: string,
+    patch: { saved?: boolean; projectId?: string | null; description?: string | null },
+  ): Promise<AttachmentRow>;
+  listSavedAttachments(projectId: string): Promise<AttachmentRow[]>;
 }

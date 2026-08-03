@@ -3,6 +3,7 @@ import { requireContext } from '@/lib/auth';
 import { buildAgentDeps } from '@/lib/agent-run';
 import { runAgent, type InputImage } from '@/agent/loop';
 import { getWebConversation, loadMessages, saveMessage } from '@/lib/chat';
+import { ingestImages, adjuntoNote } from '@/lib/attachments-ingest';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -33,6 +34,10 @@ export async function POST(req: Request) {
   const savedUser = message || (images.length > 0 ? '📷 (imagen)' : '');
   await saveMessage(supabase, conversationId, ctx.userId, 'user', savedUser);
 
+  // Sube las imágenes al bucket para poder guardarlas si el usuario lo pide luego.
+  const adjuntoIds = await ingestImages(supabase, ctx, images);
+  const userText = (message || 'Mira esta imagen.') + adjuntoNote(adjuntoIds);
+
   const deps = buildAgentDeps(supabase, ctx);
 
   const encoder = new TextEncoder();
@@ -40,7 +45,7 @@ export async function POST(req: Request) {
     async start(controller) {
       let assistantText = '';
       try {
-        for await (const ev of runAgent(deps, history, message || 'Mira esta imagen.', images)) {
+        for await (const ev of runAgent(deps, history, userText, images)) {
           if (ev.type === 'text') assistantText += ev.text;
           controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n'));
         }

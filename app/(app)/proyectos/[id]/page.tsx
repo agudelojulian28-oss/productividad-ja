@@ -9,6 +9,7 @@ import { DescriptionEditor } from '../../description-editor';
 import { NewDocForm } from '../../docs/new-doc-form';
 import { setProjectDescriptionAction } from '@/app/actions/projects';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
+import { signedUrl } from '@/adapters/supabase/storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,13 +24,25 @@ export default async function ProjectDetailPage({
   const structure = structureRepo(supabase, ctx.userId);
   const project = await repo.getProject(id);
   if (!project) notFound();
-  const [goals, tasks, events, docs] = await Promise.all([
+  const [goals, tasks, events, docs, attachments] = await Promise.all([
     repo.listGoals(id),
     repo.listTasks({ projectId: id }),
     getEventsByProject(supabase, ctx, id),
     structure.listDocuments({ projectId: id }),
+    structure.listSavedAttachments(id),
   ]);
   const goalName = new Map(goals.map((g) => [g.id, g.title] as const));
+
+  // URLs firmadas para ver las imágenes del bucket privado.
+  const fotos = (
+    await Promise.all(
+      attachments.map(async (a) => ({
+        id: a.id,
+        description: a.description,
+        url: await signedUrl(supabase, a.storagePath),
+      })),
+    )
+  ).filter((f): f is { id: string; description: string | null; url: string } => f.url !== null);
 
   return (
     <div className="page">
@@ -108,6 +121,23 @@ export default async function ProjectDetailPage({
             </li>
           ))}
         </ul>
+      )}
+
+      {fotos.length > 0 && (
+        <>
+          <h2 className="section-title" style={{ marginTop: 24 }}>
+            Fotos · {fotos.length}
+          </h2>
+          <div className="foto-grid">
+            {fotos.map((f) => (
+              <figure key={f.id} className="foto">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={f.url} alt={f.description ?? 'foto'} />
+                {f.description && <figcaption>{f.description}</figcaption>}
+              </figure>
+            ))}
+          </div>
+        </>
       )}
 
       <h2 className="section-title" style={{ marginTop: 24 }}>

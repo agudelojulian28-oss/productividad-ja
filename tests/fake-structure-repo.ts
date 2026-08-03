@@ -6,18 +6,22 @@ import type {
   DocumentRow,
   DocumentInsert,
   DocumentPatch,
+  AttachmentRow,
 } from '@/core/structure/ports';
 
 export function makeFakeStructureRepo(): StructureRepo & {
   _docs: Map<string, DocumentRow>;
+  _attachments: Map<string, AttachmentRow>;
 } {
   const areas = new Map<string, AreaRow>();
   const docs = new Map<string, DocumentRow>();
+  const attachments = new Map<string, AttachmentRow>();
   let seq = 0;
   const uuid = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`;
 
   return {
     _docs: docs,
+    _attachments: attachments,
     async listAreas() {
       return [...areas.values()];
     },
@@ -87,6 +91,41 @@ export function makeFakeStructureRepo(): StructureRepo & {
     },
     async deleteDocument(id: string) {
       docs.delete(id);
+    },
+
+    async insertAttachment(input: { storagePath: string; mime: string }) {
+      const row: AttachmentRow = {
+        id: uuid(),
+        storagePath: input.storagePath,
+        mime: input.mime,
+        projectId: null,
+        description: null,
+        saved: false,
+        createdAt: new Date().toISOString(),
+      };
+      attachments.set(row.id, row);
+      return row;
+    },
+    async getAttachment(id: string) {
+      return attachments.get(id) ?? null;
+    },
+    async updateAttachment(
+      id: string,
+      patch: { saved?: boolean; projectId?: string | null; description?: string | null },
+    ) {
+      const cur = attachments.get(id);
+      if (!cur) throw new Error('updateAttachment: no existe');
+      const next: AttachmentRow = {
+        ...cur,
+        saved: patch.saved === undefined ? cur.saved : patch.saved,
+        projectId: patch.projectId === undefined ? cur.projectId : patch.projectId,
+        description: patch.description === undefined ? cur.description : patch.description,
+      };
+      attachments.set(id, next);
+      return next;
+    },
+    async listSavedAttachments(projectId: string) {
+      return [...attachments.values()].filter((a) => a.saved && a.projectId === projectId);
     },
   };
 }

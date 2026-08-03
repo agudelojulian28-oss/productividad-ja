@@ -6,6 +6,7 @@ import { buildAgentDeps, runAgentToText } from '@/lib/agent-run';
 import { getConversation, loadMessages, saveMessage } from '@/lib/chat';
 import { sendText, downloadMedia } from '@/adapters/whatsapp/client';
 import { transcribeAudio, transcripcionDisponible } from '@/lib/transcribe';
+import { ingestImages, adjuntoNote } from '@/lib/attachments-ingest';
 import type { InputImage } from '@/agent/loop';
 import crypto from 'node:crypto';
 
@@ -139,9 +140,15 @@ async function handle(db: ServerSupabase, userId: string, row: InboxRow): Promis
   const prior = await loadMessages(db, conversationId);
   const history: Anthropic.MessageParam[] = prior.map((m) => ({ role: m.role, content: m.text }));
 
-  // El historial es de texto; la imagen va solo en este turno.
+  // Sube la imagen al bucket (para poder guardarla si se pide). El historial es texto.
+  const adjuntoIds = await ingestImages(db, ctx, images);
   await saveMessage(db, conversationId, userId, 'user', text.trim() || '📷 (imagen)');
-  const reply = await runAgentToText(buildAgentDeps(db, ctx), history, userText, images);
+  const reply = await runAgentToText(
+    buildAgentDeps(db, ctx),
+    history,
+    userText + adjuntoNote(adjuntoIds),
+    images,
+  );
   await saveMessage(db, conversationId, userId, 'assistant', reply);
   await sendText(from, reply);
 }

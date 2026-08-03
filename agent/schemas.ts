@@ -176,6 +176,14 @@ export const Documentar = z
 // opera sobre la última mutación del usuario.
 export const Deshacer = z.object({});
 
+// Guardar una imagen que el usuario adjuntó. El adjunto_id viene EXACTO en el
+// mensaje ("[imágenes adjuntas · adjunto_id: ...]"); no lo inventes.
+export const GuardarImagen = z.object({
+  adjunto_id: z.uuid().describe('El adjunto_id EXACTO que aparece en el mensaje del usuario'),
+  proyecto_id: z.uuid().optional().describe('Proyecto donde guardarla (usa consultar estructura)'),
+  descripcion: z.string().trim().max(500).optional().describe('Qué es la imagen (ej. "recibo del almuerzo")'),
+});
+
 export const toolSchemas = {
   crear_tarea: CrearTarea,
   completar: Completar,
@@ -188,6 +196,7 @@ export const toolSchemas = {
   registrar_movimiento: RegistrarMovimiento,
   documentar: Documentar,
   deshacer: Deshacer,
+  guardar_imagen: GuardarImagen,
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;
@@ -216,6 +225,9 @@ const descriptions: Record<ToolName, string> = {
   deshacer:
     'Deshace la última acción reciente (crear/renombrar una tarea o documento, últimos ' +
     '5 minutos). Si no es reversible, explica por qué.',
+  guardar_imagen:
+    'Guarda una imagen que el usuario adjuntó (usa el adjunto_id EXACTO del mensaje); ' +
+    'opcionalmente la enlaza a un proyecto con una descripción.',
 };
 
 /** Definiciones de herramientas para la API de Anthropic (JSON Schema desde Zod). */

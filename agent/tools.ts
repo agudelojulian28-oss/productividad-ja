@@ -8,6 +8,7 @@ import { resumenFinanciero, porFuente, topGastos } from '@/core/finance/queries'
 import { detectarChoques, huecosLibres } from '@/lib/agenda';
 import type { StructureRepo } from '@/core/structure/ports';
 import { createDocument, appendToDocument, updateDocument, deleteDocument } from '@/core/structure/documents';
+import { saveAttachment } from '@/core/structure/attachments';
 import { planUndo, type AuditEntry } from '@/lib/undo';
 import {
   CrearTarea,
@@ -18,6 +19,7 @@ import {
   Buscar,
   VerCalendario,
   GestionarEvento,
+  GuardarImagen,
   RegistrarMovimiento,
   Documentar,
   type ToolName,
@@ -325,6 +327,17 @@ export async function runTool(
         pinned: b.pinned as boolean,
       });
       return r.ok ? ok({ deshecho: true, detalle: 'Se restauró el documento a su estado anterior.' }) : r;
+    }
+    case 'guardar_imagen': {
+      const p = parse(GuardarImagen, rawInput);
+      if (!p.ok) return p;
+      if (!deps.structure) return err('EXTERNAL_ERROR', 'No disponible');
+      const r = await saveAttachment(ctx, deps.structure, {
+        id: p.value.adjunto_id,
+        projectId: p.value.proyecto_id,
+        description: p.value.descripcion,
+      });
+      return r.ok ? ok({ guardada: r.value.id, proyecto_id: r.value.projectId }) : r;
     }
     case 'ver_calendario': {
       const p = parse(VerCalendario, rawInput);
