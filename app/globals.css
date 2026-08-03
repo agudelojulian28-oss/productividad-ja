@@ -283,7 +283,9 @@ ol {
   .shell-main {
     padding-bottom: 32px;
   }
-  .page {
+  /* Especificidad .shell-main .page: gana a la regla base `.page{max-width:720}`
+     que aparece después en el CSS (si no, el escritorio queda capado a 720px). */
+  .shell-main .page {
     max-width: 1120px;
     padding: 28px 34px;
   }
