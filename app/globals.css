@@ -165,6 +165,137 @@ ol {
   background: var(--accent-weak);
 }
 
+/* ── Sidebar de escritorio (oculto en móvil; ver media query ≥1024px) ─────── */
+.app-sidebar {
+  display: none;
+}
+.sb-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 18px;
+}
+.sb-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--grad-accent);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+}
+.sb-brand b {
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+.sb-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sb-sec {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  padding: 16px 10px 6px;
+}
+.sb-link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 14px;
+}
+.sb-ic svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.7;
+  display: block;
+}
+.sb-link:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.sb-on {
+  background: var(--accent-weak);
+  color: var(--accent);
+}
+.sb-foot {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.sb-out {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 9px 10px;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.sb-out:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* ── Escritorio (≥1024px): sidebar + canvas ancho. El móvil NO se toca. ───── */
+@media (min-width: 1024px) {
+  .app {
+    display: grid;
+    grid-template-columns: 248px 1fr;
+    align-items: start;
+  }
+  .app-sidebar {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    background: #101015;
+    border-right: 1px solid var(--border);
+    padding: 18px 14px;
+  }
+  .shell-header {
+    display: none;
+  }
+  .bottom-nav {
+    display: none;
+  }
+  .shell-main {
+    padding-bottom: 32px;
+  }
+  .page {
+    max-width: 1120px;
+    padding: 28px 34px;
+  }
+  /* El chat ancla su input al layout; en escritorio no hay bottom-nav. */
+  .chat-input {
+    bottom: 0;
+    left: 248px;
+    max-width: none;
+    padding: 12px 34px calc(12px + var(--safe-bottom));
+  }
+  .chat-attachments {
+    left: 248px;
+    bottom: 64px;
+    max-width: none;
+    padding: 0 34px;
+  }
+}
+
 /* ── Página ─────────────────────────────────────────────────────────────── */
 .page {
   max-width: 720px;

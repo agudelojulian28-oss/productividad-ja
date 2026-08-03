@@ -1,10 +1,13 @@
 import Link from 'next/link';
 import { signOut } from '@/app/actions/auth';
 import { BottomNav } from './bottom-nav';
+import { Sidebar } from './sidebar';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="shell">
+    <div className="app">
+      <Sidebar />
+      <div className="shell">
       <header className="shell-header">
         <span className="brand">Productividad</span>
         <div className="shell-header-actions">
@@ -28,6 +31,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="shell-main">{children}</main>
 
       <BottomNav />
+      </div>
     </div>
   );
 }
