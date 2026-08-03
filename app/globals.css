@@ -93,6 +93,12 @@ a,
   cursor: pointer;
 }
 
+/* Anillo de foco consistente para teclado (acento, alto contraste en oscuro). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 a {
   color: inherit;
   text-decoration: none;
