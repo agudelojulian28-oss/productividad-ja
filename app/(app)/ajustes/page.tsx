@@ -1,4 +1,7 @@
 import { requireContext } from '@/lib/auth';
+import { getGoogleTokenCipher } from '@/adapters/supabase/integrations';
+import { decryptToken } from '@/lib/crypto';
+import { refreshAccessToken } from '@/adapters/google/oauth';
 import { PageHero } from '../page-hero';
 import { PasskeyManager } from './passkey-manager';
 
@@ -19,6 +22,20 @@ export default async function AjustesPage({
     .eq('provider', 'google')
     .maybeSingle();
   const connected = Boolean(data);
+
+  // "Conectado" solo dice que existe la fila. Verifica que el token siga vivo:
+  // un refresh_token revocado/caducado da invalid_grant y el calendario deja de
+  // sincronizar en silencio. Si falla, la conexión está rota y hay que reconectar.
+  let googleBroken = false;
+  if (connected) {
+    try {
+      const cipher = await getGoogleTokenCipher(supabase, ctx.userId);
+      if (!cipher) googleBroken = true;
+      else await refreshAccessToken(decryptToken(cipher));
+    } catch {
+      googleBroken = true;
+    }
+  }
 
   const { data: credsRaw } = await supabase
     .from('webauthn_credentials')
@@ -57,14 +74,23 @@ export default async function AjustesPage({
         <div className="task-body">
           <span className="task-title">Google Calendar</span>
           <span className="task-meta">
-            Tus tareas con hora aparecerán en tu agenda.
+            {!connected
+              ? 'Conéctalo para ver tu agenda y detectar choques.'
+              : googleBroken
+                ? 'La conexión caducó. Reconéctala para volver a ver tu agenda.'
+                : 'Conectado. Tus tareas con hora aparecen en tu agenda.'}
           </span>
         </div>
-        {connected ? (
-          <span className="pill pill-personal">Conectado</span>
+        {connected && !googleBroken ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="pill pill-personal">Conectado</span>
+            <a href="/auth/google" className="linkbtn" style={{ textDecoration: 'none' }}>
+              Reconectar
+            </a>
+          </div>
         ) : (
           <a href="/auth/google" className="btn-primary" style={{ textDecoration: 'none' }}>
-            Conectar
+            {connected ? 'Reconectar' : 'Conectar'}
           </a>
         )}
       </div>
