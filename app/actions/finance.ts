@@ -9,7 +9,10 @@ import {
   archiveIncomeSource,
 } from '@/core/finance/income-sources';
 import { createMoneyGoal } from '@/core/finance/goals';
-import type { Result } from '@/core/types';
+import { structureRepo } from '@/adapters/supabase/structure-repo';
+import { uploadImage } from '@/adapters/supabase/storage';
+import { registerAttachment } from '@/core/structure/attachments';
+import { ok, err, type Result } from '@/core/types';
 import type { IncomeSourceRow, TransactionRow, IncomeModel } from '@/core/finance/ports';
 
 async function deps() {
@@ -67,4 +70,31 @@ export async function registrarMovimientoAction(input: {
   const result = await registrarMovimiento(ctx, repo, input);
   revalidatePath('/finanzas');
   return result;
+}
+
+/** Sube el comprobante (imagen) y lo enlaza a un movimiento ya creado. */
+export async function attachReceiptAction(input: {
+  transactionId: string;
+  mediaType: string;
+  data: string; // base64
+}): Promise<Result<{ id: string }>> {
+  const { supabase, ctx } = await requireContext();
+  try {
+    const path = await uploadImage(
+      supabase,
+      ctx.userId,
+      Buffer.from(input.data, 'base64'),
+      input.mediaType,
+    );
+    const r = await registerAttachment(ctx, structureRepo(supabase, ctx.userId), {
+      storagePath: path,
+      mime: input.mediaType,
+      transactionId: input.transactionId,
+      saved: true,
+    });
+    revalidatePath('/finanzas');
+    return r.ok ? ok({ id: r.value.id }) : r;
+  } catch (e) {
+    return err('EXTERNAL_ERROR', e instanceof Error ? e.message : 'No se pudo subir el comprobante');
+  }
 }

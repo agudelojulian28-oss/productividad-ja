@@ -44,6 +44,7 @@ export interface AttachmentRow {
   storagePath: string;
   mime: string;
   projectId: string | null;
+  transactionId: string | null;
   description: string | null;
   saved: boolean;
   createdAt: string;
@@ -64,11 +65,25 @@ export interface StructureRepo {
   updateDocument(id: string, patch: DocumentPatch): Promise<DocumentRow>;
   deleteDocument(id: string): Promise<void>;
 
-  insertAttachment(input: { storagePath: string; mime: string }): Promise<AttachmentRow>;
+  insertAttachment(input: {
+    storagePath: string;
+    mime: string;
+    transactionId?: string;
+    projectId?: string;
+    description?: string;
+    saved?: boolean;
+  }): Promise<AttachmentRow>;
   getAttachment(id: string): Promise<AttachmentRow | null>;
   updateAttachment(
     id: string,
-    patch: { saved?: boolean; projectId?: string | null; description?: string | null },
+    patch: {
+      saved?: boolean;
+      projectId?: string | null;
+      transactionId?: string | null;
+      description?: string | null;
+    },
   ): Promise<AttachmentRow>;
   listSavedAttachments(projectId: string): Promise<AttachmentRow[]>;
+  listAttachmentsByTransaction(transactionId: string): Promise<AttachmentRow[]>;
+  listAttachmentsForTransactions(transactionIds: string[]): Promise<AttachmentRow[]>;
 }

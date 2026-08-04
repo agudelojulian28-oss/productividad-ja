@@ -93,14 +93,22 @@ export function makeFakeStructureRepo(): StructureRepo & {
       docs.delete(id);
     },
 
-    async insertAttachment(input: { storagePath: string; mime: string }) {
+    async insertAttachment(input: {
+      storagePath: string;
+      mime: string;
+      transactionId?: string;
+      projectId?: string;
+      description?: string;
+      saved?: boolean;
+    }) {
       const row: AttachmentRow = {
         id: uuid(),
         storagePath: input.storagePath,
         mime: input.mime,
-        projectId: null,
-        description: null,
-        saved: false,
+        projectId: input.projectId ?? null,
+        transactionId: input.transactionId ?? null,
+        description: input.description ?? null,
+        saved: input.saved ?? false,
         createdAt: new Date().toISOString(),
       };
       attachments.set(row.id, row);
@@ -111,7 +119,12 @@ export function makeFakeStructureRepo(): StructureRepo & {
     },
     async updateAttachment(
       id: string,
-      patch: { saved?: boolean; projectId?: string | null; description?: string | null },
+      patch: {
+        saved?: boolean;
+        projectId?: string | null;
+        transactionId?: string | null;
+        description?: string | null;
+      },
     ) {
       const cur = attachments.get(id);
       if (!cur) throw new Error('updateAttachment: no existe');
@@ -119,6 +132,8 @@ export function makeFakeStructureRepo(): StructureRepo & {
         ...cur,
         saved: patch.saved === undefined ? cur.saved : patch.saved,
         projectId: patch.projectId === undefined ? cur.projectId : patch.projectId,
+        transactionId:
+          patch.transactionId === undefined ? cur.transactionId : patch.transactionId,
         description: patch.description === undefined ? cur.description : patch.description,
       };
       attachments.set(id, next);
@@ -126,6 +141,13 @@ export function makeFakeStructureRepo(): StructureRepo & {
     },
     async listSavedAttachments(projectId: string) {
       return [...attachments.values()].filter((a) => a.saved && a.projectId === projectId);
+    },
+    async listAttachmentsByTransaction(transactionId: string) {
+      return [...attachments.values()].filter((a) => a.transactionId === transactionId);
+    },
+    async listAttachmentsForTransactions(transactionIds: string[]) {
+      const set = new Set(transactionIds);
+      return [...attachments.values()].filter((a) => a.transactionId && set.has(a.transactionId));
     },
   };
 }

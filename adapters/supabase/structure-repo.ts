@@ -14,12 +14,13 @@ interface DbAttachment {
   storage_path: string;
   mime: string;
   project_id: string | null;
+  transaction_id: string | null;
   description: string | null;
   saved: boolean;
   created_at: string;
 }
 
-const ATT_COLS = 'id,storage_path,mime,project_id,description,saved,created_at';
+const ATT_COLS = 'id,storage_path,mime,project_id,transaction_id,description,saved,created_at';
 
 function toAttachment(r: DbAttachment): AttachmentRow {
   return {
@@ -27,6 +28,7 @@ function toAttachment(r: DbAttachment): AttachmentRow {
     storagePath: r.storage_path,
     mime: r.mime,
     projectId: r.project_id,
+    transactionId: r.transaction_id,
     description: r.description,
     saved: r.saved,
     createdAt: r.created_at,
@@ -189,7 +191,15 @@ export function structureRepo(supabase: SupabaseClient, userId: string): Structu
     async insertAttachment(input) {
       const { data, error } = await supabase
         .from('attachments')
-        .insert({ user_id: userId, storage_path: input.storagePath, mime: input.mime })
+        .insert({
+          user_id: userId,
+          storage_path: input.storagePath,
+          mime: input.mime,
+          transaction_id: input.transactionId ?? null,
+          project_id: input.projectId ?? null,
+          description: input.description ?? null,
+          saved: input.saved ?? false,
+        })
         .select(ATT_COLS)
         .single();
       if (error) throw new Error(error.message);
@@ -210,6 +220,7 @@ export function structureRepo(supabase: SupabaseClient, userId: string): Structu
       const upd: Record<string, unknown> = {};
       if (patch.saved !== undefined) upd.saved = patch.saved;
       if (patch.projectId !== undefined) upd.project_id = patch.projectId;
+      if (patch.transactionId !== undefined) upd.transaction_id = patch.transactionId;
       if (patch.description !== undefined) upd.description = patch.description;
       const { data, error } = await supabase
         .from('attachments')
@@ -227,6 +238,27 @@ export function structureRepo(supabase: SupabaseClient, userId: string): Structu
         .select(ATT_COLS)
         .eq('project_id', projectId)
         .eq('saved', true)
+        .order('created_at', { ascending: false });
+      if (error) throw new Error(error.message);
+      return ((data as DbAttachment[] | null) ?? []).map(toAttachment);
+    },
+
+    async listAttachmentsByTransaction(transactionId) {
+      const { data, error } = await supabase
+        .from('attachments')
+        .select(ATT_COLS)
+        .eq('transaction_id', transactionId)
+        .order('created_at', { ascending: false });
+      if (error) throw new Error(error.message);
+      return ((data as DbAttachment[] | null) ?? []).map(toAttachment);
+    },
+
+    async listAttachmentsForTransactions(transactionIds) {
+      if (transactionIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('attachments')
+        .select(ATT_COLS)
+        .in('transaction_id', transactionIds)
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
       return ((data as DbAttachment[] | null) ?? []).map(toAttachment);

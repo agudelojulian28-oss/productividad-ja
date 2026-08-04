@@ -1,9 +1,29 @@
 'use client';
 
-import { useMemo, useState, useTransition, type FormEvent } from 'react';
-import { registrarMovimientoAction } from '@/app/actions/finance';
+import { useMemo, useRef, useState, useTransition, type FormEvent } from 'react';
+import { registrarMovimientoAction, attachReceiptAction } from '@/app/actions/finance';
 import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
+
+type Receipt = { data: string; preview: string };
+
+/** Lee una imagen y la reescala (máx. 1600px, JPEG) para el comprobante. */
+async function fileToReceipt(file: File): Promise<Receipt> {
+  const bitmap = await createImageBitmap(file);
+  const max = 1600;
+  let { width, height } = bitmap;
+  if (width > max || height > max) {
+    const s = max / Math.max(width, height);
+    width = Math.round(width * s);
+    height = Math.round(height * s);
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, width, height);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  return { data: dataUrl.split(',')[1]!, preview: dataUrl };
+}
 
 type Area = { id: string; name: string };
 type Source = { id: string; name: string; areaId: string };
@@ -25,7 +45,9 @@ export function RegistrarMovimiento({
   const [sourceId, setSourceId] = useState('');
   const [category, setCategory] = useState('');
   const [descripcion, setDescripcion] = useState('');
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [occurredOn, setOccurredOn] = useState(today);
+  const receiptRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -65,12 +87,22 @@ export function RegistrarMovimiento({
       });
       if (!res.ok) setError(res.message ?? 'No se pudo registrar');
       else {
+        // Si hay comprobante, súbelo y enlázalo al movimiento recién creado.
+        if (receipt) {
+          const att = await attachReceiptAction({
+            transactionId: res.value.id,
+            mediaType: 'image/jpeg',
+            data: receipt.data,
+          });
+          if (!att.ok) setError('El movimiento se registró, pero el comprobante no se pudo subir.');
+        }
         setMonto('');
         setCategory('');
         setDescripcion('');
+        setReceipt(null);
         setFx('');
         setOkMsg(
-          `${direction === 'in' ? 'Ingreso' : 'Gasto'} registrado: ${money(res.value.baseAmountMinor)}`,
+          `${direction === 'in' ? 'Ingreso' : 'Gasto'} registrado: ${money(res.value.baseAmountMinor)}${receipt ? ' · con comprobante' : ''}`,
         );
       }
     });
@@ -204,6 +236,44 @@ export function RegistrarMovimiento({
           autoComplete="off"
         />
       </label>
+
+      <div className="cal-field-label">
+        Comprobante (opcional)
+        <input
+          ref={receiptRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = '';
+            if (f) {
+              try {
+                setReceipt(await fileToReceipt(f));
+              } catch {
+                setError('No pude leer esa imagen.');
+              }
+            }
+          }}
+        />
+        {receipt ? (
+          <div className="receipt-preview">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={receipt.preview} alt="comprobante" />
+            <button type="button" aria-label="Quitar comprobante" onClick={() => setReceipt(null)}>
+              ✕
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="field receipt-pick"
+            onClick={() => receiptRef.current?.click()}
+          >
+            📎 Adjuntar foto del comprobante
+          </button>
+        )}
+      </div>
 
       <label className="cal-field-label">
         Fecha

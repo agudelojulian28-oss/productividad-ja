@@ -492,9 +492,12 @@ export async function runTool(
       const r = await saveAttachment(ctx, deps.structure, {
         id: p.value.adjunto_id,
         projectId: p.value.proyecto_id,
+        transactionId: p.value.movimiento_id,
         description: p.value.descripcion,
       });
-      return r.ok ? ok({ guardada: r.value.id, proyecto_id: r.value.projectId }) : r;
+      return r.ok
+        ? ok({ guardada: r.value.id, proyecto_id: r.value.projectId, movimiento_id: r.value.transactionId })
+        : r;
     }
 
     case 'deshacer': {

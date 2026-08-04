@@ -9,16 +9,32 @@ import type { StructureRepo, AttachmentRow } from './ports';
 export const AttachmentSave = z.object({
   id: z.uuid(),
   projectId: z.uuid().optional(),
+  transactionId: z.uuid().optional(),
   description: z.string().trim().max(500).optional(),
 });
 
 export async function registerAttachment(
   _ctx: ActorContext,
   repo: StructureRepo,
-  input: { storagePath: string; mime: string },
+  input: {
+    storagePath: string;
+    mime: string;
+    transactionId?: string;
+    projectId?: string;
+    description?: string;
+    saved?: boolean;
+  },
 ): Promise<Result<AttachmentRow>> {
   if (!input.storagePath) return err('INVALID_INPUT', 'Falta la ruta de la imagen');
   return ok(await repo.insertAttachment(input));
+}
+
+export async function listAttachmentsByTransaction(
+  _ctx: ActorContext,
+  repo: StructureRepo,
+  transactionId: string,
+): Promise<Result<AttachmentRow[]>> {
+  return ok(await repo.listAttachmentsByTransaction(transactionId));
 }
 
 export async function saveAttachment(
@@ -35,6 +51,7 @@ export async function saveAttachment(
     await repo.updateAttachment(parsed.data.id, {
       saved: true,
       projectId: parsed.data.projectId ?? null,
+      transactionId: parsed.data.transactionId ?? null,
       description: parsed.data.description ?? null,
     }),
   );

@@ -76,9 +76,15 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
         areaId: input.areaId,
         incomeSourceId: input.incomeSourceId ?? null,
         category: input.category ?? null,
+        description: input.description ?? null,
       };
       txs.push(row);
       return row;
+    },
+    async listRecentTransactions(limit = 30): Promise<TransactionRow[]> {
+      return [...txs]
+        .sort((a, b) => (a.occurredOn < b.occurredOn ? 1 : -1))
+        .slice(0, limit);
     },
     async cashflowMonthly() {
       // Agrega _txs por (área, mes) como la vista fin_cashflow_monthly.

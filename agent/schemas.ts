@@ -190,6 +190,10 @@ export const Deshacer = z.object({});
 export const GuardarImagen = z.object({
   adjunto_id: z.uuid().describe('El adjunto_id EXACTO que aparece en el mensaje del usuario'),
   proyecto_id: z.uuid().optional().describe('Proyecto donde guardarla (usa consultar estructura)'),
+  movimiento_id: z
+    .uuid()
+    .optional()
+    .describe('Movimiento (transacción) al que enlazar como comprobante; usa el id que devolvió crear movimiento'),
   descripcion: z.string().trim().max(500).optional().describe('Qué es la imagen (ej. "recibo del almuerzo")'),
 });
 
@@ -220,7 +224,7 @@ const descriptions: Record<ToolName, string> = {
   archivar:
     'Elimina o archiva según tipo: tarea/evento/documento se borran; area/fuente se archivan.',
   guardar_imagen:
-    'Guarda una imagen que el usuario adjuntó (usa el adjunto_id EXACTO del mensaje); opcional: enlazar a proyecto.',
+    'Guarda una imagen que el usuario adjuntó (usa el adjunto_id EXACTO del mensaje); opcional: enlazar a proyecto o, como comprobante, a un movimiento (movimiento_id).',
   deshacer:
     'Deshace la última acción reciente (crear/renombrar tarea o documento, últimos 5 min). Si no es reversible, explica.',
 };

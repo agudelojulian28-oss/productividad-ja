@@ -34,6 +34,7 @@ export interface TransactionRow {
   areaId: string;
   incomeSourceId: string | null;
   category: string | null;
+  description: string | null;
 }
 
 export interface TransactionInsert {
@@ -123,6 +124,7 @@ export interface FinanceRepo {
   archiveIncomeSource(id: string): Promise<void>;
 
   insertTransaction(input: TransactionInsert): Promise<TransactionRow>;
+  listRecentTransactions(limit?: number): Promise<TransactionRow[]>;
 
   insertMoneyGoal(input: MoneyGoalInsert): Promise<{ id: string }>;
   moneyGoalsProgress(): Promise<MoneyGoalProgressRow[]>;

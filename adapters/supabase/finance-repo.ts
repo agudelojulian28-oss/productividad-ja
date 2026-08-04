@@ -40,10 +40,11 @@ interface DbTransaction {
   area_id: string;
   income_source_id: string | null;
   category: string | null;
+  description: string | null;
 }
 
 const TX_COLS =
-  'id,direction,amount_minor,currency,base_amount_minor,fx_rate,occurred_on,area_id,income_source_id,category';
+  'id,direction,amount_minor,currency,base_amount_minor,fx_rate,occurred_on,area_id,income_source_id,category,description';
 
 function toTx(r: DbTransaction): TransactionRow {
   return {
@@ -57,6 +58,7 @@ function toTx(r: DbTransaction): TransactionRow {
     areaId: r.area_id,
     incomeSourceId: r.income_source_id,
     category: r.category,
+    description: r.description,
   };
 }
 
@@ -125,6 +127,17 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
         .single();
       if (error) throw new Error(error.message);
       return toTx(data as DbTransaction);
+    },
+
+    async listRecentTransactions(limit = 30) {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select(TX_COLS)
+        .order('occurred_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw new Error(error.message);
+      return ((data as DbTransaction[] | null) ?? []).map(toTx);
     },
 
     async insertMoneyGoal(input) {
