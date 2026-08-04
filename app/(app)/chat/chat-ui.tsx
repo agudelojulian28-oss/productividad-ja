@@ -40,8 +40,13 @@ export function ChatUI({ initial }: { initial: ChatMessage[] }) {
   const [input, setInput] = useState('');
   const [images, setImages] = useState<Attached[]>([]);
   const [busy, setBusy] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [micNote, setMicNote] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -70,6 +75,66 @@ export function ChatUI({ initial }: { initial: ChatMessage[] }) {
       }
     }
     setImages((prev) => [...prev, ...next].slice(0, 5));
+  }
+
+  function blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve) => {
+      const r = new FileReader();
+      r.onloadend = () => resolve((r.result as string).split(',')[1] ?? '');
+      r.readAsDataURL(blob);
+    });
+  }
+
+  // Graba una nota de voz; al parar, la transcribe y la deja en la caja para revisar.
+  async function toggleMic() {
+    if (recording) {
+      recRef.current?.stop();
+      return;
+    }
+    setMicNote(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : MediaRecorder.isTypeSupported('audio/mp4')
+          ? 'audio/mp4'
+          : '';
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      chunksRef.current = [];
+      rec.ondataavailable = (e) => {
+        if (e.data.size) chunksRef.current.push(e.data);
+      };
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecording(false);
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType });
+        if (blob.size === 0) return;
+        setTranscribing(true);
+        try {
+          const data = await blobToBase64(blob);
+          const res = await fetch('/api/transcribe', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ data, mime: rec.mimeType }),
+          });
+          const j = (await res.json()) as { text?: string; message?: string };
+          if (res.ok && j.text) {
+            setInput((prev) => (prev ? prev + ' ' : '') + j.text);
+          } else {
+            setMicNote(j.message ?? 'No pude transcribir el audio.');
+          }
+        } catch {
+          setMicNote('No pude transcribir el audio.');
+        } finally {
+          setTranscribing(false);
+        }
+      };
+      rec.start();
+      recRef.current = rec;
+      setRecording(true);
+    } catch {
+      setMicNote('No pude acceder al micrófono. Revisa los permisos.');
+    }
   }
 
   async function send(e: FormEvent) {
@@ -182,6 +247,12 @@ export function ChatUI({ initial }: { initial: ChatMessage[] }) {
         </div>
       )}
 
+      {micNote && (
+        <p className="chat-micnote" role="status">
+          {micNote}
+        </p>
+      )}
+
       <form onSubmit={send} className="chat-input">
         <input
           ref={fileRef}
@@ -200,10 +271,19 @@ export function ChatUI({ initial }: { initial: ChatMessage[] }) {
         >
           📎
         </button>
+        <button
+          type="button"
+          className={`chat-attach${recording ? ' chat-mic-on' : ''}`}
+          onClick={toggleMic}
+          aria-label={recording ? 'Detener grabación' : 'Grabar nota de voz'}
+          disabled={busy || transcribing}
+        >
+          {transcribing ? '…' : recording ? '⏹' : '🎤'}
+        </button>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Escribe…"
+          placeholder={recording ? 'Grabando…' : transcribing ? 'Transcribiendo…' : 'Escribe…'}
           className="field"
           aria-label="Mensaje"
         />

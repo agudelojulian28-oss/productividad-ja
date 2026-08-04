@@ -15,7 +15,15 @@ export async function transcribeAudio(audio: Buffer, mime: string): Promise<stri
   const key = process.env.GROQ_API_KEY;
   if (!key) throw new Error('Falta GROQ_API_KEY');
 
-  const ext = mime.includes('mp4') || mime.includes('m4a') ? 'm4a' : mime.includes('mpeg') ? 'mp3' : 'ogg';
+  const ext = mime.includes('webm')
+    ? 'webm'
+    : mime.includes('wav')
+      ? 'wav'
+      : mime.includes('mp4') || mime.includes('m4a')
+        ? 'm4a'
+        : mime.includes('mpeg')
+          ? 'mp3'
+          : 'ogg';
   const form = new FormData();
   form.append('file', new Blob([new Uint8Array(audio)], { type: mime }), `nota.${ext}`);
   form.append('model', MODEL);
