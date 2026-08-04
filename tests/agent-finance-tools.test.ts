@@ -5,37 +5,48 @@ import { makeFakeFinanceRepo } from './fake-finance-repo';
 
 const AREA = '00000000-0000-4000-8000-0000000000aa';
 
-function deps(): ToolDeps & { fin: ReturnType<typeof makeFakeFinanceRepo> } {
+function deps(): ToolDeps & {
+  fin: ReturnType<typeof makeFakeFinanceRepo>;
+  repo: ReturnType<typeof makeFakeRepo>;
+} {
   const fin = makeFakeFinanceRepo();
-  return { ctx: ctx(), repo: makeFakeRepo(), finance: fin, fin };
+  const repo = makeFakeRepo();
+  return { ctx: ctx(), repo, finance: fin, fin };
+}
+
+/** Crea un proyecto en el área y devuelve su id (el dinero se atribuye a proyectos). */
+async function unProyecto(d: ReturnType<typeof deps>): Promise<string> {
+  const p = await d.repo.insertProject({ title: 'Proyecto X', areaId: AREA });
+  return p.id;
 }
 
 describe('runTool · crear movimiento', () => {
-  it('registra un gasto en COP', async () => {
+  it('registra un gasto en COP atribuido a un proyecto', async () => {
     const d = deps();
+    const proyecto_id = await unProyecto(d);
     const r = await runTool(d, 'crear', {
       tipo: 'movimiento',
       direccion: 'gasto',
       monto: 50000,
       moneda: 'COP',
-      area_id: AREA,
+      proyecto_id,
       categoria: 'almuerzo',
     });
     expect(r.ok).toBe(true);
     expect(d.fin._txs.length).toBe(1);
     expect(d.fin._txs[0]!.baseAmountMinor).toBe(5_000_000);
+    expect(d.fin._txs[0]!.projectId).toBe(proyecto_id);
   });
 
   it('convierte el monto de moneda a centavos (12.5 USD → base con tasa)', async () => {
     const d = deps();
-    const src = await d.fin.insertIncomeSource({ areaId: AREA, name: 'C', model: 'servicio' });
+    const proyecto_id = await unProyecto(d);
     const r = await runTool(d, 'crear', {
       tipo: 'movimiento',
       direccion: 'ingreso',
       monto: 12.5,
       moneda: 'USD',
-      area_id: AREA,
-      fuente_id: src.id,
+      proyecto_id,
       tasa: 4000,
     });
     expect(r.ok).toBe(true);
@@ -44,14 +55,13 @@ describe('runTool · crear movimiento', () => {
     expect(tx.baseAmountMinor).toBe(5_000_000); // 1250 × 4000
   });
 
-  it('ingreso sin fuente → error (no escribe)', async () => {
+  it('movimiento sin proyecto → error (no escribe)', async () => {
     const d = deps();
     const r = await runTool(d, 'crear', {
       tipo: 'movimiento',
       direccion: 'ingreso',
       monto: 1000,
       moneda: 'COP',
-      area_id: AREA,
     });
     expect(r.ok).toBe(false);
     expect(d.fin._txs.length).toBe(0);
@@ -61,12 +71,13 @@ describe('runTool · crear movimiento', () => {
 describe('runTool · consultar dinero', () => {
   it('resumen_financiero suma lo registrado este mes', async () => {
     const d = deps();
+    const proyecto_id = await unProyecto(d);
     await runTool(d, 'crear', {
       tipo: 'movimiento',
       direccion: 'gasto',
       monto: 30000,
       moneda: 'COP',
-      area_id: AREA,
+      proyecto_id,
     });
     const r = await runTool(d, 'consultar', { vista: 'resumen_financiero' });
     expect(r.ok).toBe(true);

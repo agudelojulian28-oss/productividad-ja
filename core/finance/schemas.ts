@@ -30,16 +30,14 @@ export const MovimientoCreate = z
     amountMinor: z.number().int().positive().max(1_000_000_000_000),
     currency: z.enum(CURRENCIES).default('COP'),
     areaId: z.uuid(),
+    /** Proyecto al que se atribuye el dinero (ingresos y gastos). ADR-026. */
+    projectId: z.uuid(),
     incomeSourceId: z.uuid().optional(),
     category: z.string().trim().max(80).optional(),
     description: z.string().trim().max(500).optional(),
     occurredOn: Ymd.optional(),
     /** COP por 1 unidad de la moneda (solo si currency ≠ COP). Se congela. */
     fxRate: z.number().positive().max(1_000_000).optional(),
-  })
-  .refine((d) => d.direction === 'out' || !!d.incomeSourceId, {
-    message: 'Un ingreso necesita una fuente de ingreso',
-    path: ['incomeSourceId'],
   })
   .refine((d) => d.currency === 'COP' || !!d.fxRate, {
     message: 'Un movimiento en USD necesita la tasa de cambio',

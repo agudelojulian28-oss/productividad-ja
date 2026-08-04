@@ -80,10 +80,10 @@ export const Crear = z
       .max(200)
       .optional()
       .describe('Título/nombre. Requerido para: tarea, evento, proyecto, meta, area, fuente, documento'),
-    area_id: z.uuid().optional().describe('Área. Requerido: proyecto, fuente. Opcional: meta_dinero, documento, movimiento'),
-    proyecto_id: z.uuid().optional().describe('Proyecto. Requerido: meta. Opcional: tarea, evento, documento'),
+    area_id: z.uuid().optional().describe('Área. Requerido: proyecto, fuente. Opcional: meta_dinero, documento'),
+    proyecto_id: z.uuid().optional().describe('Proyecto. Requerido: meta, movimiento (el dinero se atribuye al proyecto). Opcional: tarea, evento, documento'),
     meta_id: z.uuid().optional().describe('Meta. Opcional: tarea, evento'),
-    fuente_id: z.uuid().optional().describe('Fuente de ingreso. meta_dinero (alcance) / movimiento (ingreso)'),
+    fuente_id: z.uuid().optional().describe('Fuente de ingreso (legado). Solo meta_dinero (alcance)'),
     fecha: Instant.optional().describe('Inicio con offset. tarea (vence, opcional), evento (inicio, requerido)'),
     desde: Ymd.optional().describe('Inicio YYYY-MM-DD. meta / meta_dinero'),
     hasta: Ymd.optional().describe('Fin/cumplimiento YYYY-MM-DD. meta / meta_dinero'),
@@ -129,7 +129,7 @@ export const Crear = z
         case 'documento':
           return !!d.titulo;
         case 'movimiento':
-          return !!d.direccion && d.monto != null && !!d.area_id && (d.direccion === 'gasto' || !!d.fuente_id);
+          return !!d.direccion && d.monto != null && !!d.proyecto_id;
         default:
           return false;
       }

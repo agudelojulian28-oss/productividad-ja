@@ -6,6 +6,7 @@ import { ctx } from './fake-repo';
 
 const AREA = '00000000-0000-4000-8000-0000000000aa';
 const OTRA_AREA = '00000000-0000-4000-8000-0000000000bb';
+const PROJ = '00000000-0000-4000-8000-0000000000cc';
 
 async function unaFuente(repo: ReturnType<typeof makeFakeFinanceRepo>, areaId = AREA) {
   const r = await createIncomeSource(ctx(), repo, {
@@ -25,6 +26,7 @@ describe('registrarMovimiento — COP', () => {
       amountMinor: 5_000_000, // 50.000 COP
       currency: 'COP',
       areaId: AREA,
+      projectId: PROJ,
       category: 'almuerzo',
       occurredOn: '2026-07-29',
     });
@@ -44,6 +46,7 @@ describe('registrarMovimiento — COP', () => {
       amountMinor: 200_000_000,
       currency: 'COP',
       areaId: AREA,
+      projectId: PROJ,
       incomeSourceId: src.id,
     });
     expect(r.ok).toBe(true);
@@ -61,6 +64,7 @@ describe('registrarMovimiento — USD (fx congelado)', () => {
       currency: 'USD',
       fxRate: 4000, // 4.000 COP por USD
       areaId: AREA,
+      projectId: PROJ,
       incomeSourceId: src.id,
     });
     expect(r.ok).toBe(true);
@@ -79,6 +83,7 @@ describe('registrarMovimiento — USD (fx congelado)', () => {
       currency: 'USD',
       fxRate: 4123.5,
       areaId: AREA,
+      projectId: PROJ,
     });
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value.baseAmountMinor).toBe(Math.round(1_250 * 4123.5));
@@ -91,6 +96,7 @@ describe('registrarMovimiento — USD (fx congelado)', () => {
       amountMinor: 1_000,
       currency: 'USD',
       areaId: AREA,
+      projectId: PROJ,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('INVALID_INPUT');
@@ -98,7 +104,7 @@ describe('registrarMovimiento — USD (fx congelado)', () => {
 });
 
 describe('reglas', () => {
-  it('ingreso sin fuente → INVALID_INPUT (schema)', async () => {
+  it('movimiento sin proyecto → INVALID_INPUT (schema)', async () => {
     const repo = makeFakeFinanceRepo();
     const r = await registrarMovimiento(ctx(), repo, {
       direction: 'in',
@@ -118,6 +124,7 @@ describe('reglas', () => {
       amountMinor: 1_000,
       currency: 'COP',
       areaId: AREA,
+      projectId: PROJ,
       incomeSourceId: src.id,
     });
     expect(r.ok).toBe(false);
@@ -131,6 +138,7 @@ describe('reglas', () => {
       amountMinor: 0,
       currency: 'COP',
       areaId: AREA,
+      projectId: PROJ,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('INVALID_INPUT');
@@ -143,6 +151,7 @@ describe('reglas', () => {
       amountMinor: 1_000,
       currency: 'COP',
       areaId: AREA,
+      projectId: PROJ,
     });
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value.occurredOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);

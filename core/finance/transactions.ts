@@ -28,9 +28,9 @@ export async function registrarMovimiento(
 
   const d = parsed.data;
 
-  // Regla: un ingreso necesita una fuente, y la fuente debe ser del mismo área.
-  if (d.direction === 'in') {
-    if (!d.incomeSourceId) return err('RULE_VIOLATION', 'Un ingreso necesita una fuente de ingreso');
+  // El dinero se atribuye a un proyecto (ADR-026). La fuente de ingreso es legado
+  // opcional; si viene, se valida que sea del mismo área.
+  if (d.incomeSourceId) {
     const src = await repo.getIncomeSource(d.incomeSourceId);
     if (!src) return err('NOT_FOUND', 'La fuente de ingreso no existe');
     if (src.areaId !== d.areaId) {
@@ -45,6 +45,7 @@ export async function registrarMovimiento(
 
   const row = await repo.insertTransaction({
     areaId: d.areaId,
+    projectId: d.projectId,
     incomeSourceId: d.direction === 'in' ? d.incomeSourceId : undefined,
     direction: d.direction,
     amountMinor: d.amountMinor,

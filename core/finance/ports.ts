@@ -33,6 +33,7 @@ export interface TransactionRow {
   occurredOn: string; // YYYY-MM-DD
   areaId: string;
   incomeSourceId: string | null;
+  projectId: string | null;
   category: string | null;
   description: string | null;
 }
@@ -40,6 +41,7 @@ export interface TransactionRow {
 export interface TransactionInsert {
   areaId: string;
   incomeSourceId?: string;
+  projectId?: string;
   direction: 'in' | 'out';
   amountMinor: number;
   currency: string;
@@ -48,6 +50,15 @@ export interface TransactionInsert {
   occurredOn: string;
   category?: string;
   description?: string;
+}
+
+export interface ByProjectRow {
+  projectId: string;
+  month: string; // YYYY-MM-DD (primero del mes)
+  inflowMinor: number;
+  outflowMinor: number;
+  netMinor: number;
+  movements: number;
 }
 
 // ── Filas de las vistas ────────────────────────────────────────────────────
@@ -125,6 +136,7 @@ export interface FinanceRepo {
 
   insertTransaction(input: TransactionInsert): Promise<TransactionRow>;
   listRecentTransactions(limit?: number): Promise<TransactionRow[]>;
+  byProject(): Promise<ByProjectRow[]>;
 
   insertMoneyGoal(input: MoneyGoalInsert): Promise<{ id: string }>;
   moneyGoalsProgress(): Promise<MoneyGoalProgressRow[]>;

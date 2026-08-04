@@ -2,55 +2,61 @@ import Link from 'next/link';
 import { requireContext } from '@/lib/auth';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { financeRepo } from '@/adapters/supabase/finance-repo';
-import {
-  resumenFinanciero,
-  serieMensual,
-  topGastos,
-  porFuente,
-} from '@/core/finance/queries';
+import { workRepo } from '@/adapters/supabase/work-repo';
+import { resumenFinanciero, serieMensual } from '@/core/finance/queries';
 import { money, todayInTz, dayLabelInTz } from '@/lib/format';
 import { signedUrl } from '@/adapters/supabase/storage';
 import { RealtimeRefresh } from '../realtime-refresh';
 import { RegistrarMovimiento } from './registrar-movimiento';
-import { FuentesManager } from './fuentes-manager';
 import { CashflowChart } from './cashflow-chart';
 import { MetasDinero } from './metas-dinero';
 import { FinStats } from './fin-stats';
 import { MovimientosRecientes, type MovRow } from './movimientos-recientes';
-import { Disclosure } from '../disclosure';
 import { PageHero } from '../page-hero';
 
 export const dynamic = 'force-dynamic';
-
-function pctDelta(thisM: number, lastM: number): { txt: string; up: boolean | null } {
-  if (lastM <= 0) return thisM > 0 ? { txt: 'nuevo', up: true } : { txt: '—', up: null };
-  const pct = Math.round(((thisM - lastM) / lastM) * 100);
-  if (pct === 0) return { txt: '0%', up: null };
-  return { txt: `${pct > 0 ? '+' : ''}${pct}%`, up: pct > 0 };
-}
 
 export default async function FinanzasPage() {
   const { supabase, ctx } = await requireContext();
   const structure = structureRepo(supabase, ctx.userId);
   const finance = financeRepo(supabase, ctx.userId);
+  const work = workRepo(supabase, ctx.userId);
 
-  const [areas, sources, cashflow, bySrc, expenses, metas] = await Promise.all([
+  const [areas, sources, projects, cashflow, byProj, metas] = await Promise.all([
     structure.listAreas(),
     finance.listIncomeSources(),
+    work.listProjects(),
     finance.cashflowMonthly(),
-    finance.bySource(),
-    finance.expensesByCategory(),
+    finance.byProject(),
     finance.moneyGoalsProgress(),
   ]);
 
   const resumen = resumenFinanciero(cashflow, ctx.tz);
   const serie = serieMensual(cashflow, 6);
-  const gastos = topGastos(expenses, ctx.tz, 5);
-  const fuentes = porFuente(bySrc);
+
+  // Ingresos y gastos por proyecto del mes en curso (ADR-026).
+  const projName = new Map(projects.map((p) => [p.id, p.title] as const));
+  const currentMonth = `${todayInTz(ctx.tz).slice(0, 7)}-01`;
+  const thisMonth = byProj.filter((r) => r.month === currentMonth);
+  const fuentes = thisMonth
+    .filter((r) => r.inflowMinor > 0)
+    .sort((a, b) => b.inflowMinor - a.inflowMinor)
+    .map((r) => ({
+      label: projName.get(r.projectId) ?? '—',
+      value: r.inflowMinor,
+      valueLabel: money(r.inflowMinor),
+    }));
+  const gastos = thisMonth
+    .filter((r) => r.outflowMinor > 0)
+    .sort((a, b) => b.outflowMinor - a.outflowMinor)
+    .map((r) => ({
+      label: projName.get(r.projectId) ?? '—',
+      value: r.outflowMinor,
+      valueLabel: money(r.outflowMinor),
+    }));
 
   // Movimientos recientes con su comprobante (si tiene). Una consulta para todos.
   const recientes = await finance.listRecentTransactions(20);
-  const areaName = new Map(areas.map((a) => [a.id, a.name] as const));
   const receipts = await structure.listAttachmentsForTransactions(recientes.map((t) => t.id));
   const receiptPath = new Map<string, string>();
   for (const a of receipts) {
@@ -70,7 +76,7 @@ export default async function FinanzasPage() {
     baseAmountMinor: t.baseAmountMinor,
     occurredOn: dayLabelInTz(`${t.occurredOn}T12:00:00Z`, ctx.tz),
     title: t.description || t.category || (t.direction === 'in' ? 'Ingreso' : 'Gasto'),
-    areaName: areaName.get(t.areaId) ?? '—',
+    areaName: (t.projectId ? projName.get(t.projectId) : undefined) ?? '—',
     receiptUrl: receiptUrl.get(t.id) ?? null,
   }));
 
@@ -81,6 +87,10 @@ export default async function FinanzasPage() {
     areaId: s.areaId,
     model: s.model,
   }));
+  // Solo proyectos con área pueden recibir dinero (la transacción exige área).
+  const projectOpts = projects
+    .filter((p) => p.areaId)
+    .map((p) => ({ id: p.id, title: p.title, areaId: p.areaId as string }));
 
   return (
     <div className="page">
@@ -124,20 +134,8 @@ export default async function FinanzasPage() {
           <FinStats
             inflowLabel={money(resumen.inflowMinor, { compact: true })}
             outflowLabel={money(resumen.outflowMinor, { compact: true })}
-            fuentes={fuentes.map((f) => {
-              const d = pctDelta(f.thisMonthMinor, f.lastMonthMinor);
-              return {
-                label: f.name,
-                value: f.thisMonthMinor,
-                valueLabel: money(f.thisMonthMinor),
-                delta: { text: d.txt, up: d.up },
-              };
-            })}
-            gastos={gastos.map((g) => ({
-              label: g.category,
-              value: g.amountMinor,
-              valueLabel: money(g.amountMinor),
-            }))}
+            fuentes={fuentes}
+            gastos={gastos}
           />
 
           <section className="fin-block">
@@ -151,13 +149,13 @@ export default async function FinanzasPage() {
           </p>
         </div>
 
-        {/* Rail: metas, captura y fuentes (config). */}
+        {/* Rail: captura y metas. */}
         <div className="fin-rail">
-          {areas.length === 0 ? (
+          {projectOpts.length === 0 ? (
             <p className="muted">
-              Para registrar dinero, primero crea un área en{' '}
+              Para registrar dinero, primero crea un proyecto en un{' '}
               <Link href="/areas" className="link">
-                Áreas
+                Área
               </Link>
               .
             </p>
@@ -165,11 +163,7 @@ export default async function FinanzasPage() {
             <>
               <section className="fin-block">
                 <h2 className="fin-h2">Registrar movimiento</h2>
-                <RegistrarMovimiento
-                  areas={areaOpts}
-                  sources={sourceOpts}
-                  today={todayInTz(ctx.tz)}
-                />
+                <RegistrarMovimiento projects={projectOpts} today={todayInTz(ctx.tz)} />
               </section>
 
               <section className="fin-block">
@@ -188,10 +182,6 @@ export default async function FinanzasPage() {
                   today={todayInTz(ctx.tz)}
                 />
               </section>
-
-              <Disclosure title="Fuentes de ingreso" count={sourceOpts.length}>
-                <FuentesManager areas={areaOpts} sources={sourceOpts} />
-              </Disclosure>
             </>
           )}
         </div>

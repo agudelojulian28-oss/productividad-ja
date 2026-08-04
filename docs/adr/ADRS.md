@@ -650,3 +650,31 @@ entraría como el usuario único en la app pública). Pedir/teclear la contrase�
 verificar UI en escritorio y móvil. La regla no negociable #1 (nunca `service_role` fuera de sitios
 declarados) se respeta: el uso queda documentado aquí y acotado por lint + guard de entorno. La puerta
 puede quedarse en el repo de forma permanente sin abrir superficie de ataque en producción.
+
+---
+
+## ADR-026 · El dinero se atribuye a proyectos (no a fuentes de ingreso)
+
+**Estado:** aceptado · **Fecha:** 2026-08-03
+
+**Contexto.** El modelo pedía, para registrar dinero, elegir un área y (para ingresos) una
+"fuente de ingreso". Julián no piensa su dinero así: sus fuentes de ingreso **son sus proyectos**
+(Cutbills, Monetización YouTube, …). Crear fuentes aparte era fricción y no reflejaba la realidad.
+
+**Decisión.**
+- Se agrega `project_id` a `transactions`. **Cada ingreso y cada gasto se atribuye a un proyecto.**
+  El área sale del proyecto (la transacción sigue exigiendo `area_id`, derivado del proyecto).
+- Se relaja el check `income_needs_source` → `income_has_attribution`: un ingreso necesita proyecto
+  **o** fuente (la fuente queda como legado opcional).
+- Nueva vista `fin_by_project` (security_invoker): ingresos/gastos/neto por proyecto y mes. Alimenta
+  el panel "por proyecto" y el **balance por proyecto** en la página de cada proyecto.
+- UI: al registrar un movimiento se elige **Proyecto** (no área+fuente). La gestión de "fuentes de
+  ingreso" se oculta de la app. La página de proyecto muestra tareas, eventos, docs, fotos **y balance**.
+- Agente: `crear movimiento` usa `proyecto_id` (obligatorio); el tool deriva el área del proyecto.
+
+**Alternativas descartadas.** Mantener fuentes y añadir proyecto (dos conceptos que hacen lo mismo,
+formulario confuso). Solo ingresos por proyecto (el balance por proyecto quedaría incompleto sin gastos).
+
+**Consecuencias.** El módulo de finanzas pasa a girar en torno a proyectos. Las metas de dinero siguen
+usando área/fuente por ahora (no se tocaron). No se migran datos viejos (la cuenta casi no tenía). Las
+vistas `fin_by_source`/`goal_progress` siguen existiendo; las fuentes son legado.

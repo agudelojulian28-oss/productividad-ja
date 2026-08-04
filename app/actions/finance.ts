@@ -60,6 +60,7 @@ export async function registrarMovimientoAction(input: {
   amountMinor: number;
   currency: 'COP' | 'USD';
   areaId: string;
+  projectId: string;
   incomeSourceId?: string;
   category?: string;
   description?: string;

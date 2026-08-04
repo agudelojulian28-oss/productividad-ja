@@ -6,6 +6,7 @@ import type {
   TransactionRow,
   CashflowMonthRow,
   BySourceRow,
+  ByProjectRow,
   ExpenseCategoryRow,
   ReceivableRow,
   PipelineRow,
@@ -39,12 +40,13 @@ interface DbTransaction {
   occurred_on: string;
   area_id: string;
   income_source_id: string | null;
+  project_id: string | null;
   category: string | null;
   description: string | null;
 }
 
 const TX_COLS =
-  'id,direction,amount_minor,currency,base_amount_minor,fx_rate,occurred_on,area_id,income_source_id,category,description';
+  'id,direction,amount_minor,currency,base_amount_minor,fx_rate,occurred_on,area_id,income_source_id,project_id,category,description';
 
 function toTx(r: DbTransaction): TransactionRow {
   return {
@@ -57,6 +59,7 @@ function toTx(r: DbTransaction): TransactionRow {
     occurredOn: r.occurred_on,
     areaId: r.area_id,
     incomeSourceId: r.income_source_id,
+    projectId: r.project_id,
     category: r.category,
     description: r.description,
   };
@@ -114,6 +117,7 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
           user_id: userId,
           area_id: input.areaId,
           income_source_id: input.incomeSourceId ?? null,
+          project_id: input.projectId ?? null,
           direction: input.direction,
           amount_minor: input.amountMinor,
           currency: input.currency,
@@ -217,6 +221,23 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
           thisMonthMinor: n(r.this_month_minor),
           lastMonthMinor: n(r.last_month_minor),
           ttmMinor: n(r.ttm_minor),
+        }),
+      );
+    },
+
+    async byProject() {
+      const { data, error } = await supabase
+        .from('fin_by_project')
+        .select('project_id,month,inflow_minor,outflow_minor,net_minor,movements');
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map(
+        (r): ByProjectRow => ({
+          projectId: r.project_id as string,
+          month: r.month as string,
+          inflowMinor: n(r.inflow_minor),
+          outflowMinor: n(r.outflow_minor),
+          netMinor: n(r.net_minor),
+          movements: n(r.movements),
         }),
       );
     },

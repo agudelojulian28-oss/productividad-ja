@@ -44,7 +44,7 @@ export function FinStats({
           <span className="fin-stats-num fin-pos">{inflowLabel}</span>
         </div>
         {fuentes.length === 0 ? (
-          <p className="muted">Sin ingresos por fuente aún.</p>
+          <p className="muted">Sin ingresos por proyecto este mes.</p>
         ) : (
           <BarList items={fuentes} tone="accent" />
         )}

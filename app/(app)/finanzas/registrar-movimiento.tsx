@@ -25,24 +25,20 @@ async function fileToReceipt(file: File): Promise<Receipt> {
   return { data: dataUrl.split(',')[1]!, preview: dataUrl };
 }
 
-type Area = { id: string; name: string };
-type Source = { id: string; name: string; areaId: string };
+type Project = { id: string; title: string; areaId: string };
 
 export function RegistrarMovimiento({
-  areas,
-  sources,
+  projects,
   today,
 }: {
-  areas: Area[];
-  sources: Source[];
+  projects: Project[];
   today: string;
 }) {
   const [direction, setDirection] = useState<'out' | 'in'>('out');
   const [monto, setMonto] = useState('');
   const [currency, setCurrency] = useState<'COP' | 'USD'>('COP');
   const [fx, setFx] = useState('');
-  const [areaId, setAreaId] = useState(areas[0]?.id ?? '');
-  const [sourceId, setSourceId] = useState('');
+  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
   const [category, setCategory] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -52,9 +48,9 @@ export function RegistrarMovimiento({
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const sourcesOfArea = useMemo(
-    () => sources.filter((s) => s.areaId === areaId),
-    [sources, areaId],
+  const project = useMemo(
+    () => projects.find((p) => p.id === projectId),
+    [projects, projectId],
   );
 
   const amountMinor = parseAmountToMinor(monto);
@@ -69,8 +65,7 @@ export function RegistrarMovimiento({
     setError(null);
     setOkMsg(null);
     if (!amountMinor) return setError('Monto inválido');
-    if (!areaId) return setError('Elige un área');
-    if (direction === 'in' && !sourceId) return setError('Un ingreso necesita una fuente');
+    if (!project) return setError('Elige un proyecto');
     if (currency === 'USD' && !(fxRate > 0)) return setError('Falta la tasa de cambio (COP por USD)');
 
     startTransition(async () => {
@@ -78,8 +73,8 @@ export function RegistrarMovimiento({
         direction,
         amountMinor,
         currency,
-        areaId,
-        incomeSourceId: direction === 'in' ? sourceId : undefined,
+        areaId: project.areaId,
+        projectId: project.id,
         category: category.trim() || undefined,
         description: descripcion.trim() || undefined,
         occurredOn,
@@ -171,45 +166,20 @@ export function RegistrarMovimiento({
       )}
 
       <label className="cal-field-label">
-        Área
+        Proyecto
         <select
-          value={areaId}
-          onChange={(e) => {
-            setAreaId(e.target.value);
-            setSourceId('');
-          }}
+          value={projectId}
+          onChange={(e) => setProjectId(e.target.value)}
           className="field"
         >
-          {areas.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
+          {projects.length === 0 && <option value="">Crea un proyecto primero</option>}
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.title}
             </option>
           ))}
         </select>
       </label>
-
-      {direction === 'in' && (
-        <label className="cal-field-label">
-          Fuente de ingreso
-          <select
-            value={sourceId}
-            onChange={(e) => setSourceId(e.target.value)}
-            className="field"
-          >
-            <option value="">Elige una fuente…</option>
-            {sourcesOfArea.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          {sourcesOfArea.length === 0 && (
-            <span className="muted" style={{ fontSize: 13 }}>
-              Esta área no tiene fuentes. Crea una abajo.
-            </span>
-          )}
-        </label>
-      )}
 
       {direction === 'out' && (
         <label className="cal-field-label">

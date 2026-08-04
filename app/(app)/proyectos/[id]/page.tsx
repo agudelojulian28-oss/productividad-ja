@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireContext } from '@/lib/auth';
 import { workRepo } from '@/adapters/supabase/work-repo';
-import { dayLabelInTz } from '@/lib/format';
+import { financeRepo } from '@/adapters/supabase/finance-repo';
+import { dayLabelInTz, money } from '@/lib/format';
 import { getEventsByProject } from '@/lib/calendar-sync';
 import { NewGoalForm } from './new-goal-form';
 import { DescriptionEditor } from '../../description-editor';
@@ -24,16 +25,31 @@ export default async function ProjectDetailPage({
   const { supabase, ctx } = await requireContext();
   const repo = workRepo(supabase, ctx.userId);
   const structure = structureRepo(supabase, ctx.userId);
+  const finance = financeRepo(supabase, ctx.userId);
   const project = await repo.getProject(id);
   if (!project) notFound();
-  const [goals, tasks, events, docs, attachments] = await Promise.all([
+  const [goals, tasks, events, docs, attachments, byProj] = await Promise.all([
     repo.listGoals(id),
     repo.listTasks({ projectId: id }),
     getEventsByProject(supabase, ctx, id),
     structure.listDocuments({ projectId: id }),
     structure.listSavedAttachments(id),
+    finance.byProject(),
   ]);
   const goalName = new Map(goals.map((g) => [g.id, g.title] as const));
+
+  // Balance del proyecto (suma de todos los meses).
+  const bal = byProj
+    .filter((r) => r.projectId === id)
+    .reduce(
+      (acc, r) => ({
+        inflow: acc.inflow + r.inflowMinor,
+        outflow: acc.outflow + r.outflowMinor,
+        movements: acc.movements + r.movements,
+      }),
+      { inflow: 0, outflow: 0, movements: 0 },
+    );
+  const balNet = bal.inflow - bal.outflow;
 
   // URLs firmadas para ver las imágenes del bucket privado.
   const fotos = (
@@ -54,12 +70,38 @@ export default async function ProjectDetailPage({
       <PageHero
         eyebrow="Proyecto"
         title={project.title}
-        kpis={[{ label: 'Tareas', value: String(tasks.length) }]}
+        kpis={[
+          { label: 'Tareas', value: String(tasks.length) },
+          {
+            label: 'Balance',
+            value: money(balNet, { compact: true }),
+            tone: balNet >= 0 ? 'pos' : 'neg',
+          },
+        ]}
       />
       <DescriptionEditor
         initial={project.description ?? ''}
         action={setProjectDescriptionAction.bind(null, project.id)}
       />
+
+      {bal.movements > 0 && (
+        <section className="proj-balance">
+          <div className="proj-bal-cell">
+            <span className="proj-bal-k">Ingresos</span>
+            <span className="proj-bal-v fin-pos">{money(bal.inflow, { compact: true })}</span>
+          </div>
+          <div className="proj-bal-cell">
+            <span className="proj-bal-k">Gastos</span>
+            <span className="proj-bal-v fin-neg">{money(bal.outflow, { compact: true })}</span>
+          </div>
+          <div className="proj-bal-cell">
+            <span className="proj-bal-k">Balance</span>
+            <span className={`proj-bal-v ${balNet >= 0 ? 'fin-pos' : 'fin-neg'}`}>
+              {money(balNet, { compact: true })}
+            </span>
+          </div>
+        </section>
+      )}
 
       <Disclosure title="Metas" count={goals.length}>
         <NewGoalForm projectId={project.id} />

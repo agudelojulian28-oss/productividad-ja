@@ -336,11 +336,17 @@ export async function runTool(
         }
         case 'movimiento': {
           if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          // El dinero se atribuye a un proyecto (ADR-026); el área sale del proyecto.
+          const proj = v.proyecto_id ? await repo.getProject(v.proyecto_id) : null;
+          if (!proj) {
+            return err('NOT_FOUND', 'Indica un proyecto válido (proyecto_id) para el movimiento');
+          }
           const r = await registrarMovimiento(ctx, deps.finance, {
             direction: v.direccion === 'ingreso' ? 'in' : 'out',
             amountMinor: Math.round(v.monto! * 100),
             currency: v.moneda ?? 'COP',
-            areaId: v.area_id!,
+            areaId: proj.areaId,
+            projectId: proj.id,
             incomeSourceId: v.fuente_id,
             category: v.categoria,
             description: v.descripcion,

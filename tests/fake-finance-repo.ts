@@ -75,6 +75,7 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
         occurredOn: input.occurredOn,
         areaId: input.areaId,
         incomeSourceId: input.incomeSourceId ?? null,
+        projectId: input.projectId ?? null,
         category: input.category ?? null,
         description: input.description ?? null,
       };
@@ -85,6 +86,27 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
       return [...txs]
         .sort((a, b) => (a.occurredOn < b.occurredOn ? 1 : -1))
         .slice(0, limit);
+    },
+    async byProject() {
+      const acc = new Map<string, { projectId: string; month: string; inflow: number; outflow: number; movs: number }>();
+      for (const t of txs) {
+        if (!t.projectId) continue;
+        const month = `${t.occurredOn.slice(0, 7)}-01`;
+        const key = `${t.projectId}|${month}`;
+        const cur = acc.get(key) ?? { projectId: t.projectId, month, inflow: 0, outflow: 0, movs: 0 };
+        if (t.direction === 'in') cur.inflow += t.baseAmountMinor;
+        else cur.outflow += t.baseAmountMinor;
+        cur.movs += 1;
+        acc.set(key, cur);
+      }
+      return [...acc.values()].map((r) => ({
+        projectId: r.projectId,
+        month: r.month,
+        inflowMinor: r.inflow,
+        outflowMinor: r.outflow,
+        netMinor: r.inflow - r.outflow,
+        movements: r.movs,
+      }));
     },
     async cashflowMonthly() {
       // Agrega _txs por (área, mes) como la vista fin_cashflow_monthly.
