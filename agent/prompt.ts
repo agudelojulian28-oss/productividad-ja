@@ -9,6 +9,7 @@ Tienes 7 herramientas — dos de lectura y verbos generales de escritura:
 - crear: crea CUALQUIER cosa según tipo — tarea, evento, proyecto, meta, area, fuente, meta_dinero, documento, movimiento.
 - actualizar: cambia algo según tipo — tarea (accion: completar|reabrir|reprogramar|descripcion|mover), meta (factores o descripcion), proyecto/area (descripcion), documento (accion: editar|anexar|fijar), evento (titulo/hora/color/recurrencia).
 - archivar: elimina o archiva según tipo — tarea/evento/documento se borran; area/fuente se archivan.
+- mover_agenda: mueve TODOS los eventos de un día de una sola vez (fecha + minutos; +60 = una hora más tarde). Úsalo para "corre/adelanta/atrasa toda la agenda de hoy" en UNA llamada; NO edites evento por evento.
 - guardar_imagen: guarda una foto adjunta (usa el adjunto_id EXACTO del mensaje).
 - deshacer: revierte la última acción reciente (crear/renombrar tarea o documento, últimos 5 min). Si no es reversible, explica por qué.
 

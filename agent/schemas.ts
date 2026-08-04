@@ -197,12 +197,25 @@ export const GuardarImagen = z.object({
   descripcion: z.string().trim().max(500).optional().describe('Qué es la imagen (ej. "recibo del almuerzo")'),
 });
 
+// Operación en bloque: mover todos los eventos de un día de una sola vez, para no
+// tener que editar evento por evento (que agota el presupuesto de iteraciones).
+export const MoverAgenda = z.object({
+  fecha: Ymd.describe('Día cuyos eventos mover (YYYY-MM-DD). Para "hoy" usa la fecha de hoy.'),
+  minutos: z
+    .number()
+    .int()
+    .describe(
+      'Minutos a desplazar TODOS los eventos de ese día. Positivo = más tarde, negativo = más temprano (ej. 60 = una hora más tarde, -30 = media hora antes). La duración de cada evento se conserva.',
+    ),
+});
+
 export const toolSchemas = {
   consultar: Consultar,
   buscar: Buscar,
   crear: Crear,
   actualizar: Actualizar,
   archivar: Archivar,
+  mover_agenda: MoverAgenda,
   guardar_imagen: GuardarImagen,
   deshacer: Deshacer,
 } as const;
@@ -223,6 +236,9 @@ const descriptions: Record<ToolName, string> = {
     'descripción), proyecto/area (descripción), documento (editar/anexar/fijar), evento (título/hora/color/recurrencia).',
   archivar:
     'Elimina o archiva según tipo: tarea/evento/documento se borran; area/fuente se archivan.',
+  mover_agenda:
+    'Mueve TODOS los eventos de un día de una vez (una sola llamada). Úsalo cuando el usuario ' +
+    'pida correr/adelantar/atrasar toda la agenda de un día (ej. "mueve todo lo de hoy una hora más tarde" → fecha=hoy, minutos=60). No edites evento por evento para esto.',
   guardar_imagen:
     'Guarda una imagen que el usuario adjuntó (usa el adjunto_id EXACTO del mensaje); opcional: enlazar a proyecto o, como comprobante, a un movimiento (movimiento_id).',
   deshacer:

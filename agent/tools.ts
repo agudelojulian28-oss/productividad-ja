@@ -22,7 +22,16 @@ import { createArea, archiveArea, setAreaDescription } from '@/core/structure/ar
 import { createDocument, appendToDocument, updateDocument, deleteDocument } from '@/core/structure/documents';
 import { saveAttachment } from '@/core/structure/attachments';
 import { planUndo, type AuditEntry } from '@/lib/undo';
-import { Consultar, Buscar, Crear, Actualizar, Archivar, GuardarImagen, type ToolName } from './schemas';
+import {
+  Consultar,
+  Buscar,
+  Crear,
+  Actualizar,
+  Archivar,
+  GuardarImagen,
+  MoverAgenda,
+  type ToolName,
+} from './schemas';
 import type { ZodType } from 'zod';
 import type { GEvent } from '@/adapters/google/calendar';
 import { nameToColorId } from '@/lib/calendar-colors';
@@ -491,6 +500,30 @@ export async function runTool(
         }
       }
       return err('INVALID_INPUT', 'Tipo desconocido');
+    }
+
+    case 'mover_agenda': {
+      const p = parse(MoverAgenda, rawInput);
+      if (!p.ok) return p;
+      if (!deps.listCalendar || !deps.editEvent || !(await calendarReady(deps))) {
+        return err('EXTERNAL_ERROR', CAL_OFF);
+      }
+      const { fecha, minutos } = p.value;
+      // En UNA sola llamada: lista el día y desplaza cada evento. El cálculo de la
+      // hora nueva lo hace el código (editEvent conserva la duración), no el modelo.
+      const eventos = await deps.listCalendar(fecha);
+      const movibles = eventos.filter((e) => e.start && !e.allDay);
+      let movidos = 0;
+      for (const e of movibles) {
+        const nuevoInicio = new Date(new Date(e.start!).getTime() + minutos * 60000).toISOString();
+        try {
+          await deps.editEvent(e.id, { fecha: nuevoInicio });
+          movidos++;
+        } catch {
+          // Si uno falla, sigue con los demás; se reporta cuántos se movieron.
+        }
+      }
+      return ok({ movidos, de_total: eventos.length, minutos, fecha });
     }
 
     case 'guardar_imagen': {

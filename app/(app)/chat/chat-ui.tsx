@@ -13,6 +13,7 @@ const toolLabels: Record<string, string> = {
   crear: 'creó algo',
   actualizar: 'actualizó algo',
   archivar: 'archivó algo',
+  mover_agenda: 'movió la agenda del día',
   guardar_imagen: 'guardó una imagen',
   deshacer: 'deshizo la última acción',
 };
