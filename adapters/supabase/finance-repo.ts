@@ -145,12 +145,12 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
     },
 
     async insertMoneyGoal(input) {
-      // Meta de dinero: metric money_in/money_net, en COP (base), sin proyecto.
+      // Meta de dinero: metric money_in/money_net, en COP (base), atribuida a un proyecto.
       const { data, error } = await supabase
         .from('goals')
         .insert({
           user_id: userId,
-          project_id: null,
+          project_id: input.projectId,
           area_id: input.areaId ?? null,
           income_source_id: input.incomeSourceId ?? null,
           title: input.title,

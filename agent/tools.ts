@@ -307,12 +307,14 @@ export async function runTool(
         }
         case 'meta_dinero': {
           if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          if (!v.proyecto_id) {
+            return err('NOT_FOUND', 'Indica un proyecto (proyecto_id) para la meta de dinero');
+          }
           const r = await createMoneyGoal(ctx, deps.finance, {
             title: v.titulo!,
             metric: v.metrica!,
             targetValue: v.objetivo!,
-            areaId: v.area_id,
-            incomeSourceId: v.fuente_id,
+            projectId: v.proyecto_id,
             periodStart: v.desde!,
             periodEnd: v.hasta!,
           });

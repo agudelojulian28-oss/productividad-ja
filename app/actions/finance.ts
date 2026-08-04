@@ -44,6 +44,7 @@ export async function createMoneyGoalAction(input: {
   title: string;
   metric: 'money_in' | 'money_net';
   targetValue: number;
+  projectId: string;
   areaId?: string;
   incomeSourceId?: string;
   periodStart: string;

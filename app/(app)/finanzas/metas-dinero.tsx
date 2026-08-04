@@ -5,8 +5,7 @@ import { createMoneyGoalAction } from '@/app/actions/finance';
 import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
 
-type Area = { id: string; name: string };
-type Source = { id: string; name: string; areaId: string };
+type Project = { id: string; title: string };
 export type MetaProgreso = {
   goalId: string;
   title: string;
@@ -26,20 +25,18 @@ function lastOfMonth(ymd: string): string {
 }
 
 export function MetasDinero({
-  areas,
-  sources,
+  projects,
   metas,
   today,
 }: {
-  areas: Area[];
-  sources: Source[];
+  projects: Project[];
   metas: MetaProgreso[];
   today: string;
 }) {
   const [title, setTitle] = useState('');
   const [metric, setMetric] = useState<'money_in' | 'money_net'>('money_in');
   const [objetivo, setObjetivo] = useState('');
-  const [scope, setScope] = useState(areas[0] ? `area:${areas[0].id}` : '');
+  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
   const [desde, setDesde] = useState(firstOfMonth(today));
   const [hasta, setHasta] = useState(lastOfMonth(today));
   const [error, setError] = useState<string | null>(null);
@@ -52,15 +49,13 @@ export function MetasDinero({
     const minor = parseAmountToMinor(objetivo);
     if (!t) return setError('Ponle un nombre a la meta');
     if (!minor) return setError('Objetivo inválido');
-    if (!scope) return setError('Elige un área o una fuente');
-    const [kind, id] = scope.split(':');
+    if (!projectId) return setError('Elige un proyecto');
     startTransition(async () => {
       const res = await createMoneyGoalAction({
         title: t,
         metric,
         targetValue: minor / 100, // pesos
-        areaId: kind === 'area' ? id : undefined,
-        incomeSourceId: kind === 'src' ? id : undefined,
+        projectId,
         periodStart: desde,
         periodEnd: hasta,
       });
@@ -143,27 +138,17 @@ export function MetasDinero({
           />
         </div>
         <select
-          value={scope}
-          onChange={(e) => setScope(e.target.value)}
+          value={projectId}
+          onChange={(e) => setProjectId(e.target.value)}
           className="field"
-          aria-label="Alcance de la meta"
+          aria-label="Proyecto de la meta"
         >
-          <optgroup label="Área">
-            {areas.map((a) => (
-              <option key={a.id} value={`area:${a.id}`}>
-                Todo el área: {a.name}
-              </option>
-            ))}
-          </optgroup>
-          {sources.length > 0 && (
-            <optgroup label="Fuente de ingreso">
-              {sources.map((s) => (
-                <option key={s.id} value={`src:${s.id}`}>
-                  Fuente: {s.name}
-                </option>
-              ))}
-            </optgroup>
-          )}
+          {projects.length === 0 && <option value="">Crea un proyecto primero</option>}
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.title}
+            </option>
+          ))}
         </select>
         <div className="new-task-row">
           <label className="cal-field-label" style={{ flex: 1 }}>

@@ -57,14 +57,15 @@ describe('runTool · crear (verbos generales)', () => {
     expect((await d.fin.listIncomeSources()).length).toBe(1);
   });
 
-  it('crea meta de dinero', async () => {
+  it('crea meta de dinero bajo un proyecto', async () => {
     const d = deps();
+    const p = await d.repo.insertProject({ title: 'P', areaId: AREA });
     const r = await runTool(d, 'crear', {
       tipo: 'meta_dinero',
       titulo: 'Ingresos julio',
       metrica: 'money_in',
       objetivo: 20_000_000,
-      area_id: AREA,
+      proyecto_id: p.id,
       desde: '2026-07-01',
       hasta: '2026-07-31',
     });

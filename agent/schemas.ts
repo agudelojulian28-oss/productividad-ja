@@ -122,7 +122,7 @@ export const Crear = z
             !!d.titulo &&
             !!d.metrica &&
             d.objetivo != null &&
-            (!!d.area_id || !!d.fuente_id) &&
+            !!d.proyecto_id &&
             !!d.desde &&
             !!d.hasta
           );

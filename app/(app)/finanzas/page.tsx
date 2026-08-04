@@ -22,9 +22,7 @@ export default async function FinanzasPage() {
   const finance = financeRepo(supabase, ctx.userId);
   const work = workRepo(supabase, ctx.userId);
 
-  const [areas, sources, projects, cashflow, byProj, metas] = await Promise.all([
-    structure.listAreas(),
-    finance.listIncomeSources(),
+  const [projects, cashflow, byProj, metas] = await Promise.all([
     work.listProjects(),
     finance.cashflowMonthly(),
     finance.byProject(),
@@ -80,13 +78,6 @@ export default async function FinanzasPage() {
     receiptUrl: receiptUrl.get(t.id) ?? null,
   }));
 
-  const areaOpts = areas.map((a) => ({ id: a.id, name: a.name }));
-  const sourceOpts = sources.map((s) => ({
-    id: s.id,
-    name: s.name,
-    areaId: s.areaId,
-    model: s.model,
-  }));
   // Solo proyectos con área pueden recibir dinero (la transacción exige área).
   const projectOpts = projects
     .filter((p) => p.areaId)
@@ -169,8 +160,7 @@ export default async function FinanzasPage() {
               <section className="fin-block">
                 <h2 className="fin-h2">Metas de dinero</h2>
                 <MetasDinero
-                  areas={areaOpts}
-                  sources={sourceOpts}
+                  projects={projectOpts}
                   metas={metas.map((m) => ({
                     goalId: m.goalId,
                     title: m.title,

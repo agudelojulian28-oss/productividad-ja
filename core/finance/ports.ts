@@ -110,6 +110,7 @@ export interface MoneyGoalInsert {
   title: string;
   metric: 'money_in' | 'money_net';
   targetValue: number; // en pesos (COP)
+  projectId: string;
   areaId?: string;
   incomeSourceId?: string;
   periodStart: string;

@@ -56,14 +56,12 @@ export const MoneyGoalCreate = z
     metric: z.enum(MONEY_METRICS),
     /** Objetivo en pesos (COP), no en centavos. */
     targetValue: z.number().positive().max(1_000_000_000_000),
+    /** Proyecto al que se atribuye la meta de dinero (ADR-026). */
+    projectId: z.uuid(),
     areaId: z.uuid().optional(),
     incomeSourceId: z.uuid().optional(),
     periodStart: Ymd,
     periodEnd: Ymd,
-  })
-  .refine((d) => !!d.areaId || !!d.incomeSourceId, {
-    message: 'La meta necesita un área o una fuente',
-    path: ['areaId'],
   })
   .refine((d) => d.periodStart <= d.periodEnd, {
     message: 'El inicio no puede ser posterior al cumplimiento',
