@@ -343,6 +343,7 @@ export async function runTool(
             areaId: v.area_id!,
             incomeSourceId: v.fuente_id,
             category: v.categoria,
+            description: v.descripcion,
             occurredOn: v.desde, // opcional; el core usa hoy si falta
             fxRate: v.tasa,
           });

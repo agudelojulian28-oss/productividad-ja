@@ -24,6 +24,7 @@ export function RegistrarMovimiento({
   const [areaId, setAreaId] = useState(areas[0]?.id ?? '');
   const [sourceId, setSourceId] = useState('');
   const [category, setCategory] = useState('');
+  const [descripcion, setDescripcion] = useState('');
   const [occurredOn, setOccurredOn] = useState(today);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
@@ -58,6 +59,7 @@ export function RegistrarMovimiento({
         areaId,
         incomeSourceId: direction === 'in' ? sourceId : undefined,
         category: category.trim() || undefined,
+        description: descripcion.trim() || undefined,
         occurredOn,
         fxRate: currency === 'USD' ? fxRate : undefined,
       });
@@ -65,6 +67,7 @@ export function RegistrarMovimiento({
       else {
         setMonto('');
         setCategory('');
+        setDescripcion('');
         setFx('');
         setOkMsg(
           `${direction === 'in' ? 'Ingreso' : 'Gasto'} registrado: ${money(res.value.baseAmountMinor)}`,
@@ -189,6 +192,18 @@ export function RegistrarMovimiento({
           />
         </label>
       )}
+
+      <label className="cal-field-label">
+        Descripción (opcional)
+        <input
+          type="text"
+          placeholder="ej. almuerzo con cliente, factura #044"
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+          className="field"
+          autoComplete="off"
+        />
+      </label>
 
       <label className="cal-field-label">
         Fecha

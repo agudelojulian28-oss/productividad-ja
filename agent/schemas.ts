@@ -98,7 +98,7 @@ export const Crear = z
     categoria: z.string().trim().max(80).optional().describe('Solo movimiento gasto (ej. almuerzo)'),
     contenido: z.string().max(100_000).optional().describe('Solo documento: cuerpo (markdown)'),
     clase_doc: z.enum(['proceso', 'preferencia', 'nota']).optional().describe('Solo documento (por defecto nota)'),
-    descripcion: z.string().max(5000).optional().describe('Solo evento: notas'),
+    descripcion: z.string().max(5000).optional().describe('evento: notas · movimiento: concepto (ej. "almuerzo con cliente"), máx 500'),
     color: z.enum(COLOR_NAMES).optional().describe('Solo evento'),
     duracion_min: z.number().int().min(5).max(1440).optional().describe('Solo evento: minutos (30 def)'),
   })
