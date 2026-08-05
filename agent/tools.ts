@@ -13,9 +13,8 @@ import { createGoal, updateGoal, setGoalDescription } from '@/core/work/goals';
 import { consultar, buscar } from '@/core/work/queries';
 import type { FinanceRepo } from '@/core/finance/ports';
 import { registrarMovimiento } from '@/core/finance/transactions';
-import { createIncomeSource, archiveIncomeSource } from '@/core/finance/income-sources';
 import { createMoneyGoal } from '@/core/finance/goals';
-import { resumenFinanciero, porFuente, topGastos } from '@/core/finance/queries';
+import { resumenFinanciero, topGastos } from '@/core/finance/queries';
 import { detectarChoques, huecosLibres } from '@/lib/agenda';
 import type { StructureRepo } from '@/core/structure/ports';
 import { createArea, archiveArea, setAreaDescription } from '@/core/structure/areas';
@@ -214,13 +213,23 @@ export async function runTool(
           ultimo_registro_hace_dias: r.staleDays,
         });
       }
-      if (vista === 'por_fuente') {
+      if (vista === 'por_proyecto') {
+        const rows = await fin.byProject();
+        const projects = await repo.listProjects();
+        const nombre = new Map(projects.map((p) => [p.id, p.title] as const));
+        const agg = new Map<string, { inflow: number; outflow: number }>();
+        for (const r of rows) {
+          const cur = agg.get(r.projectId) ?? { inflow: 0, outflow: 0 };
+          cur.inflow += r.inflowMinor;
+          cur.outflow += r.outflowMinor;
+          agg.set(r.projectId, cur);
+        }
         return ok(
-          porFuente(await fin.bySource()).map((f) => ({
-            fuente: f.name,
-            area: f.area,
-            este_mes: money(f.thisMonthMinor),
-            ultimos_12_meses: money(f.ttmMinor),
+          [...agg].map(([pid, v]) => ({
+            proyecto: nombre.get(pid) ?? '—',
+            ingresos: money(v.inflow),
+            gastos: money(v.outflow),
+            neto: money(v.inflow - v.outflow),
           })),
         );
       }
@@ -305,15 +314,6 @@ export async function runTool(
           const r = await createArea(ctx, deps.structure, { name: v.titulo!, kind: v.clase! });
           return r.ok ? ok({ area_id: r.value.id, nombre: r.value.name }) : r;
         }
-        case 'fuente': {
-          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
-          const r = await createIncomeSource(ctx, deps.finance, {
-            areaId: v.area_id!,
-            name: v.titulo!,
-            model: v.modelo!,
-          });
-          return r.ok ? ok({ fuente_id: r.value.id, nombre: r.value.name }) : r;
-        }
         case 'meta_dinero': {
           if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
           if (!v.proyecto_id) {
@@ -358,7 +358,6 @@ export async function runTool(
             currency: v.moneda ?? 'COP',
             areaId: proj.areaId,
             projectId: proj.id,
-            incomeSourceId: v.fuente_id,
             category: v.categoria,
             description: v.descripcion,
             occurredOn: v.desde, // opcional; el core usa hoy si falta
@@ -482,11 +481,6 @@ export async function runTool(
         case 'area': {
           if (!deps.structure) return err('EXTERNAL_ERROR', 'No disponible');
           const r = await archiveArea(ctx, deps.structure, v.id);
-          return r.ok ? ok({ archivada: v.id }) : r;
-        }
-        case 'fuente': {
-          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
-          const r = await archiveIncomeSource(ctx, deps.finance, v.id);
           return r.ok ? ok({ archivada: v.id }) : r;
         }
         case 'evento': {

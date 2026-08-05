@@ -45,17 +45,6 @@ describe('runTool · crear (verbos generales)', () => {
     expect(r.ok).toBe(true);
   });
 
-  it('crea fuente de ingreso', async () => {
-    const d = deps();
-    const r = await runTool(d, 'crear', {
-      tipo: 'fuente',
-      titulo: 'Consultoría',
-      area_id: AREA,
-      modelo: 'servicio',
-    });
-    expect(r.ok).toBe(true);
-    expect((await d.fin.listIncomeSources()).length).toBe(1);
-  });
 
   it('crea meta de dinero bajo un proyecto', async () => {
     const d = deps();
@@ -127,11 +116,4 @@ describe('runTool · actualizar / archivar', () => {
     expect(await d.repo.getTask(t.id)).toBeNull();
   });
 
-  it('archiva una fuente', async () => {
-    const d = deps();
-    const s = await d.fin.insertIncomeSource({ areaId: AREA, name: 'C', model: 'servicio' });
-    const r = await runTool(d, 'archivar', { tipo: 'fuente', id: s.id });
-    expect(r.ok).toBe(true);
-    expect((await d.fin.listIncomeSources()).length).toBe(0);
-  });
 });

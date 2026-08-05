@@ -6,7 +6,6 @@ const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?([+-]\d{
 const Instant = z.string().regex(ISO_WITH_OFFSET, 'ISO-8601 con offset (ej. 2026-07-24T16:00:00-05:00)');
 const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Día YYYY-MM-DD');
 
-const INCOME_MODELS = ['servicio', 'producto', 'suscripcion', 'empleo', 'inversion', 'otro'] as const;
 
 const Alcance = z
   .enum(['serie', 'instancia'])
@@ -35,7 +34,7 @@ export const Consultar = z.object({
       'estructura',
       'documentacion',
       'resumen_financiero',
-      'por_fuente',
+      'por_proyecto',
       'gastos',
       'por_cobrar',
       'pipeline',
@@ -45,7 +44,7 @@ export const Consultar = z.object({
     .describe(
       'Qué consultar. Trabajo: agenda_hoy (tareas+eventos de hoy), agenda (eventos de un día, usa fecha), ' +
         'pendientes (tareas), estructura (áreas, proyectos y metas con sus IDs), documentacion (el método). ' +
-        'Dinero: resumen_financiero, por_fuente, gastos, por_cobrar, pipeline. ' +
+        'Dinero: resumen_financiero, por_proyecto (ingresos/gastos por proyecto), gastos, por_cobrar, pipeline. ' +
         'Agenda: conflictos (solapes próximos 7 días), huecos (ratos libres; usa duracion_min).',
     ),
   fecha: Ymd.optional().describe('Solo vista=agenda: día YYYY-MM-DD (por defecto hoy)'),
@@ -67,7 +66,6 @@ export const Crear = z
         'proyecto',
         'meta',
         'area',
-        'fuente',
         'meta_dinero',
         'documento',
         'movimiento',
@@ -79,18 +77,21 @@ export const Crear = z
       .min(1)
       .max(200)
       .optional()
-      .describe('Título/nombre. Requerido para: tarea, evento, proyecto, meta, area, fuente, documento'),
-    area_id: z.uuid().optional().describe('Área. Requerido: proyecto, fuente. Opcional: meta_dinero, documento'),
-    proyecto_id: z.uuid().optional().describe('Proyecto. Requerido: meta, movimiento (el dinero se atribuye al proyecto). Opcional: tarea, evento, documento'),
+      .describe('Título/nombre. Requerido para: tarea, evento, proyecto, meta, area, documento'),
+    area_id: z.uuid().optional().describe('Área. Requerido: proyecto. Opcional: documento'),
+    proyecto_id: z
+      .uuid()
+      .optional()
+      .describe(
+        'Proyecto. El dinero (movimiento y meta_dinero) SIEMPRE se atribuye a un proyecto. Requerido: meta, meta_dinero, movimiento. Opcional: tarea, evento, documento',
+      ),
     meta_id: z.uuid().optional().describe('Meta. Opcional: tarea, evento'),
-    fuente_id: z.uuid().optional().describe('Fuente de ingreso (legado). Solo meta_dinero (alcance)'),
     fecha: Instant.optional().describe('Inicio con offset. tarea (vence, opcional), evento (inicio, requerido)'),
     desde: Ymd.optional().describe('Inicio YYYY-MM-DD. meta / meta_dinero'),
     hasta: Ymd.optional().describe('Fin/cumplimiento YYYY-MM-DD. meta / meta_dinero'),
     objetivo: z.number().positive().optional().describe('Cantidad objetivo. meta (nº) / meta_dinero (pesos)'),
     metrica: z.enum(['money_in', 'money_net']).optional().describe('Solo meta_dinero: ingresos o neto'),
     clase: z.enum(['negocio', 'personal']).optional().describe('Solo area: negocio o personal'),
-    modelo: z.enum(INCOME_MODELS).optional().describe('Solo fuente: servicio/producto/suscripcion/empleo/inversion/otro'),
     direccion: z.enum(['ingreso', 'gasto']).optional().describe('Solo movimiento'),
     monto: z.number().positive().optional().describe('Solo movimiento: en la moneda, NO centavos (ej. 50000, 12.5)'),
     moneda: z.enum(['COP', 'USD']).optional().describe('Solo movimiento (por defecto COP)'),
@@ -115,8 +116,6 @@ export const Crear = z
           return !!d.titulo && !!d.proyecto_id;
         case 'area':
           return !!d.titulo && !!d.clase;
-        case 'fuente':
-          return !!d.titulo && !!d.area_id && !!d.modelo;
         case 'meta_dinero':
           return (
             !!d.titulo &&
@@ -178,8 +177,8 @@ export const Actualizar = z
 // ── archivar / borrar (unión por tipo) ──────────────────────────────────────
 export const Archivar = z.object({
   tipo: z
-    .enum(['tarea', 'evento', 'documento', 'area', 'fuente'])
-    .describe('Qué eliminar/archivar. tarea/evento/documento se borran; area/fuente se archivan'),
+    .enum(['tarea', 'evento', 'documento', 'area'])
+    .describe('Qué eliminar/archivar. tarea/evento/documento se borran; area se archiva'),
   id: z.string().min(1).describe('ID (uuid; para evento el id de Google)'),
   alcance: Alcance.optional().describe('Solo evento: serie o instancia (por defecto serie)'),
 });
@@ -226,16 +225,17 @@ export const isToolName = (n: string): n is ToolName => n in toolSchemas;
 const descriptions: Record<ToolName, string> = {
   consultar:
     'Lee información: agenda_hoy, agenda (día), pendientes, estructura (IDs de áreas/proyectos/metas), ' +
-    'documentacion, resumen_financiero, por_fuente, gastos, por_cobrar, pipeline, conflictos, huecos.',
+    'documentacion, resumen_financiero, por_proyecto, gastos, por_cobrar, pipeline, conflictos, huecos.',
   buscar: 'Busca por texto en las tareas.',
   crear:
     'Crea CUALQUIER cosa del dominio según tipo: tarea, evento (Google Calendar), proyecto, meta, ' +
-    'area, fuente (de ingreso), meta_dinero, documento (del método) o movimiento (ingreso/gasto).',
+    'area, meta_dinero, documento (del método) o movimiento (ingreso/gasto). El dinero (movimiento y ' +
+    'meta_dinero) SIEMPRE se atribuye a un proyecto (proyecto_id de consultar estructura).',
   actualizar:
     'Actualiza según tipo: tarea (completar/reabrir/reprogramar/descripción/mover), meta (factores/' +
     'descripción), proyecto/area (descripción), documento (editar/anexar/fijar), evento (título/hora/color/recurrencia).',
   archivar:
-    'Elimina o archiva según tipo: tarea/evento/documento se borran; area/fuente se archivan.',
+    'Elimina o archiva según tipo: tarea/evento/documento se borran; area se archiva.',
   mover_agenda:
     'Mueve TODOS los eventos de un día de una vez (una sola llamada). Úsalo cuando el usuario ' +
     'pida correr/adelantar/atrasar toda la agenda de un día (ej. "mueve todo lo de hoy una hora más tarde" → fecha=hoy, minutos=60). No edites evento por evento para esto.',
