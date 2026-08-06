@@ -35,20 +35,25 @@ export function getWebConversation(supabase: ServerSupabase, userId: string): Pr
   return getConversation(supabase, userId, 'web');
 }
 
+/** Carga los mensajes MÁS RECIENTES de la conversación (no los más antiguos), en orden
+ *  cronológico, para que el agente siempre vea el turno inmediato (ej. su propia pregunta
+ *  "¿confirmo?" antes de un "sí"). Con `ascending: true` cargaba los primeros 50 y en un
+ *  historial largo perdía el contexto reciente. */
 export async function loadMessages(
   supabase: ServerSupabase,
   conversationId: string,
+  limit = 60,
 ): Promise<ChatMessage[]> {
   const { data } = await supabase
     .from('messages')
     .select('role,content')
     .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true })
-    .limit(50);
-  return ((data as { role: 'user' | 'assistant'; content: string }[] | null) ?? []).map((m) => ({
-    role: m.role,
-    text: m.content,
-  }));
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  const rows = (data as { role: 'user' | 'assistant'; content: string }[] | null) ?? [];
+  return rows
+    .reverse()
+    .map((m) => ({ role: m.role, text: m.content }));
 }
 
 export async function saveMessage(
