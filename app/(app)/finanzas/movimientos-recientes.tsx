@@ -20,16 +20,24 @@ export function MovimientosRecientes({ rows }: { rows: MovRow[] }) {
     <div className="mov-list">
       {rows.map((m) => (
         <div key={m.id} className="mov-row">
-          <div className="mov-thumb">
-            {m.receiptUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
+          {m.receiptUrl ? (
+            <a
+              className="mov-thumb"
+              href={m.receiptUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Ver comprobante"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={m.receiptUrl} alt="comprobante" />
-            ) : (
+            </a>
+          ) : (
+            <div className="mov-thumb">
               <span className="mov-thumb-empty" aria-hidden="true">
                 {m.direction === 'in' ? '↘' : '↗'}
               </span>
-            )}
-          </div>
+            </div>
+          )}
           <div className="mov-body">
             <span className="mov-title">{m.title}</span>
             <span className="mov-meta">

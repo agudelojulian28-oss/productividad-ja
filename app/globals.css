@@ -1641,11 +1641,19 @@ ol {
   flex: 0 0 auto;
   width: 40px;
   height: 40px;
+  min-height: 40px;
   border-radius: 8px;
   overflow: hidden;
   background: var(--surface-2);
   display: grid;
   place-items: center;
+}
+a.mov-thumb {
+  cursor: pointer;
+}
+a.mov-thumb:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .mov-thumb img {
   width: 100%;
