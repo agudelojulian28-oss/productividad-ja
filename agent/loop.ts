@@ -109,7 +109,12 @@ export async function* runAgent(
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const stream = deps.client.messages.stream({
       model: AGENT_MODEL,
-      max_tokens: 1024,
+      max_tokens: 2048,
+      // Agente de despacho de herramientas: SIN razonamiento extendido. Claude 5 lo
+      // activa por defecto y con max_tokens bajo consumía todo el presupuesto pensando
+      // → respondía vacío (stop_reason=max_tokens, solo bloque "thinking"). Desactivarlo
+      // lo hace rápido y evita que se corte la respuesta.
+      thinking: { type: 'disabled' },
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       tools: toolDefinitions as Anthropic.Tool[],
       messages,
