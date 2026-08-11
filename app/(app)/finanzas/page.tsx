@@ -12,6 +12,7 @@ import { CashflowChart } from './cashflow-chart';
 import { MetasDinero } from './metas-dinero';
 import { FinStats } from './fin-stats';
 import { MovimientosRecientes, type MovRow } from './movimientos-recientes';
+import { GastosRecurrentes, type RecurRow } from './gastos-recurrentes';
 import { PageHero } from '../page-hero';
 
 export const dynamic = 'force-dynamic';
@@ -22,12 +23,22 @@ export default async function FinanzasPage() {
   const finance = financeRepo(supabase, ctx.userId);
   const work = workRepo(supabase, ctx.userId);
 
-  const [projects, cashflow, byProj, metas] = await Promise.all([
+  const [projects, cashflow, byProj, metas, recurrentes] = await Promise.all([
     work.listProjects(),
     finance.cashflowMonthly(),
     finance.byProject(),
     finance.moneyGoalsProgress(),
+    finance.listRecurringExpenses(),
   ]);
+  const recurRows: RecurRow[] = recurrentes.map((r) => ({
+    id: r.id,
+    projectId: r.projectId,
+    amountMinor: r.amountMinor,
+    category: r.category,
+    description: r.description,
+    frequency: r.frequency,
+    nextDueOn: r.nextDueOn,
+  }));
 
   const resumen = resumenFinanciero(cashflow, ctx.tz);
   const serie = serieMensual(cashflow, 6);
@@ -132,6 +143,15 @@ export default async function FinanzasPage() {
           <section className="fin-block">
             <h2 className="fin-h2">Movimientos recientes</h2>
             <MovimientosRecientes rows={movRows} />
+          </section>
+
+          <section className="fin-block">
+            <h2 className="fin-h2">Gastos recurrentes</h2>
+            <GastosRecurrentes
+              projects={projectOpts}
+              recurrentes={recurRows}
+              today={todayInTz(ctx.tz)}
+            />
           </section>
 
           {/* Pipeline y discrepancias llegan con las ventas (Etapa 5). */}

@@ -7,6 +7,8 @@ import type {
   CashflowMonthRow,
   BySourceRow,
   ByProjectRow,
+  RecurringExpenseRow,
+  RecurringFrequency,
   ExpenseCategoryRow,
   ReceivableRow,
   PipelineRow,
@@ -62,6 +64,37 @@ function toTx(r: DbTransaction): TransactionRow {
     projectId: r.project_id,
     category: r.category,
     description: r.description,
+  };
+}
+
+interface DbRecurring {
+  id: string;
+  project_id: string;
+  area_id: string;
+  amount_minor: number | string;
+  currency: string;
+  category: string | null;
+  description: string | null;
+  frequency: RecurringFrequency;
+  next_due_on: string;
+  active: boolean;
+}
+
+const REC_COLS =
+  'id,project_id,area_id,amount_minor,currency,category,description,frequency,next_due_on,active';
+
+function toRecurring(r: DbRecurring): RecurringExpenseRow {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    areaId: r.area_id,
+    amountMinor: n(r.amount_minor),
+    currency: r.currency,
+    category: r.category,
+    description: r.description,
+    frequency: r.frequency,
+    nextDueOn: r.next_due_on,
+    active: r.active,
   };
 }
 
@@ -240,6 +273,69 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
           movements: n(r.movements),
         }),
       );
+    },
+
+    async insertRecurringExpense(input) {
+      const { data, error } = await supabase
+        .from('recurring_expenses')
+        .insert({
+          user_id: userId,
+          project_id: input.projectId,
+          area_id: input.areaId,
+          amount_minor: input.amountMinor,
+          currency: input.currency,
+          category: input.category ?? null,
+          description: input.description ?? null,
+          frequency: input.frequency,
+          next_due_on: input.nextDueOn,
+        })
+        .select(REC_COLS)
+        .single();
+      if (error) throw new Error(error.message);
+      return toRecurring(data as DbRecurring);
+    },
+
+    async listRecurringExpenses() {
+      const { data, error } = await supabase
+        .from('recurring_expenses')
+        .select(REC_COLS)
+        .eq('active', true)
+        .order('next_due_on', { ascending: true });
+      if (error) throw new Error(error.message);
+      return ((data as DbRecurring[] | null) ?? []).map(toRecurring);
+    },
+
+    async getRecurringExpense(id) {
+      const { data, error } = await supabase
+        .from('recurring_expenses')
+        .select(REC_COLS)
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? toRecurring(data as DbRecurring) : null;
+    },
+
+    async updateRecurringExpense(id, patch) {
+      const upd: Record<string, unknown> = {};
+      if (patch.amountMinor !== undefined) upd.amount_minor = patch.amountMinor;
+      if (patch.category !== undefined) upd.category = patch.category;
+      if (patch.description !== undefined) upd.description = patch.description;
+      if (patch.frequency !== undefined) upd.frequency = patch.frequency;
+      if (patch.nextDueOn !== undefined) upd.next_due_on = patch.nextDueOn;
+      if (patch.active !== undefined) upd.active = patch.active;
+      const { data, error } = await supabase
+        .from('recurring_expenses')
+        .update(upd)
+        .eq('id', id)
+        .select(REC_COLS)
+        .single();
+      if (error) throw new Error(error.message);
+      return toRecurring(data as DbRecurring);
+    },
+
+    async deleteRecurringExpense(id) {
+      const { error } = await supabase.from('recurring_expenses').delete().eq('id', id);
+      if (error) throw new Error(error.message);
     },
 
     async expensesByCategory() {

@@ -52,6 +52,47 @@ export interface TransactionInsert {
   description?: string;
 }
 
+export type RecurringFrequency =
+  | 'semanal'
+  | 'quincenal'
+  | 'mensual'
+  | 'bimestral'
+  | 'trimestral'
+  | 'anual';
+
+export interface RecurringExpenseRow {
+  id: string;
+  projectId: string;
+  areaId: string;
+  amountMinor: number;
+  currency: string;
+  category: string | null;
+  description: string | null;
+  frequency: RecurringFrequency;
+  nextDueOn: string; // YYYY-MM-DD
+  active: boolean;
+}
+
+export interface RecurringExpenseInsert {
+  projectId: string;
+  areaId: string;
+  amountMinor: number;
+  currency: string;
+  category?: string;
+  description?: string;
+  frequency: RecurringFrequency;
+  nextDueOn: string;
+}
+
+export interface RecurringExpensePatch {
+  amountMinor?: number;
+  category?: string | null;
+  description?: string | null;
+  frequency?: RecurringFrequency;
+  nextDueOn?: string;
+  active?: boolean;
+}
+
 export interface ByProjectRow {
   projectId: string;
   month: string; // YYYY-MM-DD (primero del mes)
@@ -138,6 +179,12 @@ export interface FinanceRepo {
   insertTransaction(input: TransactionInsert): Promise<TransactionRow>;
   listRecentTransactions(limit?: number): Promise<TransactionRow[]>;
   byProject(): Promise<ByProjectRow[]>;
+
+  insertRecurringExpense(input: RecurringExpenseInsert): Promise<RecurringExpenseRow>;
+  listRecurringExpenses(): Promise<RecurringExpenseRow[]>;
+  getRecurringExpense(id: string): Promise<RecurringExpenseRow | null>;
+  updateRecurringExpense(id: string, patch: RecurringExpensePatch): Promise<RecurringExpenseRow>;
+  deleteRecurringExpense(id: string): Promise<void>;
 
   insertMoneyGoal(input: MoneyGoalInsert): Promise<{ id: string }>;
   moneyGoalsProgress(): Promise<MoneyGoalProgressRow[]>;

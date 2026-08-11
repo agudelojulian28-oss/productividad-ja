@@ -678,3 +678,31 @@ formulario confuso). Solo ingresos por proyecto (el balance por proyecto quedar�
 **Consecuencias.** El módulo de finanzas pasa a girar en torno a proyectos. Las metas de dinero siguen
 usando área/fuente por ahora (no se tocaron). No se migran datos viejos (la cuenta casi no tenía). Las
 vistas `fin_by_source`/`goal_progress` siguen existiendo; las fuentes son legado.
+
+---
+
+## ADR-027 · Gastos recurrentes
+
+**Estado:** aceptado · **Fecha:** 2026-08-05
+
+**Contexto.** Julián tiene gastos que se repiten (arriendo, suscripciones). Quería verlos y
+editarlos en Finanzas, y que al llegar la fecha la app le pida rectificar si el gasto se hizo,
+con opción de editar el monto y adjuntar comprobante.
+
+**Decisión.**
+- Tabla `recurring_expenses` = **plantilla** de un gasto que se repite (proyecto, área
+  desnormalizada, monto, categoría, descripción, frecuencia, próxima fecha, activo). El dinero
+  se atribuye a un proyecto (ADR-026). El comprobante NO va en la plantilla: va en la
+  transacción de cada instancia (attachments.transaction_id, ADR reciente).
+- Frecuencias: semanal/quincenal/mensual/bimestral/trimestral/anual. `nextDue()` calcula la
+  próxima fecha conservando el día sin desbordar (31 ene → 28 feb).
+- **Confirmar** un recurrente vencido = crear la transacción real (monto editable) + avanzar
+  `next_due_on` + adjuntar comprobante opcional. **Omitir** = solo avanzar la fecha.
+- UI: sección "Gastos recurrentes" en Finanzas (CRUD) + **pop-up de rectificación** montado en
+  el layout (aparece en toda la app cuando `next_due_on <= hoy`), con editar monto, adjuntar
+  comprobante, "Sí, registrar" / "No se hizo" / "Ahora no".
+- Notificación: el **resumen diario de WhatsApp** (cron existente) lista los recurrentes por
+  confirmar. No se agrega push del navegador (requiere infra web-push aparte; queda pendiente).
+
+**Consecuencias.** Cero cron nuevo (reusa el resumen). El pop-up corre un fetch ligero en el
+layout por navegación. La confirmación reusa `registrarMovimiento` y el adjunto de comprobante.

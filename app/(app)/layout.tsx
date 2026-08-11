@@ -2,10 +2,12 @@ import Link from 'next/link';
 import { signOut } from '@/app/actions/auth';
 import { BottomNav } from './bottom-nav';
 import { Sidebar } from './sidebar';
+import { RecurrentesGate } from './recurrentes-gate';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="app">
+      <RecurrentesGate />
       <Sidebar />
       <div className="shell">
       <header className="shell-header">

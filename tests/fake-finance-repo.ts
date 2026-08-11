@@ -7,16 +7,19 @@ import type {
   TransactionInsert,
   MoneyGoalInsert,
   MoneyGoalProgressRow,
+  RecurringExpenseRow,
 } from '@/core/finance/ports';
 
 export function makeFakeFinanceRepo(): FinanceRepo & {
   _sources: Map<string, IncomeSourceRow>;
   _txs: TransactionRow[];
   _goals: MoneyGoalProgressRow[];
+  _recurring: Map<string, RecurringExpenseRow>;
 } {
   const sources = new Map<string, IncomeSourceRow>();
   const txs: TransactionRow[] = [];
   const goals: MoneyGoalProgressRow[] = [];
+  const recurring = new Map<string, RecurringExpenseRow>();
   let seq = 0;
   const uuid = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`;
 
@@ -24,6 +27,47 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
     _sources: sources,
     _txs: txs,
     _goals: goals,
+    _recurring: recurring,
+    async insertRecurringExpense(input) {
+      const row: RecurringExpenseRow = {
+        id: uuid(),
+        projectId: input.projectId,
+        areaId: input.areaId,
+        amountMinor: input.amountMinor,
+        currency: input.currency,
+        category: input.category ?? null,
+        description: input.description ?? null,
+        frequency: input.frequency,
+        nextDueOn: input.nextDueOn,
+        active: true,
+      };
+      recurring.set(row.id, row);
+      return row;
+    },
+    async listRecurringExpenses() {
+      return [...recurring.values()].filter((r) => r.active);
+    },
+    async getRecurringExpense(id: string) {
+      return recurring.get(id) ?? null;
+    },
+    async updateRecurringExpense(id: string, patch) {
+      const cur = recurring.get(id);
+      if (!cur) throw new Error('updateRecurringExpense: no existe');
+      const next: RecurringExpenseRow = {
+        ...cur,
+        amountMinor: patch.amountMinor ?? cur.amountMinor,
+        category: patch.category === undefined ? cur.category : patch.category,
+        description: patch.description === undefined ? cur.description : patch.description,
+        frequency: patch.frequency ?? cur.frequency,
+        nextDueOn: patch.nextDueOn ?? cur.nextDueOn,
+        active: patch.active ?? cur.active,
+      };
+      recurring.set(id, next);
+      return next;
+    },
+    async deleteRecurringExpense(id: string) {
+      recurring.delete(id);
+    },
     async insertMoneyGoal(input: MoneyGoalInsert): Promise<{ id: string }> {
       const id = uuid();
       goals.push({

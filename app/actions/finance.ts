@@ -9,6 +9,14 @@ import {
   archiveIncomeSource,
 } from '@/core/finance/income-sources';
 import { createMoneyGoal } from '@/core/finance/goals';
+import {
+  createRecurringExpense,
+  updateRecurringExpense,
+  deleteRecurringExpense,
+  confirmRecurringExpense,
+  skipRecurringExpense,
+} from '@/core/finance/recurring';
+import type { RecurringExpenseRow, RecurringFrequency } from '@/core/finance/ports';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { uploadImage } from '@/adapters/supabase/storage';
 import { registerAttachment } from '@/core/structure/attachments';
@@ -70,6 +78,92 @@ export async function registrarMovimientoAction(input: {
 }): Promise<Result<TransactionRow>> {
   const { ctx, repo } = await deps();
   const result = await registrarMovimiento(ctx, repo, input);
+  revalidatePath('/finanzas');
+  return result;
+}
+
+// ── Gastos recurrentes ──────────────────────────────────────────────────────
+export async function createRecurringExpenseAction(input: {
+  projectId: string;
+  areaId: string;
+  amountMinor: number;
+  category?: string;
+  description?: string;
+  frequency: RecurringFrequency;
+  nextDueOn: string;
+}): Promise<Result<RecurringExpenseRow>> {
+  const { ctx, repo } = await deps();
+  const result = await createRecurringExpense(ctx, repo, input);
+  revalidatePath('/finanzas');
+  return result;
+}
+
+export async function updateRecurringExpenseAction(input: {
+  id: string;
+  amountMinor?: number;
+  category?: string | null;
+  description?: string | null;
+  frequency?: RecurringFrequency;
+  nextDueOn?: string;
+  active?: boolean;
+}): Promise<Result<RecurringExpenseRow>> {
+  const { ctx, repo } = await deps();
+  const result = await updateRecurringExpense(ctx, repo, input);
+  revalidatePath('/finanzas');
+  return result;
+}
+
+export async function deleteRecurringExpenseAction(id: string): Promise<Result<{ id: string }>> {
+  const { ctx, repo } = await deps();
+  const result = await deleteRecurringExpense(ctx, repo, id);
+  revalidatePath('/finanzas');
+  return result;
+}
+
+/** Confirma un gasto recurrente vencido: crea la transacción (monto editable), avanza la
+ *  fecha y, si viene comprobante, lo adjunta. */
+export async function confirmRecurringExpenseAction(input: {
+  id: string;
+  amountMinor?: number;
+  occurredOn?: string;
+  receipt?: { mediaType: string; data: string } | null;
+}): Promise<Result<{ transactionId: string }>> {
+  const { supabase, ctx } = await requireContext();
+  const repo = financeRepo(supabase, ctx.userId);
+  const tx = await confirmRecurringExpense(ctx, repo, {
+    id: input.id,
+    amountMinor: input.amountMinor,
+    occurredOn: input.occurredOn,
+  });
+  if (!tx.ok) return tx;
+
+  if (input.receipt?.data) {
+    try {
+      const path = await uploadImage(
+        supabase,
+        ctx.userId,
+        Buffer.from(input.receipt.data, 'base64'),
+        input.receipt.mediaType,
+      );
+      await registerAttachment(ctx, structureRepo(supabase, ctx.userId), {
+        storagePath: path,
+        mime: input.receipt.mediaType,
+        transactionId: tx.value.id,
+        saved: true,
+      });
+    } catch {
+      /* el movimiento quedó; el comprobante puede reintentarse después */
+    }
+  }
+  revalidatePath('/finanzas');
+  return ok({ transactionId: tx.value.id });
+}
+
+export async function skipRecurringExpenseAction(
+  id: string,
+): Promise<Result<{ id: string; nextDueOn: string }>> {
+  const { ctx, repo } = await deps();
+  const result = await skipRecurringExpense(ctx, repo, id);
   revalidatePath('/finanzas');
   return result;
 }

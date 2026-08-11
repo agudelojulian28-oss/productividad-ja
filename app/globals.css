@@ -1594,6 +1594,104 @@ ol {
   place-items: center;
 }
 
+/* Gastos recurrentes — lista */
+.recur-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.recur-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.recur-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recur-meta {
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+.recur-amt {
+  flex: 0 0 auto;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.recur-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+}
+.recur-edit {
+  align-items: stretch;
+}
+
+/* Gastos recurrentes — pop-up de rectificación */
+.recur-pop-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  padding-bottom: calc(16px + var(--safe-bottom));
+}
+.recur-pop {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 90dvh;
+  overflow-y: auto;
+}
+.recur-pop-eyebrow {
+  font-size: 12px;
+  color: var(--warning);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.recur-pop-title {
+  font-size: 20px;
+  font-weight: 650;
+  margin-top: 2px;
+}
+.recur-pop-proj {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.recur-pop-q {
+  font-size: 15px;
+  margin-top: 2px;
+}
+.recur-pop-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.recur-pop-count {
+  font-size: 12px;
+  color: var(--text-subtle);
+  text-align: center;
+}
+
 /* Balance por proyecto (en la página del proyecto) */
 .proj-balance {
   display: flex;

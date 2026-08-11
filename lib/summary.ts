@@ -26,10 +26,12 @@ export async function buildSummary(
   const fin = financeRepo(supabase, ctx.userId);
   const today = todayInTz(ctx.tz);
 
-  const [tasks, cashflow] = await Promise.all([
+  const [tasks, cashflow, recurrentes] = await Promise.all([
     repo.listTasks({ status: 'pending' }),
     fin.cashflowMonthly(),
+    fin.listRecurringExpenses(),
   ]);
+  const recurVencidos = recurrentes.filter((r) => r.nextDueOn <= today);
 
   let vencidas = 0;
   let paraHoy = 0;
@@ -58,6 +60,16 @@ export async function buildSummary(
     }
     lineas.push(`✅ Tareas: ${vencidas} vencidas · ${paraHoy} para hoy`);
     lineas.push(`💰 Mes: entró ${money(r.inflowMinor)} · salió ${money(r.outflowMinor)} · neto ${money(r.netMinor)}`);
+    if (recurVencidos.length > 0) {
+      lineas.push(
+        `🔁 ${recurVencidos.length} gasto(s) recurrente(s) por confirmar: ` +
+          recurVencidos
+            .slice(0, 5)
+            .map((x) => `${x.description || x.category || 'gasto'} (${money(x.amountMinor)})`)
+            .join(', ') +
+          '. Ábrelos en la app para confirmar.',
+      );
+    }
     const choques = detectarChoques(await getDayEvents(supabase, ctx, today));
     if (choques.length > 0) lineas.push(`⚠️ ${choques.length} choque(s) de agenda hoy.`);
   } else {
