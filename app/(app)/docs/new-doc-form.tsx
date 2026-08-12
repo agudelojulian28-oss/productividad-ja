@@ -18,10 +18,12 @@ export function NewDocForm({
   areas = [],
   projects = [],
   fixedProjectId,
+  onDone,
 }: {
   areas?: Area[];
   projects?: Project[];
   fixedProjectId?: string;
+  onDone?: () => void;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState('');
@@ -46,6 +48,7 @@ export function NewDocForm({
       if (!res.ok) setError(res.message ?? 'No se pudo crear');
       else {
         setTitle('');
+        onDone?.();
         router.push(`/docs/${res.value.id}`);
       }
     });

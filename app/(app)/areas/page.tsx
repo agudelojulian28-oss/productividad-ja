@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireContext } from '@/lib/auth';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
-import { NewAreaForm } from './new-area-form';
+import { AreaLauncher } from './area-launcher';
 import { PageHero } from '../page-hero';
 import { RealtimeRefresh } from '../realtime-refresh';
 
@@ -20,13 +20,13 @@ export default async function AreasPage() {
         title="Áreas"
         subtitle="Tus contextos de trabajo y de vida. Los proyectos y el dinero cuelgan de aquí."
         kpis={areas.length > 0 ? [{ label: 'Áreas', value: String(areas.length) }] : undefined}
+        actions={<AreaLauncher />}
       />
-      <NewAreaForm />
 
       {areas.length === 0 ? (
         <p className="muted" style={{ marginTop: 24 }}>
-          Aún no tienes áreas. Crea la primera arriba (ej. &ldquo;Consultoría&rdquo;,
-          &ldquo;Personal&rdquo;).
+          Aún no tienes áreas. Crea la primera con &ldquo;Nueva área&rdquo; (ej.
+          &ldquo;Consultoría&rdquo;, &ldquo;Personal&rdquo;).
         </p>
       ) : (
         <ul style={{ marginTop: 16 }}>

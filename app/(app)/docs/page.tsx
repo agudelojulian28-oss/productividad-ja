@@ -5,7 +5,7 @@ import { workRepo } from '@/adapters/supabase/work-repo';
 import type { DocumentRow } from '@/core/structure/ports';
 import { RealtimeRefresh } from '../realtime-refresh';
 import { PageHero } from '../page-hero';
-import { NewDocForm } from './new-doc-form';
+import { DocLauncher } from './doc-launcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,16 +59,18 @@ export default async function DocsPage() {
         title="Documentación"
         subtitle="Cómo te gusta que se hagan las cosas. El agente lo consulta y lo alimenta."
         kpis={docs.length > 0 ? [{ label: 'Documentos', value: String(docs.length) }] : undefined}
-      />
-
-      <NewDocForm
-        areas={areas.map((a) => ({ id: a.id, name: a.name }))}
-        projects={projects.map((p) => ({ id: p.id, title: p.title }))}
+        actions={
+          <DocLauncher
+            areas={areas.map((a) => ({ id: a.id, name: a.name }))}
+            projects={projects.map((p) => ({ id: p.id, title: p.title }))}
+          />
+        }
       />
 
       {docs.length === 0 ? (
         <p className="muted" style={{ marginTop: 24 }}>
-          Aún no hay documentos. Crea el primero arriba (ej. &ldquo;Cómo cotizo&rdquo;).
+          Aún no hay documentos. Crea el primero con &ldquo;Nuevo documento&rdquo; (ej.
+          &ldquo;Cómo cotizo&rdquo;).
         </p>
       ) : (
         <>

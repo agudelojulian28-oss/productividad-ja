@@ -3,7 +3,7 @@
 import { useState, useTransition, type FormEvent } from 'react';
 import { createAreaAction } from '@/app/actions/areas';
 
-export function NewAreaForm() {
+export function NewAreaForm({ onDone }: { onDone?: () => void }) {
   const [name, setName] = useState('');
   const [kind, setKind] = useState<'negocio' | 'personal'>('negocio');
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +17,10 @@ export function NewAreaForm() {
     startTransition(async () => {
       const res = await createAreaAction({ name: n, kind });
       if (!res.ok) setError(res.message ?? 'No se pudo crear');
-      else setName('');
+      else {
+        setName('');
+        onDone?.();
+      }
     });
   }
 

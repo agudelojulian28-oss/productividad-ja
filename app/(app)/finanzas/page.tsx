@@ -7,7 +7,7 @@ import { resumenFinanciero, serieMensual } from '@/core/finance/queries';
 import { money, todayInTz, dayLabelInTz } from '@/lib/format';
 import { signedUrl } from '@/adapters/supabase/storage';
 import { RealtimeRefresh } from '../realtime-refresh';
-import { RegistrarMovimiento } from './registrar-movimiento';
+import { MovimientoLauncher } from './movimiento-launcher';
 import { CashflowChart } from './cashflow-chart';
 import { MetasDinero } from './metas-dinero';
 import { FinStats } from './fin-stats';
@@ -172,9 +172,8 @@ export default async function FinanzasPage() {
             </p>
           ) : (
             <>
-              <section className="fin-block">
-                <h2 className="fin-h2">Registrar movimiento</h2>
-                <RegistrarMovimiento projects={projectOpts} today={todayInTz(ctx.tz)} />
+              <section className="fin-block fin-capture">
+                <MovimientoLauncher projects={projectOpts} today={todayInTz(ctx.tz)} />
               </section>
 
               <section className="fin-block">

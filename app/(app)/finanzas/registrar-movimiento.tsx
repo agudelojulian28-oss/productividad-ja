@@ -30,9 +30,12 @@ type Project = { id: string; title: string; areaId: string };
 export function RegistrarMovimiento({
   projects,
   today,
+  onDone,
 }: {
   projects: Project[];
   today: string;
+  /** Si se pasa, se invoca tras registrar con éxito (p. ej. cerrar el modal). */
+  onDone?: (summary: string) => void;
 }) {
   const [direction, setDirection] = useState<'out' | 'in'>('out');
   const [monto, setMonto] = useState('');
@@ -96,9 +99,9 @@ export function RegistrarMovimiento({
         setDescripcion('');
         setReceipt(null);
         setFx('');
-        setOkMsg(
-          `${direction === 'in' ? 'Ingreso' : 'Gasto'} registrado: ${money(res.value.baseAmountMinor)}${receipt ? ' · con comprobante' : ''}`,
-        );
+        const summary = `${direction === 'in' ? 'Ingreso' : 'Gasto'} registrado: ${money(res.value.baseAmountMinor)}${receipt ? ' · con comprobante' : ''}`;
+        if (onDone) onDone(summary);
+        else setOkMsg(summary);
       }
     });
   }
