@@ -4,6 +4,7 @@ import { useState, useTransition, type FormEvent } from 'react';
 import { createMoneyGoalAction } from '@/app/actions/finance';
 import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
+import { Modal } from '../modal';
 
 type Project = { id: string; title: string };
 export type MetaProgreso = {
@@ -33,44 +34,12 @@ export function MetasDinero({
   metas: MetaProgreso[];
   today: string;
 }) {
-  const [title, setTitle] = useState('');
-  const [metric, setMetric] = useState<'money_in' | 'money_net'>('money_in');
-  const [objetivo, setObjetivo] = useState('');
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
-  const [desde, setDesde] = useState(firstOfMonth(today));
-  const [hasta, setHasta] = useState(lastOfMonth(today));
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    const t = title.trim();
-    const minor = parseAmountToMinor(objetivo);
-    if (!t) return setError('Ponle un nombre a la meta');
-    if (!minor) return setError('Objetivo inválido');
-    if (!projectId) return setError('Elige un proyecto');
-    startTransition(async () => {
-      const res = await createMoneyGoalAction({
-        title: t,
-        metric,
-        targetValue: minor / 100, // pesos
-        projectId,
-        periodStart: desde,
-        periodEnd: hasta,
-      });
-      if (!res.ok) setError(res.message ?? 'No se pudo crear');
-      else {
-        setTitle('');
-        setObjetivo('');
-      }
-    });
-  }
+  const [open, setOpen] = useState(false);
 
   return (
     <div>
-      {metas.length > 0 && (
-        <ul className="fin-list" style={{ marginBottom: 16 }}>
+      {metas.length > 0 ? (
+        <ul className="fin-list" style={{ marginBottom: 14 }}>
           {metas.map((m) => {
             const pct =
               m.targetValue > 0
@@ -104,8 +73,67 @@ export function MetasDinero({
             );
           })}
         </ul>
+      ) : (
+        <p className="muted" style={{ marginBottom: 12 }}>
+          Sin metas de dinero todavía.
+        </p>
       )}
 
+      <button type="button" className="btn-ghost meta-add" onClick={() => setOpen(true)}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+        Nueva meta de dinero
+      </button>
+
+      <Modal open={open} onClose={() => setOpen(false)} eyebrow="Finanzas" title="Nueva meta de dinero">
+        <MetaForm projects={projects} today={today} onDone={() => setOpen(false)} />
+      </Modal>
+    </div>
+  );
+}
+
+function MetaForm({
+  projects,
+  today,
+  onDone,
+}: {
+  projects: Project[];
+  today: string;
+  onDone: () => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [metric, setMetric] = useState<'money_in' | 'money_net'>('money_in');
+  const [objetivo, setObjetivo] = useState('');
+  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
+  const [desde, setDesde] = useState(firstOfMonth(today));
+  const [hasta, setHasta] = useState(lastOfMonth(today));
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const t = title.trim();
+    const minor = parseAmountToMinor(objetivo);
+    if (!t) return setError('Ponle un nombre a la meta');
+    if (!minor) return setError('Objetivo inválido');
+    if (!projectId) return setError('Elige un proyecto');
+    startTransition(async () => {
+      const res = await createMoneyGoalAction({
+        title: t,
+        metric,
+        targetValue: minor / 100, // pesos
+        projectId,
+        periodStart: desde,
+        periodEnd: hasta,
+      });
+      if (!res.ok) setError(res.message ?? 'No se pudo crear');
+      else onDone();
+    });
+  }
+
+  return (
       <form onSubmit={onSubmit} className="fin-form">
         <input
           type="text"
@@ -165,6 +193,5 @@ export function MetasDinero({
           {pending ? '…' : 'Crear meta de dinero'}
         </button>
       </form>
-    </div>
   );
 }

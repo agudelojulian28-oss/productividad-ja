@@ -666,6 +666,31 @@ ol {
   filter: none;
   box-shadow: none;
 }
+/* Botón secundario (contorno) — acciones no primarias */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  padding: 11px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.btn-ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-ghost svg {
+  flex-shrink: 0;
+}
+.meta-add {
+  width: 100%;
+}
 .error-text {
   color: var(--negative);
   font-size: 14px;

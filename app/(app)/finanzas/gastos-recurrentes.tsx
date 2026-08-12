@@ -9,6 +9,7 @@ import {
 import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
 import type { RecurringFrequency } from '@/core/finance/ports';
+import { Modal } from '../modal';
 
 type Project = { id: string; title: string; areaId: string };
 export type RecurRow = {
@@ -40,46 +41,14 @@ export function GastosRecurrentes({
   recurrentes: RecurRow[];
   today: string;
 }) {
-  const [monto, setMonto] = useState('');
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
-  const [category, setCategory] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [frequency, setFrequency] = useState<RecurringFrequency>('mensual');
-  const [nextDueOn, setNextDueOn] = useState(today);
-  const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-
-  function onCreate(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    const minor = parseAmountToMinor(monto);
-    const project = projects.find((p) => p.id === projectId);
-    if (!minor) return setError('Monto inválido');
-    if (!project) return setError('Elige un proyecto');
-    startTransition(async () => {
-      const r = await createRecurringExpenseAction({
-        projectId: project.id,
-        areaId: project.areaId,
-        amountMinor: minor,
-        category: category.trim() || undefined,
-        description: descripcion.trim() || undefined,
-        frequency,
-        nextDueOn,
-      });
-      if (!r.ok) setError(r.message ?? 'No se pudo crear');
-      else {
-        setMonto('');
-        setCategory('');
-        setDescripcion('');
-      }
-    });
-  }
 
   return (
     <div>
-      {recurrentes.length > 0 && (
-        <ul className="fin-list" style={{ marginBottom: 16 }}>
+      {recurrentes.length > 0 ? (
+        <ul className="fin-list" style={{ marginBottom: 14 }}>
           {recurrentes.map((r) =>
             editing === r.id ? (
               <EditRow key={r.id} row={r} onDone={() => setEditing(null)} />
@@ -118,79 +87,137 @@ export function GastosRecurrentes({
             ),
           )}
         </ul>
+      ) : (
+        <p className="muted" style={{ marginBottom: 12 }}>
+          Sin gastos recurrentes todavía.
+        </p>
       )}
 
-      <form onSubmit={onCreate} className="fin-form">
-        <select
-          value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
+      <button type="button" className="btn-ghost meta-add" onClick={() => setOpen(true)}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+        Nuevo gasto recurrente
+      </button>
+
+      <Modal open={open} onClose={() => setOpen(false)} eyebrow="Finanzas" title="Nuevo gasto recurrente">
+        <RecurForm projects={projects} today={today} onDone={() => setOpen(false)} />
+      </Modal>
+    </div>
+  );
+}
+
+function RecurForm({
+  projects,
+  today,
+  onDone,
+}: {
+  projects: Project[];
+  today: string;
+  onDone: () => void;
+}) {
+  const [monto, setMonto] = useState('');
+  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
+  const [category, setCategory] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [frequency, setFrequency] = useState<RecurringFrequency>('mensual');
+  const [nextDueOn, setNextDueOn] = useState(today);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function onCreate(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const minor = parseAmountToMinor(monto);
+    const project = projects.find((p) => p.id === projectId);
+    if (!minor) return setError('Monto inválido');
+    if (!project) return setError('Elige un proyecto');
+    startTransition(async () => {
+      const r = await createRecurringExpenseAction({
+        projectId: project.id,
+        areaId: project.areaId,
+        amountMinor: minor,
+        category: category.trim() || undefined,
+        description: descripcion.trim() || undefined,
+        frequency,
+        nextDueOn,
+      });
+      if (!r.ok) setError(r.message ?? 'No se pudo crear');
+      else onDone();
+    });
+  }
+
+  return (
+    <form onSubmit={onCreate} className="fin-form">
+      <select
+        value={projectId}
+        onChange={(e) => setProjectId(e.target.value)}
+        className="field"
+        aria-label="Proyecto"
+      >
+        {projects.length === 0 && <option value="">Crea un proyecto primero</option>}
+        {projects.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.title}
+          </option>
+        ))}
+      </select>
+      <div className="new-task-row">
+        <input
+          type="text"
+          inputMode="decimal"
+          placeholder="Monto"
+          value={monto}
+          onChange={(e) => setMonto(e.target.value)}
           className="field"
-          aria-label="Proyecto"
+          aria-label="Monto"
+          autoComplete="off"
+        />
+        <select
+          value={frequency}
+          onChange={(e) => setFrequency(e.target.value as RecurringFrequency)}
+          className="field"
+          aria-label="Frecuencia"
         >
-          {projects.length === 0 && <option value="">Crea un proyecto primero</option>}
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.title}
+          {FREQS.map((f) => (
+            <option key={f.v} value={f.v}>
+              {f.label}
             </option>
           ))}
         </select>
-        <div className="new-task-row">
-          <input
-            type="text"
-            inputMode="decimal"
-            placeholder="Monto"
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
-            className="field"
-            aria-label="Monto"
-            autoComplete="off"
-          />
-          <select
-            value={frequency}
-            onChange={(e) => setFrequency(e.target.value as RecurringFrequency)}
-            className="field"
-            aria-label="Frecuencia"
-          >
-            {FREQS.map((f) => (
-              <option key={f.v} value={f.v}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </div>
+      </div>
+      <input
+        type="text"
+        placeholder="Concepto (ej. arriendo, Netflix)"
+        value={descripcion}
+        onChange={(e) => setDescripcion(e.target.value)}
+        className="field"
+        aria-label="Concepto"
+        autoComplete="off"
+      />
+      <input
+        type="text"
+        placeholder="Categoría (opcional)"
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+        className="field"
+        aria-label="Categoría"
+        autoComplete="off"
+      />
+      <label className="cal-field-label">
+        Próxima fecha
         <input
-          type="text"
-          placeholder="Concepto (ej. arriendo, Netflix)"
-          value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
+          type="date"
+          value={nextDueOn}
+          onChange={(e) => setNextDueOn(e.target.value)}
           className="field"
-          aria-label="Concepto"
-          autoComplete="off"
         />
-        <input
-          type="text"
-          placeholder="Categoría (opcional)"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="field"
-          aria-label="Categoría"
-          autoComplete="off"
-        />
-        <label className="cal-field-label">
-          Próxima fecha
-          <input
-            type="date"
-            value={nextDueOn}
-            onChange={(e) => setNextDueOn(e.target.value)}
-            className="field"
-          />
-        </label>
-        {error && <p className="error-text">{error}</p>}
-        <button type="submit" className="btn-primary" disabled={pending}>
-          {pending ? '…' : 'Agregar gasto recurrente'}
-        </button>
-      </form>
-    </div>
+      </label>
+      {error && <p className="error-text">{error}</p>}
+      <button type="submit" className="btn-primary" disabled={pending}>
+        {pending ? '…' : 'Agregar gasto recurrente'}
+      </button>
+    </form>
   );
 }
 
