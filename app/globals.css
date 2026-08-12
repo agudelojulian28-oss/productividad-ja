@@ -37,7 +37,15 @@
   --radius-pill: 999px;
 
   /* Elevación */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-pop: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --ring: 0 0 0 3px var(--accent-weak);
+
+  /* Movimiento (150–200ms, curva natural; respeta prefers-reduced-motion) */
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
 
   /* Gradiente de marca */
   --grad-accent: linear-gradient(135deg, var(--accent-from), var(--accent-to));
@@ -93,10 +101,46 @@ a,
   cursor: pointer;
 }
 
-/* Anillo de foco consistente para teclado (acento, alto contraste en oscuro). */
+/* Transiciones sutiles en todo lo interactivo (150–200ms). Solo props baratas:
+   color, fondo, borde, sombra, opacidad y transform — nunca width/height. */
+button,
+a,
+[role='button'],
+select,
+input,
+textarea,
+summary,
+.row-card,
+.kpi,
+.recur-row,
+.mov-row,
+.mov-thumb {
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    opacity var(--dur) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+/* Anillo de foco consistente y prominente para teclado (acento + halo). */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+  box-shadow: var(--ring);
+}
+
+/* Respeta a quien pide menos movimiento (accesibilidad, WCAG). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 a {
@@ -586,6 +630,15 @@ ol {
   width: 100%;
   min-width: 0; /* deja que los inputs encojan en flex/grid (evita overflow móvil) */
 }
+.field::placeholder {
+  color: var(--text-subtle);
+}
+/* Foco de campo también con ratón: borde de acento + halo. */
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
 .btn-primary {
   background: var(--grad-accent);
   color: var(--on-accent);
@@ -595,8 +648,18 @@ ol {
   font-weight: 600;
   white-space: nowrap;
 }
+.btn-primary:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 4px 14px var(--accent-weak);
+}
+.btn-primary:active {
+  transform: translateY(1px) scale(0.99);
+  filter: brightness(0.98);
+}
 .btn-primary:disabled {
   opacity: 0.6;
+  filter: none;
+  box-shadow: none;
 }
 .error-text {
   color: var(--negative);
@@ -732,6 +795,17 @@ ol {
 }
 .row-card:hover {
   border-color: var(--border-strong);
+}
+/* Elevación al pasar el mouse — solo con puntero real (no se "pega" en táctil). */
+@media (hover: hover) {
+  .row-card:hover,
+  .kpi:hover,
+  .recur-row:hover,
+  .mov-row:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+  }
 }
 .pill {
   font-size: 12px;
@@ -1635,6 +1709,17 @@ ol {
 }
 
 /* Gastos recurrentes — pop-up de rectificación */
+@keyframes recur-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes recur-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
 .recur-pop-backdrop {
   position: fixed;
   inset: 0;
@@ -1645,6 +1730,7 @@ ol {
   place-items: center;
   padding: 16px;
   padding-bottom: calc(16px + var(--safe-bottom));
+  animation: recur-fade var(--dur) var(--ease);
 }
 .recur-pop {
   width: 100%;
@@ -1652,7 +1738,8 @@ ol {
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-pop);
+  animation: recur-pop-in var(--dur) var(--ease);
   padding: 20px;
   display: flex;
   flex-direction: column;
