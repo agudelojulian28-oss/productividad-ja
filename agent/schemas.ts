@@ -5,6 +5,7 @@ import { COLOR_NAMES } from '@/lib/calendar-colors';
 const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?([+-]\d{2}:\d{2}|Z)$/;
 const Instant = z.string().regex(ISO_WITH_OFFSET, 'ISO-8601 con offset (ej. 2026-07-24T16:00:00-05:00)');
 const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Día YYYY-MM-DD');
+const RECUR_FREQ = ['semanal', 'quincenal', 'mensual', 'bimestral', 'trimestral', 'anual'] as const;
 
 
 const Alcance = z
@@ -36,6 +37,7 @@ export const Consultar = z.object({
       'resumen_financiero',
       'por_proyecto',
       'gastos',
+      'recurrentes',
       'por_cobrar',
       'pipeline',
       'conflictos',
@@ -69,6 +71,7 @@ export const Crear = z
         'meta_dinero',
         'documento',
         'movimiento',
+        'recurrente',
       ])
       .describe('Qué crear'),
     titulo: z
@@ -96,7 +99,8 @@ export const Crear = z
     monto: z.number().positive().optional().describe('Solo movimiento: en la moneda, NO centavos (ej. 50000, 12.5)'),
     moneda: z.enum(['COP', 'USD']).optional().describe('Solo movimiento (por defecto COP)'),
     tasa: z.number().positive().optional().describe('Solo movimiento en USD: COP por 1 USD'),
-    categoria: z.string().trim().max(80).optional().describe('Solo movimiento gasto (ej. almuerzo)'),
+    categoria: z.string().trim().max(80).optional().describe('movimiento gasto / recurrente (ej. almuerzo, arriendo)'),
+    frecuencia: z.enum(RECUR_FREQ).optional().describe('Solo recurrente: cada cuánto se repite el gasto'),
     contenido: z.string().max(100_000).optional().describe('Solo documento: cuerpo (markdown)'),
     clase_doc: z.enum(['proceso', 'preferencia', 'nota']).optional().describe('Solo documento (por defecto nota)'),
     descripcion: z.string().max(5000).optional().describe('evento: notas · movimiento: concepto (ej. "almuerzo con cliente"), máx 500'),
@@ -129,6 +133,8 @@ export const Crear = z
           return !!d.titulo;
         case 'movimiento':
           return !!d.direccion && d.monto != null && !!d.proyecto_id;
+        case 'recurrente':
+          return !!d.proyecto_id && d.monto != null && !!d.frecuencia && !!d.desde;
         default:
           return false;
       }
@@ -139,15 +145,36 @@ export const Crear = z
 // ── actualizar (unión por tipo + acción) ────────────────────────────────────
 export const Actualizar = z
   .object({
-    tipo: z.enum(['tarea', 'evento', 'meta', 'proyecto', 'area', 'documento']).describe('Qué actualizar'),
+    tipo: z
+      .enum(['tarea', 'evento', 'meta', 'proyecto', 'area', 'documento', 'recurrente'])
+      .describe('Qué actualizar'),
     id: z.string().min(1).describe('ID de la entidad (uuid; para evento es el id de Google de consultar agenda)'),
     accion: z
-      .enum(['completar', 'reabrir', 'reprogramar', 'descripcion', 'mover', 'factores', 'editar', 'anexar', 'fijar'])
+      .enum([
+        'completar',
+        'reabrir',
+        'reprogramar',
+        'descripcion',
+        'mover',
+        'factores',
+        'editar',
+        'anexar',
+        'fijar',
+        'confirmar',
+        'omitir',
+      ])
       .optional()
       .describe(
         'tarea: completar|reabrir|reprogramar|descripcion|mover · meta: factores|descripcion · ' +
-          'proyecto/area: descripcion · documento: editar|anexar|fijar · evento: editar',
+          'proyecto/area: descripcion · documento: editar|anexar|fijar · evento: editar · ' +
+          'recurrente: confirmar (registra el gasto y avanza) | omitir (avanza sin registrar); sin accion = editar campos',
       ),
+    monto: z
+      .number()
+      .positive()
+      .optional()
+      .describe('recurrente: monto nuevo (editar) o monto real al confirmar si cambió'),
+    frecuencia: z.enum(RECUR_FREQ).optional().describe('recurrente: nueva frecuencia'),
     titulo: z.string().trim().min(1).max(200).optional().describe('Nuevo título (documento editar / evento)'),
     descripcion: z
       .string()
@@ -177,8 +204,8 @@ export const Actualizar = z
 // ── archivar / borrar (unión por tipo) ──────────────────────────────────────
 export const Archivar = z.object({
   tipo: z
-    .enum(['tarea', 'evento', 'documento', 'area'])
-    .describe('Qué eliminar/archivar. tarea/evento/documento se borran; area se archiva'),
+    .enum(['tarea', 'evento', 'documento', 'area', 'recurrente'])
+    .describe('Qué eliminar/archivar. tarea/evento/documento/recurrente se borran; area se archiva'),
   id: z.string().min(1).describe('ID (uuid; para evento el id de Google)'),
   alcance: Alcance.optional().describe('Solo evento: serie o instancia (por defecto serie)'),
 });
@@ -225,17 +252,18 @@ export const isToolName = (n: string): n is ToolName => n in toolSchemas;
 const descriptions: Record<ToolName, string> = {
   consultar:
     'Lee información: agenda_hoy, agenda (día), pendientes, estructura (IDs de áreas/proyectos/metas), ' +
-    'documentacion, resumen_financiero, por_proyecto, gastos, por_cobrar, pipeline, conflictos, huecos.',
+    'documentacion, resumen_financiero, por_proyecto, gastos, recurrentes (gastos recurrentes y cuáles vencen), por_cobrar, pipeline, conflictos, huecos.',
   buscar: 'Busca por texto en las tareas.',
   crear:
     'Crea CUALQUIER cosa del dominio según tipo: tarea, evento (Google Calendar), proyecto, meta, ' +
-    'area, meta_dinero, documento (del método) o movimiento (ingreso/gasto). El dinero (movimiento y ' +
-    'meta_dinero) SIEMPRE se atribuye a un proyecto (proyecto_id de consultar estructura).',
+    'area, meta_dinero, documento (del método), movimiento (ingreso/gasto) o recurrente (gasto que se ' +
+    'repite). El dinero (movimiento, meta_dinero, recurrente) SIEMPRE se atribuye a un proyecto (proyecto_id).',
   actualizar:
     'Actualiza según tipo: tarea (completar/reabrir/reprogramar/descripción/mover), meta (factores/' +
-    'descripción), proyecto/area (descripción), documento (editar/anexar/fijar), evento (título/hora/color/recurrencia).',
+    'descripción), proyecto/area (descripción), documento (editar/anexar/fijar), evento (título/hora/color/recurrencia), ' +
+    'recurrente (confirmar = registra el gasto y avanza la fecha; omitir = avanza sin registrar; o edita monto/frecuencia/fecha).',
   archivar:
-    'Elimina o archiva según tipo: tarea/evento/documento se borran; area se archiva.',
+    'Elimina o archiva según tipo: tarea/evento/documento/recurrente se borran; area se archiva.',
   mover_agenda:
     'Mueve TODOS los eventos de un día de una vez (una sola llamada). Úsalo cuando el usuario ' +
     'pida correr/adelantar/atrasar toda la agenda de un día (ej. "mueve todo lo de hoy una hora más tarde" → fecha=hoy, minutos=60). No edites evento por evento para esto.',

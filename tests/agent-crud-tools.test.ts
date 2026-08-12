@@ -67,6 +67,26 @@ describe('runTool · crear (verbos generales)', () => {
     expect(r.ok).toBe(true);
   });
 
+  it('crea y confirma un gasto recurrente (registra el gasto)', async () => {
+    const d = deps();
+    const p = await d.repo.insertProject({ title: 'P', areaId: AREA });
+    const c = await runTool(d, 'crear', {
+      tipo: 'recurrente',
+      proyecto_id: p.id,
+      monto: 500000,
+      frecuencia: 'mensual',
+      desde: '2026-08-05',
+      descripcion: 'Arriendo',
+    });
+    expect(c.ok).toBe(true);
+    const id = c.ok ? (c.value as { recurrente_id: string }).recurrente_id : '';
+    const r = await runTool(d, 'actualizar', { tipo: 'recurrente', id, accion: 'confirmar' });
+    expect(r.ok).toBe(true);
+    expect(d.fin._txs.length).toBe(1);
+    expect(d.fin._txs[0]!.direction).toBe('out');
+    expect(d.fin._txs[0]!.baseAmountMinor).toBe(50_000_000);
+  });
+
   it('rechaza proyecto sin área (refine)', async () => {
     const d = deps();
     const r = await runTool(d, 'crear', { tipo: 'proyecto', titulo: 'X' });

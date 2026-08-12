@@ -13,6 +13,13 @@ import { createGoal, updateGoal, setGoalDescription } from '@/core/work/goals';
 import { consultar, buscar } from '@/core/work/queries';
 import type { FinanceRepo } from '@/core/finance/ports';
 import { registrarMovimiento } from '@/core/finance/transactions';
+import {
+  createRecurringExpense,
+  updateRecurringExpense,
+  deleteRecurringExpense,
+  confirmRecurringExpense,
+  skipRecurringExpense,
+} from '@/core/finance/recurring';
 import { createMoneyGoal } from '@/core/finance/goals';
 import { resumenFinanciero, topGastos } from '@/core/finance/queries';
 import { detectarChoques, huecosLibres } from '@/lib/agenda';
@@ -34,7 +41,7 @@ import {
 import type { ZodType } from 'zod';
 import type { GEvent } from '@/adapters/google/calendar';
 import { nameToColorId } from '@/lib/calendar-colors';
-import { money } from '@/lib/format';
+import { money, todayInTz } from '@/lib/format';
 import type { Recurrencia } from '@/lib/recurrence';
 
 type EventScope = 'serie' | 'instancia';
@@ -241,6 +248,23 @@ export async function runTool(
           })),
         );
       }
+      if (vista === 'recurrentes') {
+        const list = await fin.listRecurringExpenses();
+        const hoy = todayInTz(ctx.tz);
+        const projects = await repo.listProjects();
+        const nombre = new Map(projects.map((p) => [p.id, p.title] as const));
+        return ok(
+          list.map((r) => ({
+            id: r.id,
+            concepto: r.description || r.category || 'gasto recurrente',
+            monto: money(r.amountMinor),
+            frecuencia: r.frequency,
+            proximo: r.nextDueOn,
+            proyecto: nombre.get(r.projectId) ?? '—',
+            vencido: r.nextDueOn <= hoy,
+          })),
+        );
+      }
       if (vista === 'por_cobrar') {
         const rows = await fin.receivables();
         if (rows.length === 0)
@@ -367,6 +391,25 @@ export async function runTool(
             ? ok({ registrado: r.value.id, monto: money(r.value.baseAmountMinor), moneda: r.value.currency })
             : r;
         }
+        case 'recurrente': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          const proj = v.proyecto_id ? await repo.getProject(v.proyecto_id) : null;
+          if (!proj) {
+            return err('NOT_FOUND', 'Indica un proyecto válido (proyecto_id) para el gasto recurrente');
+          }
+          const r = await createRecurringExpense(ctx, deps.finance, {
+            projectId: proj.id,
+            areaId: proj.areaId,
+            amountMinor: Math.round(v.monto! * 100),
+            category: v.categoria,
+            description: v.descripcion,
+            frequency: v.frecuencia!,
+            nextDueOn: v.desde!,
+          });
+          return r.ok
+            ? ok({ recurrente_id: r.value.id, monto: money(r.value.amountMinor), frecuencia: r.value.frequency })
+            : r;
+        }
       }
       return err('INVALID_INPUT', 'Tipo desconocido');
     }
@@ -459,6 +502,31 @@ export async function runTool(
             return noEvento;
           }
         }
+        case 'recurrente': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          if (v.accion === 'confirmar') {
+            const r = await confirmRecurringExpense(ctx, deps.finance, {
+              id: v.id,
+              amountMinor: v.monto != null ? Math.round(v.monto * 100) : undefined,
+            });
+            return r.ok
+              ? ok({ confirmado: v.id, transaccion: r.value.id, monto: money(r.value.baseAmountMinor) })
+              : r;
+          }
+          if (v.accion === 'omitir') {
+            const r = await skipRecurringExpense(ctx, deps.finance, v.id);
+            return r.ok ? ok({ omitido: v.id, proximo: r.value.nextDueOn }) : r;
+          }
+          // editar campos
+          const r = await updateRecurringExpense(ctx, deps.finance, {
+            id: v.id,
+            amountMinor: v.monto != null ? Math.round(v.monto * 100) : undefined,
+            description: v.descripcion,
+            frequency: v.frecuencia,
+            nextDueOn: v.desde,
+          });
+          return r.ok ? ok({ recurrente_id: r.value.id }) : r;
+        }
       }
       return err('INVALID_INPUT', 'Tipo desconocido');
     }
@@ -476,6 +544,11 @@ export async function runTool(
         case 'documento': {
           if (!deps.structure) return err('EXTERNAL_ERROR', 'La documentación no está disponible');
           const r = await deleteDocument(ctx, deps.structure, v.id);
+          return r.ok ? ok({ borrado: v.id }) : r;
+        }
+        case 'recurrente': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          const r = await deleteRecurringExpense(ctx, deps.finance, v.id);
           return r.ok ? ok({ borrado: v.id }) : r;
         }
         case 'area': {
