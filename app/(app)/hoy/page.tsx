@@ -1,10 +1,12 @@
 import { requireContext } from '@/lib/auth';
 import { workRepo } from '@/adapters/supabase/work-repo';
+import { financeRepo } from '@/adapters/supabase/finance-repo';
 import { getDayEvents } from '@/lib/calendar-sync';
 import { todayInTz, dateInTz } from '@/lib/format';
 import type { TaskRow } from '@/core/work/ports';
 import { detectarChoques } from '@/lib/agenda';
 import { TareaLauncher } from './tarea-launcher';
+import { ResumenDia, type ProjIncome } from './resumen-dia';
 import { TaskItem } from './task-item';
 import { EventItem } from './event-item';
 import { RealtimeRefresh } from '../realtime-refresh';
@@ -17,14 +19,34 @@ export const dynamic = 'force-dynamic';
 export default async function HoyPage() {
   const { supabase, ctx } = await requireContext();
   const repo = workRepo(supabase, ctx.userId);
+  const finance = financeRepo(supabase, ctx.userId);
   const today = todayInTz(ctx.tz);
 
-  const [tasks, projects, events] = await Promise.all([
+  const [tasks, projects, events, recientes] = await Promise.all([
     repo.listTasks({ status: 'pending' }),
     repo.listProjects(),
     getDayEvents(supabase, ctx, today),
+    finance.listRecentTransactions(120),
   ]);
   const projectName = new Map(projects.map((p) => [p.id, p.title] as const));
+
+  // Movimientos de hoy: facturado (ingresos) por proyecto + neto del día.
+  let inToday = 0;
+  let outToday = 0;
+  const inflowByProject = new Map<string, number>();
+  for (const t of recientes) {
+    if (t.occurredOn !== today) continue;
+    if (t.direction === 'in') {
+      inToday += t.baseAmountMinor;
+      const key = t.projectId ?? '';
+      inflowByProject.set(key, (inflowByProject.get(key) ?? 0) + t.baseAmountMinor);
+    } else {
+      outToday += t.baseAmountMinor;
+    }
+  }
+  const facturadoHoy: ProjIncome[] = [...inflowByProject.entries()]
+    .map(([pid, value]) => ({ label: projectName.get(pid) ?? '—', value }))
+    .sort((a, b) => b.value - a.value);
 
   // Metas por proyecto, para el selector opcional del formulario de tareas.
   const goalsByProject: Record<string, { id: string; title: string }[]> = {};
@@ -133,6 +155,7 @@ export default async function HoyPage() {
 
         {/* Main: las tareas, el foco del trabajo. En escritorio, columna izquierda. */}
         <div className="hoy-main">
+          <ResumenDia inToday={inToday} outToday={outToday} byProject={facturadoHoy} />
           {totalPend === 0 ? (
             <EmptyState
               icon={emptyIcons.tasks}

@@ -559,6 +559,11 @@ ol {
     display: block;
     padding: 0;
   }
+  /* Chrome ≥131 colapsa el contenido de <details> cerrado vía ::details-content
+     (content-visibility: hidden); esto lo reexpone en escritorio. */
+  .disc::details-content {
+    content-visibility: visible;
+  }
 }
 
 /* ── Hoy: rail (captura + agenda) + main (tareas) ───────────────────────── */
@@ -793,6 +798,69 @@ ol {
 .task-meta {
   font-size: 13px;
   color: var(--text-subtle);
+}
+
+/* Resumen del día (facturado hoy) en Hoy */
+.dia-cells {
+  display: flex;
+  gap: 8px;
+}
+.dia-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+.dia-cell-k {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.dia-cell-v {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.dia-empty {
+  margin: 12px 0 2px;
+  font-size: 13.5px;
+}
+.dia-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+.dia-bar-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+.dia-bar-name {
+  font-size: 14px;
+}
+.dia-bar-val {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.dia-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.dia-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--positive);
 }
 
 /* Eventos de Google Calendar en Hoy */
