@@ -6,9 +6,11 @@ import { createTaskAction } from '@/app/actions/tasks';
 export function NewTaskForm({
   projects,
   goalsByProject = {},
+  onDone,
 }: {
   projects: { id: string; title: string }[];
   goalsByProject?: Record<string, { id: string; title: string }[]>;
+  onDone?: () => void;
 }) {
   const [title, setTitle] = useState('');
   const [due, setDue] = useState('');
@@ -40,6 +42,7 @@ export function NewTaskForm({
         setDue('');
         setProjectId('');
         setGoalId('');
+        onDone?.();
       }
     });
   }

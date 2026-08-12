@@ -609,7 +609,6 @@ ol {
 .new-task {
   display: grid;
   gap: 8px;
-  margin-bottom: 24px;
 }
 .new-task-row {
   display: flex;
@@ -690,6 +689,9 @@ ol {
   margin-top: 20px;
 }
 .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
@@ -697,7 +699,25 @@ ol {
   color: var(--text-muted);
   margin-bottom: 8px;
 }
+.section-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
 .section-danger {
+  color: var(--negative);
+}
+.section-danger .section-count {
+  background: var(--negative-weak);
   color: var(--negative);
 }
 .task {

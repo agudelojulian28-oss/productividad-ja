@@ -4,7 +4,7 @@ import { getDayEvents } from '@/lib/calendar-sync';
 import { todayInTz, dateInTz } from '@/lib/format';
 import type { TaskRow } from '@/core/work/ports';
 import { detectarChoques } from '@/lib/agenda';
-import { NewTaskForm } from './new-task-form';
+import { TareaLauncher } from './tarea-launcher';
 import { TaskItem } from './task-item';
 import { EventItem } from './event-item';
 import { RealtimeRefresh } from '../realtime-refresh';
@@ -92,17 +92,18 @@ export default async function HoyPage() {
             : `${hoy.length} para hoy · ${vencidas.length} vencidas · ${calEvents.length} eventos`
         }
         kpis={kpis}
+        actions={
+          <TareaLauncher
+            projects={projects.map((p) => ({ id: p.id, title: p.title }))}
+            goalsByProject={goalsByProject}
+          />
+        }
       />
       <ChoquesBanner choques={detectarChoques(calEvents)} tz={ctx.tz} />
 
       <div className="hoy-grid">
-        {/* Rail: captura + agenda del día. En móvil va arriba (orden de captura). */}
+        {/* Rail: agenda del día. En móvil va arriba. */}
         <div className="hoy-rail">
-          <NewTaskForm
-            projects={projects.map((p) => ({ id: p.id, title: p.title }))}
-            goalsByProject={goalsByProject}
-          />
-
           <div className="hoy-rail-card">
             <div className="hoy-rail-head">
               <span>Agenda de hoy</span>
@@ -136,7 +137,7 @@ export default async function HoyPage() {
             <EmptyState
               icon={emptyIcons.tasks}
               title="Todo al día"
-              hint="No tienes pendientes. Captura uno nuevo desde el recuadro de arriba o pídeselo al asistente."
+              hint="No tienes pendientes. Crea uno con “Nueva tarea” o pídeselo al asistente."
             />
           ) : (
             sections
@@ -146,7 +147,8 @@ export default async function HoyPage() {
                   <h2
                     className={`section-title${s.tone === 'danger' ? ' section-danger' : ''}`}
                   >
-                    {s.label} · {s.items.length}
+                    <span>{s.label}</span>
+                    <span className="section-count">{s.items.length}</span>
                   </h2>
                   <ul>
                     {s.items.map((t) => (
