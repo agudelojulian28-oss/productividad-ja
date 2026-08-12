@@ -351,23 +351,12 @@ ol {
     max-width: 1120px;
     padding: 28px 34px;
   }
-  /* El chat ancla su input al layout; en escritorio no hay bottom-nav. */
-  .chat-input {
+  /* El chat ancla su dock al layout; en escritorio no hay bottom-nav. */
+  .chat-dock {
+    left: 248px;
     bottom: 0;
-    left: 248px;
     max-width: none;
-    padding: 12px 34px calc(12px + var(--safe-bottom));
-  }
-  .chat-attachments {
-    left: 248px;
-    bottom: 64px;
-    max-width: none;
-    padding: 0 34px;
-  }
-  .chat-micnote {
-    left: 248px;
-    max-width: none;
-    padding: 6px 34px;
+    padding: 12px 34px calc(14px + var(--safe-bottom));
   }
   /* Hoy: command-center de 2 columnas. Tareas a la izquierda, rail pegajoso
      (captura + agenda) a la derecha. Colocación explícita: el orden de origen
@@ -889,7 +878,7 @@ ol {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-bottom: 80px;
+  padding-bottom: 96px;
 }
 .chat-hint {
   margin-top: 12px;
@@ -933,52 +922,106 @@ ol {
   border: 1px solid var(--border);
   border-bottom-left-radius: 6px;
 }
-.chat-input {
+/* Dock inferior: agrupa adjuntos, aviso de micrófono y la barra de entrada. */
+.chat-dock {
   position: fixed;
   left: 0;
   right: 0;
   bottom: calc(64px + var(--safe-bottom));
-  display: flex;
-  gap: 8px;
   max-width: 720px;
   margin: 0 auto;
   padding: 8px 16px;
   background: color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
 }
-
-.chat-attach {
+/* Barra de entrada tipo "pill": iconos + textarea que crece + enviar. */
+.chat-input {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 6px 6px 6px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 24px;
+  box-shadow: var(--shadow-sm);
+}
+.chat-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.chat-icbtn {
   flex: 0 0 auto;
-  width: 44px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text);
-  border-radius: var(--radius-input);
-  font-size: 18px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-pill);
   touch-action: manipulation;
 }
-.chat-attach:disabled {
-  opacity: 0.5;
+.chat-icbtn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.chat-icbtn:disabled {
+  opacity: 0.4;
 }
 .chat-mic-on {
-  border-color: var(--negative);
   color: var(--negative);
   background: var(--negative-weak);
   animation: mic-pulse 1.2s ease-in-out infinite;
 }
 @keyframes mic-pulse {
   50% {
-    opacity: 0.6;
+    opacity: 0.55;
   }
 }
+.chat-ta {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  padding: 9px 4px;
+  max-height: 148px;
+}
+.chat-ta::placeholder {
+  color: var(--text-subtle);
+}
+.chat-send {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--grad-accent);
+  color: var(--on-accent);
+  touch-action: manipulation;
+}
+.chat-send:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.chat-send:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.chat-send:disabled {
+  background: var(--surface-3);
+  color: var(--text-subtle);
+  cursor: default;
+}
 .chat-micnote {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: calc(120px + var(--safe-bottom));
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 6px 16px;
+  padding: 4px 8px 8px;
   font-size: 13px;
   color: var(--text-muted);
 }
@@ -991,19 +1034,104 @@ ol {
   margin-bottom: 6px;
 }
 .chat-attachments {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: calc(120px + var(--safe-bottom));
   display: flex;
   gap: 8px;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 0 16px;
-  z-index: 1;
+  padding: 0 4px 8px;
 }
 .chat-thumb {
   position: relative;
+}
+
+/* Bienvenida (chat vacío): saludo + sugerencias tocables. */
+.chat-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 12dvh 16px 24px;
+}
+.chat-welcome-ic {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--accent-weak);
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.chat-welcome-title {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.chat-welcome-sub {
+  color: var(--text-muted);
+  font-size: 14.5px;
+  max-width: 44ch;
+}
+.chat-suggests {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.chat-suggest {
+  min-height: 40px;
+  padding: 9px 15px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+.chat-suggest:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* Tool-trace como chips discretos */
+.tool-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+/* Indicador de "escribiendo" (tres puntos) */
+.typing {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 2px 0;
+}
+.typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-subtle);
+  animation: typing-bounce 1.2s ease-in-out infinite;
+}
+.typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
 }
 .chat-thumb img {
   width: 56px;
@@ -1028,11 +1156,8 @@ ol {
 }
 
 @media (min-width: 768px) {
-  .chat-input {
+  .chat-dock {
     bottom: calc(72px + var(--safe-bottom));
-  }
-  .chat-attachments {
-    bottom: calc(128px + var(--safe-bottom));
   }
   .bottom-nav {
     max-width: 720px;

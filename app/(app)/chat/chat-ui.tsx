@@ -18,6 +18,53 @@ const toolLabels: Record<string, string> = {
   deshacer: 'deshizo la última acción',
 };
 
+const SUGGESTIONS = [
+  '¿Qué tengo hoy?',
+  'Registrar un gasto',
+  '¿Cómo van mis finanzas?',
+  'Recuérdame algo mañana',
+];
+
+/* Íconos de línea (currentColor) — sin emojis, coherente con el sistema de diseño. */
+const IconPaperclip = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="20" height="20" aria-hidden="true">
+    <path
+      d="M21 11.5l-8.4 8.4a5 5 0 01-7-7l8.4-8.4a3.3 3.3 0 014.7 4.7l-8.5 8.4a1.6 1.6 0 01-2.3-2.3l7.8-7.7"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+const IconMic = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="20" height="20" aria-hidden="true">
+    <rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" strokeWidth="1.8" />
+    <path d="M5 11a7 7 0 0014 0M12 18v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
+const IconStop = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" aria-hidden="true">
+    <rect x="6" y="6" width="12" height="12" rx="3" fill="currentColor" />
+  </svg>
+);
+const IconSend = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="20" height="20" aria-hidden="true">
+    <path d="M12 20V5M6 11l6-6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const IconSpark = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="26" height="26" aria-hidden="true">
+    <path
+      d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" fill="currentColor" />
+  </svg>
+);
+
 /** Reescala en el navegador (máx. 1536 px, JPEG) para no enviar imágenes enormes. */
 async function fileToAttached(file: File): Promise<Attached> {
   const bitmap = await createImageBitmap(file);
@@ -46,12 +93,21 @@ export function ChatUI({ initial }: { initial: ChatMessage[] }) {
   const [micNote, setMicNote] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
   const recRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Auto-crece la caja de texto según el contenido (máx. ~6 líneas).
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${Math.min(ta.scrollHeight, 148)}px`;
+  }, [input]);
 
   function updateLast(patch: Partial<Msg>) {
     setMessages((prev) => {
@@ -138,16 +194,13 @@ export function ChatUI({ initial }: { initial: ChatMessage[] }) {
     }
   }
 
-  async function send(e: FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
-    if ((!text && images.length === 0) || busy) return;
-    const sentImages = images;
+  async function sendMessage(text: string, imgs: Attached[]) {
+    if ((!text && imgs.length === 0) || busy) return;
     setInput('');
     setImages([]);
     setMessages((prev) => [
       ...prev,
-      { role: 'user', text, image: sentImages[0]?.preview },
+      { role: 'user', text, image: imgs[0]?.preview },
       { role: 'assistant', text: '', tools: [] },
     ]);
     setBusy(true);
@@ -158,7 +211,7 @@ export function ChatUI({ initial }: { initial: ChatMessage[] }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: text,
-          images: sentImages.map((i) => ({ mediaType: i.mediaType, data: i.data })),
+          images: imgs.map((i) => ({ mediaType: i.mediaType, data: i.data })),
         }),
       });
       if (!res.body) throw new Error('sin respuesta');
@@ -200,98 +253,149 @@ export function ChatUI({ initial }: { initial: ChatMessage[] }) {
     }
   }
 
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    void sendMessage(input.trim(), images);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Enter envía; Shift+Enter hace salto de línea.
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void sendMessage(input.trim(), images);
+    }
+  }
+
+  const empty = messages.length === 0;
+  const canSend = (input.trim() || images.length > 0) && !busy;
+
   return (
     <div className="chat">
       <div className="chat-log">
-        {messages.length === 0 && (
-          <p className="muted chat-hint">
-            Pídeme algo: &ldquo;recuérdame llamar a Carlos mañana a las 4&rdquo;, &ldquo;¿qué
-            tengo hoy?&rdquo;, o mándame una foto y dime qué hacer con ella.
-          </p>
-        )}
-        {messages.map((m, i) => (
-          <div key={i} className={`msg msg-${m.role}`}>
-            {m.tools && m.tools.length > 0 && (
-              <div className="tool-trace">
-                {m.tools.map((t, j) => (
-                  <span key={j}>· {toolLabels[t] ?? t}</span>
-                ))}
-              </div>
-            )}
-            <div className={`bubble bubble-${m.role}`}>
-              {m.image && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.image} alt="adjunto" className="chat-img" />
-              )}
-              {m.text || (busy && i === messages.length - 1 ? '…' : '')}
+        {empty && (
+          <div className="chat-welcome">
+            <div className="chat-welcome-ic" aria-hidden="true">
+              <IconSpark />
+            </div>
+            <h2 className="chat-welcome-title">¿En qué te ayudo?</h2>
+            <p className="chat-welcome-sub">
+              Pídeme lo que sea por texto, voz o foto: capturar tareas y gastos, revisar tu
+              día, mover la agenda…
+            </p>
+            <div className="chat-suggests">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className="chat-suggest"
+                  onClick={() => void sendMessage(s, [])}
+                >
+                  {s}
+                </button>
+              ))}
             </div>
           </div>
-        ))}
+        )}
+        {messages.map((m, i) => {
+          const streaming = busy && i === messages.length - 1 && m.role === 'assistant';
+          return (
+            <div key={i} className={`msg msg-${m.role}`}>
+              {m.tools && m.tools.length > 0 && (
+                <div className="tool-trace">
+                  {m.tools.map((t, j) => (
+                    <span key={j} className="tool-pill">
+                      {toolLabels[t] ?? t}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className={`bubble bubble-${m.role}`}>
+                {m.image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={m.image} alt="adjunto" className="chat-img" />
+                )}
+                {m.text}
+                {streaming && m.text === '' ? (
+                  <span className="typing" aria-label="escribiendo">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
         <div ref={endRef} />
       </div>
 
-      {images.length > 0 && (
-        <div className="chat-attachments">
-          {images.map((img, i) => (
-            <div key={i} className="chat-thumb">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img.preview} alt="adjunto" />
-              <button
-                type="button"
-                aria-label="Quitar imagen"
-                onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="chat-dock">
+        {images.length > 0 && (
+          <div className="chat-attachments">
+            {images.map((img, i) => (
+              <div key={i} className="chat-thumb">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img.preview} alt="adjunto" />
+                <button
+                  type="button"
+                  aria-label="Quitar imagen"
+                  onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {micNote && (
-        <p className="chat-micnote" role="status">
-          {micNote}
-        </p>
-      )}
+        {micNote && (
+          <p className="chat-micnote" role="status">
+            {micNote}
+          </p>
+        )}
 
-      <form onSubmit={send} className="chat-input">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          multiple
-          hidden
-          onChange={onPick}
-        />
-        <button
-          type="button"
-          className="chat-attach"
-          onClick={() => fileRef.current?.click()}
-          aria-label="Adjuntar imagen"
-          disabled={busy}
-        >
-          📎
-        </button>
-        <button
-          type="button"
-          className={`chat-attach${recording ? ' chat-mic-on' : ''}`}
-          onClick={toggleMic}
-          aria-label={recording ? 'Detener grabación' : 'Grabar nota de voz'}
-          disabled={busy || transcribing}
-        >
-          {transcribing ? '…' : recording ? '⏹' : '🎤'}
-        </button>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={recording ? 'Grabando…' : transcribing ? 'Transcribiendo…' : 'Escribe…'}
-          className="field"
-          aria-label="Mensaje"
-        />
-        <button type="submit" className="btn-primary" disabled={busy}>
-          {busy ? '…' : 'Enviar'}
-        </button>
-      </form>
+        <form onSubmit={onSubmit} className="chat-input">
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onPick} />
+          <button
+            type="button"
+            className="chat-icbtn"
+            onClick={() => fileRef.current?.click()}
+            aria-label="Adjuntar imagen"
+            disabled={busy}
+          >
+            <IconPaperclip />
+          </button>
+          <button
+            type="button"
+            className={`chat-icbtn${recording ? ' chat-mic-on' : ''}`}
+            onClick={toggleMic}
+            aria-label={recording ? 'Detener grabación' : 'Grabar nota de voz'}
+            disabled={busy || transcribing}
+          >
+            {recording ? <IconStop /> : <IconMic />}
+          </button>
+          <textarea
+            ref={taRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={
+              recording ? 'Grabando…' : transcribing ? 'Transcribiendo…' : 'Escribe un mensaje…'
+            }
+            className="chat-ta"
+            aria-label="Mensaje"
+            rows={1}
+          />
+          <button
+            type="submit"
+            className="chat-send"
+            disabled={!canSend}
+            aria-label="Enviar"
+          >
+            <IconSend />
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
