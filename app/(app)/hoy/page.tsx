@@ -10,6 +10,7 @@ import { EventItem } from './event-item';
 import { RealtimeRefresh } from '../realtime-refresh';
 import { ChoquesBanner } from '../choques-banner';
 import { PageHero, type Kpi } from '../page-hero';
+import { EmptyState, emptyIcons } from '../empty-state';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,9 +133,11 @@ export default async function HoyPage() {
         {/* Main: las tareas, el foco del trabajo. En escritorio, columna izquierda. */}
         <div className="hoy-main">
           {totalPend === 0 ? (
-            <p className="muted" style={{ marginTop: 4 }}>
-              No tienes pendientes. Agrega uno en el capturador.
-            </p>
+            <EmptyState
+              icon={emptyIcons.tasks}
+              title="Todo al día"
+              hint="No tienes pendientes. Captura uno nuevo desde el recuadro de arriba o pídeselo al asistente."
+            />
           ) : (
             sections
               .filter((s) => s.items.length > 0)

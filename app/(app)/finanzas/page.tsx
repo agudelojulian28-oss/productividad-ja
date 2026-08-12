@@ -14,6 +14,7 @@ import { FinStats } from './fin-stats';
 import { MovimientosRecientes, type MovRow } from './movimientos-recientes';
 import { GastosRecurrentes, type RecurRow } from './gastos-recurrentes';
 import { PageHero } from '../page-hero';
+import { EmptyState, emptyIcons } from '../empty-state';
 
 export const dynamic = 'force-dynamic';
 
@@ -163,13 +164,16 @@ export default async function FinanzasPage() {
         {/* Rail: captura y metas. */}
         <div className="fin-rail">
           {projectOpts.length === 0 ? (
-            <p className="muted">
-              Para registrar dinero, primero crea un proyecto en un{' '}
-              <Link href="/areas" className="link">
-                Área
-              </Link>
-              .
-            </p>
+            <EmptyState
+              icon={emptyIcons.money}
+              title="Aún no puedes registrar dinero"
+              hint="El dinero se atribuye a un proyecto. Crea un proyecto dentro de un Área para empezar."
+              action={
+                <Link href="/areas" className="btn-primary launch-btn">
+                  Ir a Áreas
+                </Link>
+              }
+            />
           ) : (
             <>
               <section className="fin-block fin-capture">

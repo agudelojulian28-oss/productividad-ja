@@ -6,6 +6,7 @@ import type { DocumentRow } from '@/core/structure/ports';
 import { RealtimeRefresh } from '../realtime-refresh';
 import { PageHero } from '../page-hero';
 import { DocLauncher } from './doc-launcher';
+import { EmptyState, emptyIcons } from '../empty-state';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,10 +69,17 @@ export default async function DocsPage() {
       />
 
       {docs.length === 0 ? (
-        <p className="muted" style={{ marginTop: 24 }}>
-          Aún no hay documentos. Crea el primero con &ldquo;Nuevo documento&rdquo; (ej.
-          &ldquo;Cómo cotizo&rdquo;).
-        </p>
+        <EmptyState
+          icon={emptyIcons.docs}
+          title="Aún no hay documentos"
+          hint="Documenta cómo te gusta que se hagan las cosas. El asistente lo consulta y lo alimenta. Ej. “Cómo cotizo un proyecto”."
+          action={
+            <DocLauncher
+              areas={areas.map((a) => ({ id: a.id, name: a.name }))}
+              projects={projects.map((p) => ({ id: p.id, title: p.title }))}
+            />
+          }
+        />
       ) : (
         <>
           {global.length > 0 && (

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { requireContext } from '@/lib/auth';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { AreaLauncher } from './area-launcher';
+import { EmptyState, emptyIcons } from '../empty-state';
 import { PageHero } from '../page-hero';
 import { RealtimeRefresh } from '../realtime-refresh';
 
@@ -24,10 +25,12 @@ export default async function AreasPage() {
       />
 
       {areas.length === 0 ? (
-        <p className="muted" style={{ marginTop: 24 }}>
-          Aún no tienes áreas. Crea la primera con &ldquo;Nueva área&rdquo; (ej.
-          &ldquo;Consultoría&rdquo;, &ldquo;Personal&rdquo;).
-        </p>
+        <EmptyState
+          icon={emptyIcons.areas}
+          title="Aún no tienes áreas"
+          hint="Las áreas son tus contextos de trabajo y de vida. Los proyectos y el dinero cuelgan de aquí. Ej. “Consultoría”, “Personal”."
+          action={<AreaLauncher />}
+        />
       ) : (
         <ul style={{ marginTop: 16 }}>
           {areas.map((a) => (

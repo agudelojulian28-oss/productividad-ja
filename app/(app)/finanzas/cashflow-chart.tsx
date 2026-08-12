@@ -11,7 +11,7 @@ function mesCorto(month: string): string {
   return MESES[mm - 1] ?? month.slice(5, 7);
 }
 
-type View = 'neto' | 'inout' | 'acum';
+type View = 'neto' | 'inout' | 'acum' | 'tabla';
 
 const W = 320;
 const H = 158;
@@ -66,7 +66,19 @@ export function CashflowChart({ serie }: { serie: SerieMes[] }) {
         >
           Acumulado
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'tabla'}
+          className={`seg-btn${view === 'tabla' ? ' seg-on' : ''}`}
+          onClick={() => setView('tabla')}
+          aria-label="Ver como tabla"
+        >
+          Tabla
+        </button>
       </div>
+
+      {view === 'tabla' && <CashTable serie={serie} />}
 
       {view === 'inout' && (
         <div className="chart-legend">
@@ -79,6 +91,7 @@ export function CashflowChart({ serie }: { serie: SerieMes[] }) {
         </div>
       )}
 
+      {view !== 'tabla' && (
       <figure className="fin-chart" style={{ position: 'relative' }}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
@@ -151,6 +164,55 @@ export function CashflowChart({ serie }: { serie: SerieMes[] }) {
           </div>
         )}
       </figure>
+      )}
+    </div>
+  );
+}
+
+/** Alternativa en tabla (accesibilidad dataviz): mes × ingresos/gastos/neto. */
+function CashTable({ serie }: { serie: SerieMes[] }) {
+  const tot = serie.reduce(
+    (a, s) => ({
+      inflowMinor: a.inflowMinor + s.inflowMinor,
+      outflowMinor: a.outflowMinor + s.outflowMinor,
+      netMinor: a.netMinor + s.netMinor,
+    }),
+    { inflowMinor: 0, outflowMinor: 0, netMinor: 0 },
+  );
+  return (
+    <div className="chart-table-wrap">
+      <table className="chart-table">
+        <thead>
+          <tr>
+            <th scope="col">Mes</th>
+            <th scope="col" className="num">Ingresos</th>
+            <th scope="col" className="num">Gastos</th>
+            <th scope="col" className="num">Neto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {serie.map((s) => (
+            <tr key={s.month}>
+              <th scope="row">{mesCorto(s.month)}</th>
+              <td className="num fin-pos">{money(s.inflowMinor, { compact: true })}</td>
+              <td className="num fin-neg">{money(s.outflowMinor, { compact: true })}</td>
+              <td className={`num ${s.netMinor >= 0 ? 'fin-pos' : 'fin-neg'}`}>
+                {money(s.netMinor, { compact: true })}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th scope="row">Total</th>
+            <td className="num fin-pos">{money(tot.inflowMinor, { compact: true })}</td>
+            <td className="num fin-neg">{money(tot.outflowMinor, { compact: true })}</td>
+            <td className={`num ${tot.netMinor >= 0 ? 'fin-pos' : 'fin-neg'}`}>
+              {money(tot.netMinor, { compact: true })}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 }
