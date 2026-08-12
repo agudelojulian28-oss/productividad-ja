@@ -2196,6 +2196,46 @@ a.mov-thumb:hover {
   font-weight: 650;
   margin-top: 2px;
 }
+/* Skeletons de carga (shimmer) */
+@keyframes skel-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.skel {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--surface-3) 37%,
+    var(--surface-2) 63%
+  );
+  background-size: 200% 100%;
+  animation: skel-shimmer 1.4s ease-in-out infinite;
+}
+.skel-hero {
+  margin-bottom: 24px;
+}
+.skel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skel-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 16px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel {
+    animation: none;
+  }
+}
+
 /* Estado vacío reutilizable */
 .empty-state {
   display: flex;
