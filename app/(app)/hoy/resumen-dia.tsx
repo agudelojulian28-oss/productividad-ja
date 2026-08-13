@@ -33,7 +33,7 @@ export function ResumenDia({
             <span className="dia-cell-v fin-neg">{money(outToday, { compact: true })}</span>
           </div>
           <div className="dia-cell">
-            <span className="dia-cell-k">Neto</span>
+            <span className="dia-cell-k">Balance</span>
             <span className={`dia-cell-v ${net >= 0 ? 'fin-pos' : 'fin-neg'}`}>
               {money(net, { compact: true })}
             </span>

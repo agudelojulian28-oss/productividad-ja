@@ -51,7 +51,7 @@ export function MetasDinero({
                 <div className="meta-money-head">
                   <span className="fin-row-name">{m.title}</span>
                   <span className="muted" style={{ fontSize: 12 }}>
-                    {m.metric === 'money_in' ? 'ingresos' : 'neto'}
+                    {m.metric === 'money_in' ? 'ingresos' : 'balance'}
                   </span>
                 </div>
                 <div className="meta-bar">

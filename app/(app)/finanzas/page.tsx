@@ -107,7 +107,7 @@ export default async function FinanzasPage() {
         )}`}
         kpis={[
           {
-            label: 'Neto del mes',
+            label: 'Balance del mes',
             value: money(resumen.netMinor, { compact: true }),
             tone: resumen.netMinor >= 0 ? 'pos' : 'neg',
           },
@@ -130,8 +130,12 @@ export default async function FinanzasPage() {
         {/* Main: los gráficos (flujo grande + barras). */}
         <div className="fin-main">
           <section className="fin-block">
-            <h2 className="fin-h2">Flujo de caja (neto por mes)</h2>
-            <CashflowChart serie={serie} />
+            <h2 className="fin-h2">Balance de caja</h2>
+            <CashflowChart
+              serie={serie}
+              porProyecto={fuentes.map((f) => ({ label: f.label, value: f.value }))}
+              balanceMinor={resumen.netMinor}
+            />
           </section>
 
           <FinStats
