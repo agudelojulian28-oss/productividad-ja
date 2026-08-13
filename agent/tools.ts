@@ -240,6 +240,24 @@ export async function runTool(
           })),
         );
       }
+      if (vista === 'movimientos') {
+        const { desde, hasta, direccion } = p.value;
+        const dir = direccion === 'ingreso' ? 'in' : direccion === 'gasto' ? 'out' : undefined;
+        const [txs, projects] = await Promise.all([
+          fin.listTransactions({ from: desde, to: hasta, direction: dir, limit: 100 }),
+          repo.listProjects(),
+        ]);
+        const nombre = new Map(projects.map((pr) => [pr.id, pr.title] as const));
+        return ok(
+          txs.map((t) => ({
+            fecha: t.occurredOn,
+            tipo: t.direction === 'in' ? 'ingreso' : 'gasto',
+            monto: money(t.baseAmountMinor),
+            proyecto: t.projectId ? (nombre.get(t.projectId) ?? '—') : '—',
+            concepto: t.description || t.category || undefined,
+          })),
+        );
+      }
       if (vista === 'gastos') {
         return ok(
           topGastos(await fin.expensesByCategory(), ctx.tz).map((g) => ({

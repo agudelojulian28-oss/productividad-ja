@@ -94,4 +94,37 @@ describe('runTool · consultar dinero', () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect((r.value as { nota?: string }).nota).toMatch(/Etapa 5/);
   });
+
+  it('movimientos filtra por rango de fechas y por dirección', async () => {
+    const d = deps();
+    const proyecto_id = await unProyecto(d);
+    const base = {
+      areaId: AREA,
+      currency: 'COP',
+      fxRate: 1,
+      projectId: proyecto_id,
+    };
+    // marzo: un ingreso y un gasto; abril: un gasto (fuera del rango).
+    await d.fin.insertTransaction({ ...base, direction: 'in', amountMinor: 1_000_000, baseAmountMinor: 1_000_000, occurredOn: '2026-03-10' });
+    await d.fin.insertTransaction({ ...base, direction: 'out', amountMinor: 400_000, baseAmountMinor: 400_000, occurredOn: '2026-03-20' });
+    await d.fin.insertTransaction({ ...base, direction: 'out', amountMinor: 999_999, baseAmountMinor: 999_999, occurredOn: '2026-04-02' });
+
+    const marzo = await runTool(d, 'consultar', { vista: 'movimientos', desde: '2026-03-01', hasta: '2026-03-31' });
+    expect(marzo.ok).toBe(true);
+    if (marzo.ok) expect((marzo.value as unknown[]).length).toBe(2);
+
+    const soloGastos = await runTool(d, 'consultar', {
+      vista: 'movimientos',
+      desde: '2026-03-01',
+      hasta: '2026-03-31',
+      direccion: 'gasto',
+    });
+    expect(soloGastos.ok).toBe(true);
+    if (soloGastos.ok) {
+      const rows = soloGastos.value as { tipo: string; fecha: string }[];
+      expect(rows.length).toBe(1);
+      expect(rows[0]!.tipo).toBe('gasto');
+      expect(rows[0]!.fecha).toBe('2026-03-20');
+    }
+  });
 });

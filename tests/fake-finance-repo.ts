@@ -131,6 +131,15 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
         .sort((a, b) => (a.occurredOn < b.occurredOn ? 1 : -1))
         .slice(0, limit);
     },
+    async listTransactions(filter = {}): Promise<TransactionRow[]> {
+      const { from, to, direction, limit = 200 } = filter;
+      return [...txs]
+        .filter((t) => (from ? t.occurredOn >= from : true))
+        .filter((t) => (to ? t.occurredOn <= to : true))
+        .filter((t) => (direction ? t.direction === direction : true))
+        .sort((a, b) => (a.occurredOn < b.occurredOn ? 1 : -1))
+        .slice(0, limit);
+    },
     async byProject() {
       const acc = new Map<string, { projectId: string; month: string; inflow: number; outflow: number; movs: number }>();
       for (const t of txs) {

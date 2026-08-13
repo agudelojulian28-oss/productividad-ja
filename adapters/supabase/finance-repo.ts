@@ -177,6 +177,21 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
       return ((data as DbTransaction[] | null) ?? []).map(toTx);
     },
 
+    async listTransactions(filter = {}) {
+      const { from, to, direction, limit = 200 } = filter;
+      let q = supabase
+        .from('transactions')
+        .select(TX_COLS)
+        .order('occurred_on', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (from) q = q.gte('occurred_on', from);
+      if (to) q = q.lte('occurred_on', to);
+      if (direction) q = q.eq('direction', direction);
+      const { data, error } = await q.limit(limit);
+      if (error) throw new Error(error.message);
+      return ((data as DbTransaction[] | null) ?? []).map(toTx);
+    },
+
     async insertMoneyGoal(input) {
       // Meta de dinero: metric money_in/money_net, en COP (base), atribuida a un proyecto.
       const { data, error } = await supabase

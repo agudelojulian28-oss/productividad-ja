@@ -147,7 +147,7 @@ export default async function FinanzasPage() {
 
           <section className="fin-block">
             <h2 className="fin-h2">Movimientos recientes</h2>
-            <MovimientosRecientes rows={movRows} />
+            <MovimientosRecientes rows={movRows} today={todayInTz(ctx.tz)} />
           </section>
 
           <section className="fin-block">

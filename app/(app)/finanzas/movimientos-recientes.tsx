@@ -1,65 +1,142 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { money } from '@/lib/format';
+import { listMovimientosAction } from '@/app/actions/finance';
 
 export type MovRow = {
   id: string;
   direction: 'in' | 'out';
   baseAmountMinor: number;
-  occurredOn: string;
+  occurredOn: string; // ya formateada (día)
   title: string; // descripción, o categoría, o "Ingreso/Gasto"
   areaName: string;
   receiptUrl: string | null;
 };
 
-type Filter = 'all' | 'in' | 'out';
+type Dir = 'all' | 'in' | 'out';
+type Preset = 'recientes' | 'hoy' | '7d' | '30d' | 'mes' | 'custom';
 
-// Lista de movimientos recientes con su descripción y comprobante (referencia:
-// "Transaction History"). Filtro de vista Todos/Ingresos/Gastos (client-side).
-export function MovimientosRecientes({ rows }: { rows: MovRow[] }) {
-  const [filter, setFilter] = useState<Filter>('all');
+function addDays(ymd: string, n: number): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d!));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
+}
+const firstOfMonth = (ymd: string) => `${ymd.slice(0, 7)}-01`;
 
-  if (rows.length === 0) {
-    return <p className="muted">Aún no hay movimientos registrados.</p>;
+const PRESETS: { v: Preset; label: string }[] = [
+  { v: 'recientes', label: 'Recientes' },
+  { v: 'hoy', label: 'Hoy' },
+  { v: '7d', label: '7 días' },
+  { v: '30d', label: '30 días' },
+  { v: 'mes', label: 'Este mes' },
+  { v: 'custom', label: 'Personalizado' },
+];
+
+// Movimientos con filtro por fechas (server-side, eficiente) y por dirección
+// (client-side sobre el conjunto ya traído). El agente accede a lo mismo por
+// consultar(vista=movimientos, desde, hasta, direccion).
+export function MovimientosRecientes({ rows, today }: { rows: MovRow[]; today: string }) {
+  const [base, setBase] = useState<MovRow[]>(rows);
+  const [preset, setPreset] = useState<Preset>('recientes');
+  const [dir, setDir] = useState<Dir>('all');
+  const [from, setFrom] = useState(addDays(today, -29));
+  const [to, setTo] = useState(today);
+  const [pending, startTransition] = useTransition();
+
+  function rangeFor(p: Preset): { from?: string; to?: string } {
+    switch (p) {
+      case 'hoy':
+        return { from: today, to: today };
+      case '7d':
+        return { from: addDays(today, -6), to: today };
+      case '30d':
+        return { from: addDays(today, -29), to: today };
+      case 'mes':
+        return { from: firstOfMonth(today), to: today };
+      case 'custom':
+        return { from, to };
+      default:
+        return {};
+    }
   }
 
-  const shown = filter === 'all' ? rows : rows.filter((r) => r.direction === filter);
+  function applyPreset(p: Preset) {
+    setPreset(p);
+    if (p === 'custom') return; // espera a "Aplicar"
+    if (p === 'recientes') {
+      setBase(rows);
+      return;
+    }
+    fetchRange(rangeFor(p));
+  }
+
+  function fetchRange(range: { from?: string; to?: string }) {
+    startTransition(async () => {
+      const res = await listMovimientosAction(range);
+      setBase(res);
+    });
+  }
+
+  const shown = dir === 'all' ? base : base.filter((r) => r.direction === dir);
 
   return (
     <div className="mov-wrap">
-      <div className="seg mov-seg" role="tablist" aria-label="Filtrar movimientos">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={filter === 'all'}
-          className={`seg-btn${filter === 'all' ? ' seg-on' : ''}`}
-          onClick={() => setFilter('all')}
-        >
-          Todos
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={filter === 'in'}
-          className={`seg-btn${filter === 'in' ? ' seg-on' : ''}`}
-          onClick={() => setFilter('in')}
-        >
-          Ingresos
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={filter === 'out'}
-          className={`seg-btn${filter === 'out' ? ' seg-on' : ''}`}
-          onClick={() => setFilter('out')}
-        >
-          Gastos
-        </button>
+      <div className="mov-filters">
+        <div className="seg mov-presets" role="tablist" aria-label="Rango de fechas">
+          {PRESETS.map((p) => (
+            <button
+              key={p.v}
+              type="button"
+              role="tab"
+              aria-selected={preset === p.v}
+              className={`seg-btn${preset === p.v ? ' seg-on' : ''}`}
+              onClick={() => applyPreset(p.v)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {preset === 'custom' && (
+          <div className="mov-range">
+            <label className="mov-range-field">
+              Desde
+              <input type="date" className="field" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
+            </label>
+            <label className="mov-range-field">
+              Hasta
+              <input type="date" className="field" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} />
+            </label>
+            <button type="button" className="btn-ghost mov-apply" disabled={pending} onClick={() => fetchRange({ from, to })}>
+              {pending ? '…' : 'Aplicar'}
+            </button>
+          </div>
+        )}
       </div>
 
-      {shown.length === 0 ? (
-        <p className="muted">Sin {filter === 'in' ? 'ingresos' : 'gastos'} recientes.</p>
+      <div className="seg mov-seg" role="tablist" aria-label="Filtrar por tipo">
+        {(['all', 'in', 'out'] as Dir[]).map((d) => (
+          <button
+            key={d}
+            type="button"
+            role="tab"
+            aria-selected={dir === d}
+            className={`seg-btn${dir === d ? ' seg-on' : ''}`}
+            onClick={() => setDir(d)}
+          >
+            {d === 'all' ? 'Todos' : d === 'in' ? 'Ingresos' : 'Gastos'}
+          </button>
+        ))}
+      </div>
+
+      {pending ? (
+        <p className="muted mov-empty">Cargando…</p>
+      ) : shown.length === 0 ? (
+        <p className="muted mov-empty">
+          {base.length === 0 ? 'No hay movimientos en este rango.' : `Sin ${dir === 'in' ? 'ingresos' : 'gastos'} en este rango.`}
+        </p>
       ) : (
         <div className="mov-list">
           {shown.map((m) => (

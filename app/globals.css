@@ -2248,6 +2248,42 @@ ol {
 .mov-seg {
   align-self: flex-start;
 }
+.mov-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mov-presets {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mov-presets::-webkit-scrollbar {
+  display: none;
+}
+.mov-presets .seg-btn {
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+.mov-range {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mov-range-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 0;
+}
+.mov-apply {
+  padding: 10px 16px;
+}
+.mov-empty {
+  margin: 4px 0;
+}
 .mov-list {
   display: flex;
   flex-direction: column;

@@ -36,6 +36,7 @@ export const Consultar = z.object({
       'documentacion',
       'resumen_financiero',
       'por_proyecto',
+      'movimientos',
       'gastos',
       'recurrentes',
       'por_cobrar',
@@ -46,10 +47,17 @@ export const Consultar = z.object({
     .describe(
       'Qué consultar. Trabajo: agenda_hoy (tareas+eventos de hoy), agenda (eventos de un día, usa fecha), ' +
         'pendientes (tareas), estructura (áreas, proyectos y metas con sus IDs), documentacion (el método). ' +
-        'Dinero: resumen_financiero, por_proyecto (ingresos/gastos por proyecto), gastos, por_cobrar, pipeline. ' +
+        'Dinero: resumen_financiero, por_proyecto (ingresos/gastos por proyecto), movimientos (lista de ' +
+        'ingresos/gastos filtrable por rango de fechas: usa desde/hasta/direccion), gastos, por_cobrar, pipeline. ' +
         'Agenda: conflictos (solapes próximos 7 días), huecos (ratos libres; usa duracion_min).',
     ),
   fecha: Ymd.optional().describe('Solo vista=agenda: día YYYY-MM-DD (por defecto hoy)'),
+  desde: Ymd.optional().describe('Solo vista=movimientos: inicio del rango YYYY-MM-DD (inclusive)'),
+  hasta: Ymd.optional().describe('Solo vista=movimientos: fin del rango YYYY-MM-DD (inclusive)'),
+  direccion: z
+    .enum(['ingreso', 'gasto'])
+    .optional()
+    .describe('Solo vista=movimientos: filtra a ingresos o gastos'),
   proyecto_id: z.uuid().optional().describe('Solo vista=documentacion: limita a ese proyecto'),
   duracion_min: z.number().int().min(15).max(480).optional().describe('Solo vista=huecos: minutos (60 def)'),
 });

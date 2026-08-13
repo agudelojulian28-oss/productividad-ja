@@ -18,14 +18,60 @@ import {
 } from '@/core/finance/recurring';
 import type { RecurringExpenseRow, RecurringFrequency } from '@/core/finance/ports';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
-import { uploadImage } from '@/adapters/supabase/storage';
+import { workRepo } from '@/adapters/supabase/work-repo';
+import { uploadImage, signedUrl } from '@/adapters/supabase/storage';
 import { registerAttachment } from '@/core/structure/attachments';
 import { ok, err, type Result } from '@/core/types';
+import { dayLabelInTz } from '@/lib/format';
 import type { IncomeSourceRow, TransactionRow, IncomeModel } from '@/core/finance/ports';
+import type { MovRow } from '@/app/(app)/finanzas/movimientos-recientes';
 
 async function deps() {
   const { supabase, ctx } = await requireContext();
   return { ctx, repo: financeRepo(supabase, ctx.userId) };
+}
+
+/** Movimientos filtrados por rango de fechas (server-side) + dirección, listos para
+ *  la lista (con nombre de proyecto y comprobante firmado). */
+export async function listMovimientosAction(filter: {
+  from?: string;
+  to?: string;
+  direction?: 'in' | 'out';
+}): Promise<MovRow[]> {
+  const { supabase, ctx } = await requireContext();
+  const finance = financeRepo(supabase, ctx.userId);
+  const structure = structureRepo(supabase, ctx.userId);
+  const work = workRepo(supabase, ctx.userId);
+
+  const [txs, projects] = await Promise.all([
+    finance.listTransactions({ ...filter, limit: 200 }),
+    work.listProjects(),
+  ]);
+  const projName = new Map(projects.map((p) => [p.id, p.title] as const));
+
+  const attachments = await structure.listAttachmentsForTransactions(txs.map((t) => t.id));
+  const receiptPath = new Map<string, string>();
+  for (const a of attachments) {
+    if (a.transactionId && !receiptPath.has(a.transactionId)) {
+      receiptPath.set(a.transactionId, a.storagePath);
+    }
+  }
+  const receiptUrl = new Map<string, string | null>();
+  await Promise.all(
+    [...receiptPath].map(async ([txId, path]) => {
+      receiptUrl.set(txId, await signedUrl(supabase, path));
+    }),
+  );
+
+  return txs.map((t) => ({
+    id: t.id,
+    direction: t.direction,
+    baseAmountMinor: t.baseAmountMinor,
+    occurredOn: dayLabelInTz(`${t.occurredOn}T12:00:00Z`, ctx.tz),
+    title: t.description || t.category || (t.direction === 'in' ? 'Ingreso' : 'Gasto'),
+    areaName: (t.projectId ? projName.get(t.projectId) : undefined) ?? '—',
+    receiptUrl: receiptUrl.get(t.id) ?? null,
+  }));
 }
 
 export async function createIncomeSourceAction(input: {

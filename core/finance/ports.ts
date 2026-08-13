@@ -38,6 +38,14 @@ export interface TransactionRow {
   description: string | null;
 }
 
+/** Filtro de movimientos por rango de fechas y dirección (todo opcional). */
+export interface TransactionFilter {
+  from?: string; // YYYY-MM-DD (inclusive)
+  to?: string; // YYYY-MM-DD (inclusive)
+  direction?: 'in' | 'out';
+  limit?: number;
+}
+
 export interface TransactionInsert {
   areaId: string;
   incomeSourceId?: string;
@@ -178,6 +186,8 @@ export interface FinanceRepo {
 
   insertTransaction(input: TransactionInsert): Promise<TransactionRow>;
   listRecentTransactions(limit?: number): Promise<TransactionRow[]>;
+  /** Movimientos por rango de fechas (occurred_on) y dirección — filtrado en la BD. */
+  listTransactions(filter?: TransactionFilter): Promise<TransactionRow[]>;
   byProject(): Promise<ByProjectRow[]>;
 
   insertRecurringExpense(input: RecurringExpenseInsert): Promise<RecurringExpenseRow>;
