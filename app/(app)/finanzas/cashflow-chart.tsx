@@ -11,7 +11,7 @@ function mesCorto(month: string): string {
   return MESES[mm - 1] ?? month.slice(5, 7);
 }
 
-type View = 'montana' | 'linea' | 'circular' | 'tabla';
+type View = 'circular' | 'montana' | 'tabla';
 type Proj = { label: string; value: number };
 
 const W = 320;
@@ -39,7 +39,7 @@ export function CashflowChart({
   porProyecto: Proj[];
   balanceMinor: number;
 }) {
-  const [view, setView] = useState<View>('montana');
+  const [view, setView] = useState<View>('circular');
   const [hover, setHover] = useState<number | null>(null);
   const gradId = useId();
 
@@ -55,9 +55,8 @@ export function CashflowChart({
   }
 
   const tabs: { v: View; label: string }[] = [
-    { v: 'montana', label: 'Montaña' },
-    { v: 'linea', label: 'Línea' },
     { v: 'circular', label: 'Circular' },
+    { v: 'montana', label: 'Montaña' },
     { v: 'tabla', label: 'Tabla' },
   ];
 
@@ -84,7 +83,7 @@ export function CashflowChart({
         <Donut porProyecto={porProyecto} balanceMinor={balanceMinor} hover={hover} setHover={setHover} />
       )}
 
-      {(view === 'montana' || view === 'linea') && (
+      {view === 'montana' && (
         <figure className="fin-chart" style={{ position: 'relative' }}>
           <svg
             viewBox={`0 0 ${W} ${H}`}
@@ -94,7 +93,7 @@ export function CashflowChart({
             style={{ display: 'block' }}
             onMouseLeave={() => setHover(null)}
           >
-            <BalanceArea serie={serie} slot={slot} area={view === 'montana'} gradId={gradId} hover={hover} />
+            <BalanceArea serie={serie} slot={slot} area gradId={gradId} hover={hover} />
 
             {serie.map((s, i) => (
               <rect
