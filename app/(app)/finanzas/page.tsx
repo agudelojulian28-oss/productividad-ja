@@ -44,6 +44,14 @@ export default async function FinanzasPage() {
   const resumen = resumenFinanciero(cashflow, ctx.tz);
   const serie = serieMensual(cashflow, 6);
 
+  // Variación % vs el mes anterior (badge en KPIs). Solo si el mes previo > 0.
+  const cur = serie[serie.length - 1];
+  const prev = serie.length >= 2 ? serie[serie.length - 2] : undefined;
+  const pctDelta = (c: number, p: number | undefined) =>
+    p && p > 0 ? { pct: Math.round(((c - p) / p) * 100), up: c >= p } : undefined;
+  const balanceDelta = cur ? pctDelta(cur.netMinor, prev?.netMinor) : undefined;
+  const ingresosDelta = cur ? pctDelta(cur.inflowMinor, prev?.inflowMinor) : undefined;
+
   // Ingresos y gastos por proyecto del mes en curso (ADR-026).
   const projName = new Map(projects.map((p) => [p.id, p.title] as const));
   const currentMonth = `${todayInTz(ctx.tz).slice(0, 7)}-01`;
@@ -112,12 +120,14 @@ export default async function FinanzasPage() {
             tone: resumen.netMinor >= 0 ? 'pos' : 'neg',
             sub: `${resumen.movements} ${resumen.movements === 1 ? 'movimiento' : 'movimientos'}`,
             spark: serie.map((s) => s.netMinor),
+            delta: balanceDelta,
           },
           {
             label: 'Ingresos',
             value: money(resumen.inflowMinor, { compact: true }),
             tone: 'acc',
             spark: serie.map((s) => s.inflowMinor),
+            delta: ingresosDelta,
           },
         ]}
       />

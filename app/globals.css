@@ -2992,3 +2992,33 @@ select.field:hover {
 .mov-thumb-out .mov-thumb-empty {
   color: inherit;
 }
+
+/* 10) Badge de variación % en KPIs (▲/▼, como la referencia). */
+.kpi-vrow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.kpi-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+.kpi-delta.up {
+  color: var(--positive);
+  background: var(--positive-weak);
+}
+.kpi-delta.down {
+  color: var(--negative);
+  background: var(--negative-weak);
+}
+/* En la tarjeta-estrella (naranja): badge legible sobre el degradado. */
+.hero-aside .kpi:first-child .kpi-delta {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+}

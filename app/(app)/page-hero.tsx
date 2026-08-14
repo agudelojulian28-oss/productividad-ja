@@ -8,6 +8,7 @@ export type Kpi = {
   tone?: 'pos' | 'neg' | 'acc';
   sub?: string; // segunda línea (ej. "de $24,2 M ingresos")
   spark?: number[]; // mini tendencia (sparkline)
+  delta?: { pct: number; up: boolean }; // variación vs mes anterior (badge)
 };
 
 /** Sparkline estático (SVG): tendencia sutil dentro de la tarjeta KPI. */
@@ -70,7 +71,14 @@ export function PageHero({
           {kpis?.map((k, i) => (
             <div key={i} className="kpi">
               <div className="kpi-k">{k.label}</div>
-              <div className={`kpi-v${k.tone ? ` kpi-${k.tone}` : ''}`}>{k.value}</div>
+              <div className="kpi-vrow">
+                <span className={`kpi-v${k.tone ? ` kpi-${k.tone}` : ''}`}>{k.value}</span>
+                {k.delta && (
+                  <span className={`kpi-delta ${k.delta.up ? 'up' : 'down'}`}>
+                    {k.delta.up ? '▲' : '▼'} {Math.abs(k.delta.pct)}%
+                  </span>
+                )}
+              </div>
               {k.sub && <div className="kpi-sub">{k.sub}</div>}
               {k.spark && k.spark.length > 1 && <Spark data={k.spark} />}
             </div>
