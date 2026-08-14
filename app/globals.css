@@ -2822,7 +2822,6 @@ body::before {
 /* 2) Tarjetas elevadas: sheen de luz superior + borde vivo (opaco, sin coste
    de blur). Activa los tokens --card-surface / --card-border ya definidos. */
 .kpi,
-.fin-block,
 .fin-chart,
 .chart-table-wrap,
 .donut-wrap,
