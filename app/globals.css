@@ -2799,3 +2799,49 @@ a.mov-thumb:hover {
   color: var(--text-muted);
   font-size: 14px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Uplift visual "Modern Dark" — aura de degradado + vidrio esmerilado + sheen.
+   Solo estética; aplica a todas las páginas. No cambia estructura ni lógica.
+   (ui-ux-pro-max: glassmorphism, ambient light, linear gradient, frosted glass)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* 1) Aura de fondo: glows cálidos fijos que dan profundidad (el degradado). */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(58% 42% at 12% -8%, rgba(255, 122, 60, 0.18), transparent 60%),
+    radial-gradient(48% 36% at 104% -4%, rgba(255, 90, 44, 0.12), transparent 55%),
+    radial-gradient(78% 55% at 50% 114%, rgba(255, 90, 44, 0.055), transparent 60%);
+}
+
+/* 2) Tarjetas elevadas: sheen de luz superior + borde vivo (opaco, sin coste
+   de blur). Activa los tokens --card-surface / --card-border ya definidos. */
+.kpi,
+.fin-block,
+.fin-chart,
+.chart-table-wrap,
+.donut-wrap,
+.row-card,
+.task,
+.event-row,
+.recur-row,
+.mov-row,
+.hoy-rail-card {
+  background: var(--card-surface);
+  border-color: var(--card-border);
+}
+
+/* 3) Franjas de vidrio esmerilado: la aura se difumina detrás (header + nav). */
+.shell-header {
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+}
+.bottom-nav {
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+}
