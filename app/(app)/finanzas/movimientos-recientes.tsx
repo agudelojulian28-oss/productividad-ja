@@ -153,7 +153,7 @@ export function MovimientosRecientes({ rows, today }: { rows: MovRow[]; today: s
                   <img src={m.receiptUrl} alt="comprobante" />
                 </a>
               ) : (
-                <div className="mov-thumb">
+                <div className={`mov-thumb mov-thumb-${m.direction}`}>
                   <span className="mov-thumb-empty" aria-hidden="true">
                     {m.direction === 'in' ? '↘' : '↗'}
                   </span>

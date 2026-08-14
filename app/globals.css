@@ -2954,3 +2954,41 @@ select.field {
 select.field:hover {
   border-color: var(--border-strong);
 }
+
+/* 8) Sparkline + subtítulo en tarjetas KPI (como los mini-gráficos de la referencia). */
+.kpi {
+  min-width: 148px;
+}
+.kpi-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.kpi-spark {
+  display: block;
+  width: 100%;
+  height: 24px;
+  margin-top: 8px;
+  color: var(--accent);
+}
+/* En la tarjeta-estrella (naranja): subtítulo y sparkline en blanco. */
+.hero-aside .kpi:first-child .kpi-sub {
+  color: rgba(255, 255, 255, 0.82);
+}
+.hero-aside .kpi:first-child .kpi-spark {
+  color: #fff;
+}
+
+/* 9) Thumb circular tintado por dirección en movimientos (estilo "Top Token"). */
+.mov-thumb-in {
+  background: var(--positive-weak);
+  color: var(--positive);
+}
+.mov-thumb-out {
+  background: var(--negative-weak);
+  color: var(--negative);
+}
+.mov-thumb-in .mov-thumb-empty,
+.mov-thumb-out .mov-thumb-empty {
+  color: inherit;
+}

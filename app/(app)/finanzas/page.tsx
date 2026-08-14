@@ -110,11 +110,14 @@ export default async function FinanzasPage() {
             label: 'Balance del mes',
             value: money(resumen.netMinor, { compact: true }),
             tone: resumen.netMinor >= 0 ? 'pos' : 'neg',
+            sub: `${resumen.movements} ${resumen.movements === 1 ? 'movimiento' : 'movimientos'}`,
+            spark: serie.map((s) => s.netMinor),
           },
           {
             label: 'Ingresos',
             value: money(resumen.inflowMinor, { compact: true }),
             tone: 'acc',
+            spark: serie.map((s) => s.inflowMinor),
           },
         ]}
       />

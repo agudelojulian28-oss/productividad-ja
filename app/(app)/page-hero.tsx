@@ -6,7 +6,43 @@ export type Kpi = {
   label: string;
   value: string;
   tone?: 'pos' | 'neg' | 'acc';
+  sub?: string; // segunda línea (ej. "de $24,2 M ingresos")
+  spark?: number[]; // mini tendencia (sparkline)
 };
+
+/** Sparkline estático (SVG): tendencia sutil dentro de la tarjeta KPI. */
+function Spark({ data }: { data: number[] }) {
+  if (data.length < 2) return null;
+  const w = 100;
+  const h = 26;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const pts = data.map(
+    (v, i) => [(i / (data.length - 1)) * w, h - ((v - min) / range) * (h - 3) - 1.5] as const,
+  );
+  const line = pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const area = `0,${h} ${line} ${w},${h}`;
+  return (
+    <svg
+      className="kpi-spark"
+      viewBox={`0 0 ${w} ${h}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <polygon points={area} fill="currentColor" opacity="0.16" />
+      <polyline
+        points={line}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        vectorEffect="non-scaling-stroke"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export function PageHero({
   eyebrow,
@@ -35,6 +71,8 @@ export function PageHero({
             <div key={i} className="kpi">
               <div className="kpi-k">{k.label}</div>
               <div className={`kpi-v${k.tone ? ` kpi-${k.tone}` : ''}`}>{k.value}</div>
+              {k.sub && <div className="kpi-sub">{k.sub}</div>}
+              {k.spark && k.spark.length > 1 && <Spark data={k.spark} />}
             </div>
           ))}
           {actions}
