@@ -2845,3 +2845,20 @@ body::before {
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   backdrop-filter: blur(16px) saturate(1.3);
 }
+
+/* 4) Tipografía de display (Space Grotesk) en títulos y cifras grandes.
+   El cuerpo, listas y tablas siguen en Inter (legibilidad + números tabulares). */
+.hero-title,
+.page-title,
+.fin-h2,
+.kpi-v,
+.fin-stats-num,
+.dia-cell-v,
+.donut-center-v,
+.chat-welcome-title,
+.modal-title,
+.recur-pop-title,
+.empty-title {
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
