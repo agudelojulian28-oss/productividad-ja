@@ -6,6 +6,7 @@ import { todayInTz, dateInTz } from '@/lib/format';
 import type { TaskRow } from '@/core/work/ports';
 import { detectarChoques } from '@/lib/agenda';
 import { TareaLauncher } from './tarea-launcher';
+import { QuickActions } from './quick-actions';
 import { ResumenDia, type ProjIncome } from './resumen-dia';
 import { TaskItem } from './task-item';
 import { EventItem } from './event-item';
@@ -29,6 +30,10 @@ export default async function HoyPage() {
     finance.listRecentTransactions(120),
   ]);
   const projectName = new Map(projects.map((p) => [p.id, p.title] as const));
+  // Proyectos con área (los únicos que pueden recibir dinero) para el acceso rápido.
+  const movProjects = projects
+    .filter((p) => p.areaId)
+    .map((p) => ({ id: p.id, title: p.title, areaId: p.areaId as string }));
 
   // Movimientos de hoy: facturado (ingresos) por proyecto + neto del día.
   let inToday = 0;
@@ -121,6 +126,13 @@ export default async function HoyPage() {
           />
         }
       />
+      <QuickActions
+        projects={projects.map((p) => ({ id: p.id, title: p.title }))}
+        goalsByProject={goalsByProject}
+        movProjects={movProjects}
+        today={today}
+      />
+
       <ChoquesBanner choques={detectarChoques(calEvents)} tz={ctx.tz} />
 
       <div className="hoy-grid">
