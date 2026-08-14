@@ -2814,9 +2814,10 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(58% 42% at 12% -8%, rgba(255, 122, 60, 0.18), transparent 60%),
-    radial-gradient(48% 36% at 104% -4%, rgba(255, 90, 44, 0.12), transparent 55%),
-    radial-gradient(78% 55% at 50% 114%, rgba(255, 90, 44, 0.055), transparent 60%);
+    radial-gradient(52% 44% at 100% -6%, rgba(255, 128, 66, 0.30), transparent 58%),
+    radial-gradient(50% 42% at 4% -8%, rgba(255, 90, 44, 0.22), transparent 60%),
+    radial-gradient(95% 40% at 50% -14%, rgba(255, 110, 55, 0.10), transparent 55%),
+    radial-gradient(85% 55% at 50% 116%, rgba(255, 90, 44, 0.06), transparent 60%);
 }
 
 /* 2) Tarjetas elevadas: sheen de luz superior + borde vivo (opaco, sin coste
@@ -2860,4 +2861,19 @@ body::before {
 .empty-title {
   font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
   letter-spacing: -0.02em;
+}
+
+/* 5) Tarjeta-estrella: el KPI principal del hero como card con degradado naranja
+   (como el "Total Balance" de la referencia). Solo el primero; los demás, oscuros. */
+.hero-aside .kpi:first-child {
+  background: var(--grad-accent);
+  border-color: transparent;
+  box-shadow: 0 10px 30px rgba(255, 90, 44, 0.28);
+  padding: 14px 18px;
+}
+.hero-aside .kpi:first-child .kpi-k {
+  color: rgba(255, 255, 255, 0.82);
+}
+.hero-aside .kpi:first-child .kpi-v {
+  color: #fff;
 }
