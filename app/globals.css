@@ -3072,3 +3072,34 @@ select.field:hover {
   font-size: 13px;
   font-weight: 500;
 }
+
+/* 12) Acceso rápido dentro del sidebar (compacto, 2 columnas, sobre "Salir"). */
+.sb-quick-wrap {
+  margin-bottom: 12px;
+}
+.sb-quick-wrap .sb-sec {
+  padding: 0 2px 8px;
+}
+.quick-sb {
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 0;
+}
+.quick-sb .quick-tile {
+  padding: 10px 6px;
+  gap: 6px;
+  box-shadow: none;
+  border-radius: var(--radius-sm);
+}
+.quick-sb .quick-ic {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+}
+.quick-sb .quick-ic svg {
+  width: 17px;
+  height: 17px;
+}
+.quick-sb .quick-label {
+  font-size: 11.5px;
+}

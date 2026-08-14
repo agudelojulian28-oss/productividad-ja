@@ -3,33 +3,37 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Modal } from '../modal';
-import { NewTaskForm } from './new-task-form';
-import { RegistrarMovimiento } from '../finanzas/registrar-movimiento';
+import { Modal } from './modal';
+import { NewTaskForm } from './hoy/new-task-form';
+import { RegistrarMovimiento } from './finanzas/registrar-movimiento';
 
 type Project = { id: string; title: string };
 type MovProject = { id: string; title: string; areaId: string };
 
+export type QuickData = {
+  projects: Project[];
+  goalsByProject: Record<string, { id: string; title: string }[]>;
+  movProjects: MovProject[];
+  today: string;
+};
+
 /**
- * Fila de acceso rápido (estilo "Quick Actions" de la referencia): abre los
- * pop-ups y acciones que YA existen. No añade backend ni cambia funcionalidad.
+ * Acceso rápido: abre los pop-ups y acciones que YA existen. No añade backend ni
+ * cambia funcionalidad. `variant='sidebar'` lo compacta para el panel izquierdo.
  */
 export function QuickActions({
   projects,
   goalsByProject,
   movProjects,
   today,
-}: {
-  projects: Project[];
-  goalsByProject: Record<string, { id: string; title: string }[]>;
-  movProjects: MovProject[];
-  today: string;
-}) {
+  variant,
+}: QuickData & { variant?: 'sidebar' }) {
   const router = useRouter();
   const [open, setOpen] = useState<null | 'tarea' | 'mov'>(null);
+  const cls = `quick${variant === 'sidebar' ? ' quick-sb' : ''}`;
 
   return (
-    <div className="quick">
+    <div className={cls}>
       <button type="button" className="quick-tile" onClick={() => setOpen('tarea')}>
         <span className="quick-ic quick-ic-task">
           <svg viewBox="0 0 24 24" fill="none" width="20" height="20" aria-hidden="true">

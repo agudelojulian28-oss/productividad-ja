@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
 import { signOut } from '@/app/actions/auth';
+import { QuickActions, type QuickData } from './quick-actions';
 
 type Item = { href: Route; label: string; icon: React.ReactNode };
 
@@ -37,7 +38,7 @@ const config: Item[] = [
   { href: '/ajustes', label: 'Ajustes', icon: I.ajustes },
 ];
 
-export function Sidebar() {
+export function Sidebar({ quick }: { quick?: QuickData }) {
   const path = usePathname();
   const isOn = (href: string) => path === href || path.startsWith(href + '/');
 
@@ -59,11 +60,19 @@ export function Sidebar() {
         <div className="sb-sec">Configuración</div>
         {config.map(link)}
       </nav>
-      <form action={signOut} className="sb-foot">
-        <button type="submit" className="sb-out">
-          Salir
-        </button>
-      </form>
+      <div className="sb-foot">
+        {quick && (
+          <div className="sb-quick-wrap">
+            <div className="sb-sec">Acceso rápido</div>
+            <QuickActions {...quick} variant="sidebar" />
+          </div>
+        )}
+        <form action={signOut}>
+          <button type="submit" className="sb-out">
+            Salir
+          </button>
+        </form>
+      </div>
     </aside>
   );
 }
