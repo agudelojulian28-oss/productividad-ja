@@ -2877,3 +2877,63 @@ body::before {
 .hero-aside .kpi:first-child .kpi-v {
   color: #fff;
 }
+
+/* 6) Detalles finos para acercar a la referencia (segmentos, sidebar, barras,
+   sombras, scrollbars, selección). Todo estético; aplica en toda la app. */
+
+/* Chip activo de segmento: elevado con degradado sutil (vistas, filtros, presets). */
+.seg-btn.seg-on {
+  background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Ítem activo del sidebar: pill con degradado de acento (como el nav activo). */
+.sb-on {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 20%, transparent), var(--accent-weak));
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Barras glossy (degradado de marca), como las de la referencia. */
+.barlist-accent {
+  background: var(--grad-accent);
+}
+
+/* Sombra de reposo suave en las tarjetas grandes (profundidad). */
+.kpi,
+.fin-chart,
+.chart-table-wrap,
+.donut-wrap,
+.hoy-rail-card {
+  box-shadow: var(--shadow-sm);
+}
+
+/* Scrollbars finas y discretas en toda la app. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-subtle);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Selección de texto con acento. */
+::selection {
+  background: var(--accent-weak);
+  color: var(--text);
+}
