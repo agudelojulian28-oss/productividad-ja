@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useTransition, type FormEvent } from 'react'
 import { registrarMovimientoAction, attachReceiptAction } from '@/app/actions/finance';
 import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
+import { SegSelect } from '../seg-select';
 
 type Receipt = { data: string; preview: string };
 
@@ -125,27 +126,25 @@ export function RegistrarMovimiento({
         </button>
       </div>
 
-      <div className="fin-amount-row">
-        <input
-          type="text"
-          inputMode="decimal"
-          placeholder="Monto"
-          value={monto}
-          onChange={(e) => setMonto(e.target.value)}
-          className="field fin-amount"
-          aria-label="Monto"
-          autoComplete="off"
-        />
-        <select
-          value={currency}
-          onChange={(e) => setCurrency(e.target.value as 'COP' | 'USD')}
-          className="field fin-cur"
-          aria-label="Moneda"
-        >
-          <option value="COP">COP</option>
-          <option value="USD">USD</option>
-        </select>
-      </div>
+      <input
+        type="text"
+        inputMode="decimal"
+        placeholder="Monto"
+        value={monto}
+        onChange={(e) => setMonto(e.target.value)}
+        className="field fin-amount"
+        aria-label="Monto"
+        autoComplete="off"
+      />
+      <SegSelect
+        ariaLabel="Moneda"
+        value={currency}
+        onChange={setCurrency}
+        options={[
+          { value: 'COP', label: 'COP' },
+          { value: 'USD', label: 'USD' },
+        ]}
+      />
 
       {currency === 'USD' && (
         <label className="cal-field-label">

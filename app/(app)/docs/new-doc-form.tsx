@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition, type FormEvent } from 'react';
 import { createDocumentAction } from '@/app/actions/documents';
 import type { DocumentKind } from '@/core/structure/ports';
+import { SegSelect } from '../seg-select';
 
 type Area = { id: string; name: string };
 type Project = { id: string; title: string };
@@ -65,19 +66,13 @@ export function NewDocForm({
         aria-label="Título del documento"
         autoComplete="off"
       />
+      <SegSelect
+        ariaLabel="Tipo de documento"
+        value={kind}
+        onChange={setKind}
+        options={KINDS.map((k) => ({ value: k.value, label: k.label }))}
+      />
       <div className="new-task-row">
-        <select
-          value={kind}
-          onChange={(e) => setKind(e.target.value as DocumentKind)}
-          className="field"
-          aria-label="Tipo"
-        >
-          {KINDS.map((k) => (
-            <option key={k.value} value={k.value}>
-              {k.label}
-            </option>
-          ))}
-        </select>
         {!fixedProjectId && (
           <select
             value={scope}

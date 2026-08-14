@@ -5,6 +5,7 @@ import { createMoneyGoalAction } from '@/app/actions/finance';
 import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
 import { Modal } from '../modal';
+import { SegSelect } from '../seg-select';
 
 type Project = { id: string; title: string };
 export type MetaProgreso = {
@@ -144,27 +145,25 @@ function MetaForm({
           aria-label="Nombre de la meta"
           autoComplete="off"
         />
-        <div className="new-task-row">
-          <select
-            value={metric}
-            onChange={(e) => setMetric(e.target.value as 'money_in' | 'money_net')}
-            className="field"
-            aria-label="Métrica"
-          >
-            <option value="money_in">Ingresos</option>
-            <option value="money_net">Neto (ingresos − gastos)</option>
-          </select>
-          <input
-            type="text"
-            inputMode="decimal"
-            placeholder="Objetivo en COP"
-            value={objetivo}
-            onChange={(e) => setObjetivo(e.target.value)}
-            className="field"
-            aria-label="Objetivo en pesos"
-            autoComplete="off"
-          />
-        </div>
+        <SegSelect
+          ariaLabel="Métrica de la meta"
+          value={metric}
+          onChange={setMetric}
+          options={[
+            { value: 'money_in', label: 'Ingresos' },
+            { value: 'money_net', label: 'Balance' },
+          ]}
+        />
+        <input
+          type="text"
+          inputMode="decimal"
+          placeholder="Objetivo en COP"
+          value={objetivo}
+          onChange={(e) => setObjetivo(e.target.value)}
+          className="field"
+          aria-label="Objetivo en pesos"
+          autoComplete="off"
+        />
         <select
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}

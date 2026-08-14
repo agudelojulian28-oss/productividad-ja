@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from 'react';
 import { createAreaAction } from '@/app/actions/areas';
+import { SegSelect } from '../seg-select';
 
 export function NewAreaForm({ onDone }: { onDone?: () => void }) {
   const [name, setName] = useState('');
@@ -34,20 +35,18 @@ export function NewAreaForm({ onDone }: { onDone?: () => void }) {
         className="field"
         aria-label="Nombre del área"
       />
-      <div className="new-task-row">
-        <select
-          value={kind}
-          onChange={(e) => setKind(e.target.value as 'negocio' | 'personal')}
-          className="field"
-          aria-label="Tipo de área"
-        >
-          <option value="negocio">Negocio</option>
-          <option value="personal">Personal</option>
-        </select>
-        <button type="submit" className="btn-primary" disabled={pending}>
-          {pending ? '…' : 'Crear'}
-        </button>
-      </div>
+      <SegSelect
+        ariaLabel="Tipo de área"
+        value={kind}
+        onChange={setKind}
+        options={[
+          { value: 'negocio', label: 'Negocio' },
+          { value: 'personal', label: 'Personal' },
+        ]}
+      />
+      <button type="submit" className="btn-primary" disabled={pending}>
+        {pending ? '…' : 'Crear'}
+      </button>
       {error && <p className="error-text">{error}</p>}
     </form>
   );
