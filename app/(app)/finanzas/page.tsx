@@ -146,6 +146,14 @@ export default async function FinanzasPage() {
         </div>
       )}
 
+      {/* En móvil el botón de registrar va arriba, justo bajo el balance. En
+          escritorio este se oculta (se usa el del rail). */}
+      {projectOpts.length > 0 && (
+        <div className="fin-capture-top">
+          <MovimientoLauncher projects={projectOpts} today={todayInTz(ctx.tz)} />
+        </div>
+      )}
+
       <div className="fin-grid">
         {/* Main: los gráficos (flujo grande + barras). */}
         <div className="fin-main">

@@ -3148,3 +3148,33 @@ button.mov-row:hover {
   display: inline-block;
   font-size: 13.5px;
 }
+
+/* 14) Correcciones de orden en móvil ────────────────────────────────────── */
+/* Hoy (móvil): Facturado hoy → tareas → agenda. En escritorio manda el grid. */
+@media (max-width: 1023px) {
+  .hoy-grid {
+    display: flex;
+    flex-direction: column;
+  }
+  .hoy-main {
+    order: 1;
+  }
+  .hoy-rail {
+    order: 2;
+  }
+}
+/* Finanzas: botón de registrar arriba (bajo el balance) en móvil; en el rail
+   solo en escritorio. */
+.fin-capture-top {
+  margin-bottom: 16px;
+}
+@media (min-width: 1024px) {
+  .fin-capture-top {
+    display: none;
+  }
+}
+@media (max-width: 1023px) {
+  .fin-capture {
+    display: none;
+  }
+}
