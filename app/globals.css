@@ -3182,3 +3182,27 @@ button.mov-row:hover {
     display: none;
   }
 }
+
+/* 15) Vidrio esmerilado en más módulos (pop-ups, barra lateral, toast). ────── */
+.modal {
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  backdrop-filter: blur(22px) saturate(1.3);
+}
+.modal-head {
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(22px) saturate(1.3);
+}
+.recur-pop {
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  backdrop-filter: blur(22px) saturate(1.3);
+}
+.toast {
+  background: color-mix(in srgb, var(--surface-3) 78%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+}
+@media (min-width: 1024px) {
+  .app-sidebar {
+    background: color-mix(in srgb, var(--bg) 58%, transparent);
+    backdrop-filter: blur(18px) saturate(1.2);
+  }
+}
