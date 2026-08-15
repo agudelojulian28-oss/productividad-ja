@@ -10,7 +10,11 @@ import { toolDefinitions, isToolName } from './schemas';
 import { runTool } from './tools';
 import { SYSTEM_PROMPT } from './prompt';
 
-const MAX_ITERATIONS = 8; // corta bucles del modelo (causa de facturas sorpresa)
+// Tope de pasos (tool_use → resultado) por turno. Más alto = puede completar
+// tareas grandes descompuestas en varios pasos; el circuit breaker de costo
+// (consumeBudget) sigue siendo el guardián real del gasto. Al alcanzarlo, el loop
+// cierra con un resumen en vez de cortar en seco.
+const MAX_ITERATIONS = 12;
 
 /** Imagen adjunta al mensaje del usuario (base64). Claude la entiende de forma
  *  nativa (visión). Los formatos que acepta la API son estos cuatro. */
@@ -181,5 +185,30 @@ export async function* runAgent(
     messages.push({ role: 'user', content: results });
   }
 
+  // Se alcanzó el tope con trabajo aún pendiente (la última iteración pidió más
+  // herramientas). Cierre sin herramientas para no cortar en seco: el modelo
+  // resume qué logró y qué falta, e invita a escribir "continúa".
+  const wrap = deps.client.messages.stream({
+    model: AGENT_MODEL,
+    max_tokens: 400,
+    thinking: { type: 'disabled' },
+    system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+    tools: [],
+    messages: [
+      ...messages,
+      {
+        role: 'user',
+        content:
+          'Alcanzaste el límite de pasos de esta tanda. En 1-2 frases y en español, dime qué lograste y qué quedó pendiente, y avísame que puedo escribir "continúa" para seguir. No uses herramientas.',
+      },
+    ],
+  });
+  for await (const event of wrap) {
+    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+      yield { type: 'text', text: event.delta.text };
+    }
+  }
+  const wrapFinal = await wrap.finalMessage();
+  await deps.consumeBudget(costUsd(wrapFinal.usage));
   yield { type: 'done' };
 }
