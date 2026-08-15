@@ -2814,10 +2814,16 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
+    /* glow superior cálido (izq + der) */
     radial-gradient(52% 44% at 100% -6%, rgba(255, 128, 66, 0.30), transparent 58%),
     radial-gradient(50% 42% at 4% -8%, rgba(255, 90, 44, 0.22), transparent 60%),
     radial-gradient(95% 40% at 50% -14%, rgba(255, 110, 55, 0.10), transparent 55%),
-    radial-gradient(85% 55% at 50% 116%, rgba(255, 90, 44, 0.06), transparent 60%);
+    /* toque de luz blanca (superior-centro), como la referencia */
+    radial-gradient(42% 30% at 50% 4%, rgba(255, 255, 255, 0.05), transparent 62%),
+    /* naranja en la zona media-baja (más presencia) */
+    radial-gradient(68% 46% at 16% 80%, rgba(255, 110, 55, 0.16), transparent 62%),
+    radial-gradient(72% 50% at 98% 92%, rgba(255, 90, 44, 0.18), transparent 62%),
+    radial-gradient(100% 42% at 50% 118%, rgba(255, 120, 60, 0.12), transparent 60%);
 }
 
 /* 2) Tarjetas elevadas: sheen de luz superior + borde vivo (opaco, sin coste
