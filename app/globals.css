@@ -1019,19 +1019,20 @@ ol {
   max-width: 720px;
   margin: 0 auto;
   padding: 8px 16px;
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter: blur(10px);
+  /* Sin caja: el dock es transparente; el blur/vidrio va en la barra misma. */
+  background: transparent;
 }
-/* Barra de entrada tipo "pill": iconos + textarea que crece + enviar. */
+/* Barra de entrada tipo "pill": vidrio esmerilado, un poco translúcida. */
 .chat-input {
   display: flex;
   align-items: flex-end;
   gap: 4px;
   padding: 6px 6px 6px 8px;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
   border: 1px solid var(--border-strong);
   border-radius: 24px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
 }
 .chat-input:focus-within {
   border-color: var(--accent);
