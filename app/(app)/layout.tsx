@@ -19,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .filter((p) => p.areaId)
       .map((p) => ({ id: p.id, title: p.title, areaId: p.areaId as string })),
     today: todayInTz(ctx.tz),
+    tz: ctx.tz,
   };
 
   return (

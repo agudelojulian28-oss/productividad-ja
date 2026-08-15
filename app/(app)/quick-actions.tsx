@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Modal } from './modal';
 import { NewTaskForm } from './hoy/new-task-form';
 import { RegistrarMovimiento } from './finanzas/registrar-movimiento';
+import { EventEditor } from './calendario/event-editor';
 
 type Project = { id: string; title: string };
 type MovProject = { id: string; title: string; areaId: string };
@@ -15,6 +16,7 @@ export type QuickData = {
   goalsByProject: Record<string, { id: string; title: string }[]>;
   movProjects: MovProject[];
   today: string;
+  tz: string;
 };
 
 /**
@@ -26,10 +28,11 @@ export function QuickActions({
   goalsByProject,
   movProjects,
   today,
+  tz,
   variant,
 }: QuickData & { variant?: 'sidebar' }) {
   const router = useRouter();
-  const [open, setOpen] = useState<null | 'tarea' | 'mov'>(null);
+  const [open, setOpen] = useState<null | 'tarea' | 'mov' | 'evento'>(null);
   const cls = `quick${variant === 'sidebar' ? ' quick-sb' : ''}`;
 
   return (
@@ -55,15 +58,15 @@ export function QuickActions({
         </button>
       )}
 
-      <Link href="/calendario" className="quick-tile">
+      <button type="button" className="quick-tile" onClick={() => setOpen('evento')}>
         <span className="quick-ic quick-ic-cal">
           <svg viewBox="0 0 24 24" fill="none" width="20" height="20" aria-hidden="true">
             <rect x="3" y="4" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="2" />
             <path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </span>
-        <span className="quick-label">Agenda</span>
-      </Link>
+        <span className="quick-label">Nuevo evento</span>
+      </button>
 
       <Link href="/chat" className="quick-tile">
         <span className="quick-ic quick-ic-chat">
@@ -87,6 +90,20 @@ export function QuickActions({
           }}
         />
       </Modal>
+
+      {open === 'evento' && (
+        <EventEditor
+          target={{ mode: 'create', slotIso: new Date().toISOString() }}
+          tz={tz}
+          projects={projects}
+          goalsByProject={goalsByProject}
+          onClose={() => setOpen(null)}
+          onDone={() => {
+            setOpen(null);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
