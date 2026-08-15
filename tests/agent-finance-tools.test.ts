@@ -95,6 +95,40 @@ describe('runTool · consultar dinero', () => {
     if (r.ok) expect((r.value as { nota?: string }).nota).toMatch(/Etapa 5/);
   });
 
+  it('edita y borra un movimiento (actualizar / archivar)', async () => {
+    const d = deps();
+    const proyecto_id = await unProyecto(d);
+    const otro = await d.repo.insertProject({ title: 'Otro', areaId: AREA });
+    const c = await runTool(d, 'crear', {
+      tipo: 'movimiento',
+      direccion: 'gasto',
+      monto: 30000,
+      moneda: 'COP',
+      proyecto_id,
+    });
+    expect(c.ok).toBe(true);
+    const id = c.ok ? (c.value as { registrado: string }).registrado : '';
+
+    // Editar: nuevo monto, descripción y proyecto.
+    const u = await runTool(d, 'actualizar', {
+      tipo: 'movimiento',
+      id,
+      monto: 50000,
+      descripcion: 'cortesía María',
+      proyecto_id: otro.id,
+    });
+    expect(u.ok).toBe(true);
+    expect(d.fin._txs.length).toBe(1);
+    expect(d.fin._txs[0]!.baseAmountMinor).toBe(5_000_000);
+    expect(d.fin._txs[0]!.description).toBe('cortesía María');
+    expect(d.fin._txs[0]!.projectId).toBe(otro.id);
+
+    // Borrar.
+    const del = await runTool(d, 'archivar', { tipo: 'movimiento', id });
+    expect(del.ok).toBe(true);
+    expect(d.fin._txs.length).toBe(0);
+  });
+
   it('movimientos filtra por rango de fechas y por dirección', async () => {
     const d = deps();
     const proyecto_id = await unProyecto(d);

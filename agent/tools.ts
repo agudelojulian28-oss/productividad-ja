@@ -12,7 +12,7 @@ import { createProject, setProjectDescription } from '@/core/work/projects';
 import { createGoal, updateGoal, setGoalDescription } from '@/core/work/goals';
 import { consultar, buscar } from '@/core/work/queries';
 import type { FinanceRepo } from '@/core/finance/ports';
-import { registrarMovimiento } from '@/core/finance/transactions';
+import { registrarMovimiento, updateTransaction, deleteTransaction } from '@/core/finance/transactions';
 import {
   createRecurringExpense,
   updateRecurringExpense,
@@ -545,6 +545,32 @@ export async function runTool(
           });
           return r.ok ? ok({ recurrente_id: r.value.id }) : r;
         }
+        case 'movimiento': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          // Si cambia de proyecto, el área sale del nuevo proyecto (ADR-026).
+          let areaId: string | undefined;
+          if (v.proyecto_id) {
+            const proj = await repo.getProject(v.proyecto_id);
+            if (!proj) return err('NOT_FOUND', 'Indica un proyecto válido (proyecto_id)');
+            if (!proj.areaId) return err('RULE_VIOLATION', 'Ese proyecto no tiene área');
+            areaId = proj.areaId;
+          }
+          const r = await updateTransaction(ctx, deps.finance, {
+            id: v.id,
+            direction: v.direccion ? (v.direccion === 'ingreso' ? 'in' : 'out') : undefined,
+            amountMinor: v.monto != null ? Math.round(v.monto * 100) : undefined,
+            currency: v.moneda,
+            fxRate: v.tasa,
+            projectId: v.proyecto_id,
+            areaId,
+            category: v.categoria,
+            description: v.descripcion,
+            occurredOn: v.desde,
+          });
+          return r.ok
+            ? ok({ actualizado: r.value.id, monto: money(r.value.baseAmountMinor) })
+            : r;
+        }
       }
       return err('INVALID_INPUT', 'Tipo desconocido');
     }
@@ -567,6 +593,11 @@ export async function runTool(
         case 'recurrente': {
           if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
           const r = await deleteRecurringExpense(ctx, deps.finance, v.id);
+          return r.ok ? ok({ borrado: v.id }) : r;
+        }
+        case 'movimiento': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          const r = await deleteTransaction(ctx, deps.finance, v.id);
           return r.ok ? ok({ borrado: v.id }) : r;
         }
         case 'area': {

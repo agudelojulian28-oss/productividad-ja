@@ -45,6 +45,28 @@ export const MovimientoCreate = z
   });
 export type MovimientoCreateInput = z.infer<typeof MovimientoCreate>;
 
+/** Edición parcial de un movimiento. Todo opcional salvo el id; al cambiar de
+ *  proyecto hay que pasar también el área (el área sale del proyecto). El base COP
+ *  se recalcula desde los valores efectivos (monto/moneda/tasa). */
+export const MovimientoUpdate = z
+  .object({
+    id: z.uuid(),
+    direction: z.enum(['in', 'out']).optional(),
+    amountMinor: z.number().int().positive().max(1_000_000_000_000).optional(),
+    currency: z.enum(CURRENCIES).optional(),
+    fxRate: z.number().positive().max(1_000_000).optional(),
+    projectId: z.uuid().optional(),
+    areaId: z.uuid().optional(),
+    category: z.string().trim().max(80).nullable().optional(),
+    description: z.string().trim().max(500).nullable().optional(),
+    occurredOn: Ymd.optional(),
+  })
+  .refine((d) => !d.projectId || !!d.areaId, {
+    message: 'Al cambiar de proyecto indica también el área',
+    path: ['areaId'],
+  });
+export type MovimientoUpdateInput = z.infer<typeof MovimientoUpdate>;
+
 // Metas de dinero. Miden contra las transacciones vía la vista goal_progress:
 //  money_in = ingresos del periodo; money_net = ingresos − gastos. El objetivo va
 //  en pesos (COP base), acotado a un área o a una fuente. project_id queda null.

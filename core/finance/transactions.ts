@@ -1,5 +1,6 @@
+import { z } from 'zod';
 import { ok, err, type Result, type ActorContext } from '@/core/types';
-import { MovimientoCreate } from './schemas';
+import { MovimientoCreate, MovimientoUpdate } from './schemas';
 import type { FinanceRepo, TransactionRow } from './ports';
 
 // YMD de hoy en la zona del usuario (aritmética de fechas nunca en UTC).
@@ -57,4 +58,59 @@ export async function registrarMovimiento(
     description: d.description,
   });
   return ok(row);
+}
+
+/**
+ * Edita un movimiento existente. Recalcula `base_amount_minor` desde los valores
+ * efectivos (monto/moneda/tasa) y, si cambia de proyecto, actualiza el área.
+ * Ownership por RLS + verificación explícita (getTransaction devuelve null si no
+ * es del usuario → NOT_FOUND).
+ */
+export async function updateTransaction(
+  ctx: ActorContext,
+  repo: FinanceRepo,
+  raw: unknown,
+): Promise<Result<TransactionRow>> {
+  const parsed = MovimientoUpdate.safeParse(raw);
+  if (!parsed.success) return err('INVALID_INPUT', 'Datos inválidos', parsed.error.issues);
+  const d = parsed.data;
+
+  const cur = await repo.getTransaction(d.id);
+  if (!cur) return err('NOT_FOUND', 'El movimiento no existe');
+
+  const direction = d.direction ?? cur.direction;
+  const currency = d.currency ?? cur.currency;
+  const amountMinor = d.amountMinor ?? cur.amountMinor;
+  const fxRate = currency === 'COP' ? 1 : (d.fxRate ?? cur.fxRate);
+  if (currency !== 'COP' && !(fxRate > 0)) {
+    return err('INVALID_INPUT', 'Un movimiento en USD necesita la tasa de cambio');
+  }
+  const baseAmountMinor = currency === 'COP' ? amountMinor : Math.round(amountMinor * fxRate);
+
+  const row = await repo.updateTransaction(d.id, {
+    direction,
+    amountMinor,
+    currency,
+    fxRate,
+    baseAmountMinor,
+    areaId: d.projectId ? d.areaId! : cur.areaId,
+    projectId: d.projectId ?? cur.projectId,
+    category: d.category !== undefined ? d.category : cur.category,
+    description: d.description !== undefined ? d.description : cur.description,
+    occurredOn: d.occurredOn ?? cur.occurredOn,
+  });
+  return ok(row);
+}
+
+/** Borra un movimiento. Ownership por RLS + verificación explícita. */
+export async function deleteTransaction(
+  _ctx: ActorContext,
+  repo: FinanceRepo,
+  id: string,
+): Promise<Result<{ id: string }>> {
+  if (!z.uuid().safeParse(id).success) return err('INVALID_INPUT', 'ID inválido');
+  const cur = await repo.getTransaction(id);
+  if (!cur) return err('NOT_FOUND', 'El movimiento no existe');
+  await repo.deleteTransaction(id);
+  return ok({ id });
 }

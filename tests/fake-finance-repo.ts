@@ -126,6 +126,20 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
       txs.push(row);
       return row;
     },
+    async getTransaction(id: string): Promise<TransactionRow | null> {
+      return txs.find((t) => t.id === id) ?? null;
+    },
+    async updateTransaction(id, patch): Promise<TransactionRow> {
+      const i = txs.findIndex((t) => t.id === id);
+      if (i < 0) throw new Error('not found');
+      const next: TransactionRow = { ...txs[i]!, ...patch };
+      txs[i] = next;
+      return next;
+    },
+    async deleteTransaction(id: string): Promise<void> {
+      const i = txs.findIndex((t) => t.id === id);
+      if (i >= 0) txs.splice(i, 1);
+    },
     async listRecentTransactions(limit = 30): Promise<TransactionRow[]> {
       return [...txs]
         .sort((a, b) => (a.occurredOn < b.occurredOn ? 1 : -1))

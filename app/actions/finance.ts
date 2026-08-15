@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireContext } from '@/lib/auth';
 import { financeRepo } from '@/adapters/supabase/finance-repo';
-import { registrarMovimiento } from '@/core/finance/transactions';
+import { registrarMovimiento, updateTransaction, deleteTransaction } from '@/core/finance/transactions';
 import {
   createIncomeSource,
   archiveIncomeSource,
@@ -71,6 +71,13 @@ export async function listMovimientosAction(filter: {
     title: t.description || t.category || (t.direction === 'in' ? 'Ingreso' : 'Gasto'),
     areaName: (t.projectId ? projName.get(t.projectId) : undefined) ?? '—',
     receiptUrl: receiptUrl.get(t.id) ?? null,
+    projectId: t.projectId,
+    category: t.category,
+    description: t.description,
+    amountMinor: t.amountMinor,
+    currency: t.currency,
+    fxRate: t.fxRate,
+    occurredOnRaw: t.occurredOn,
   }));
 }
 
@@ -125,6 +132,33 @@ export async function registrarMovimientoAction(input: {
   const { ctx, repo } = await deps();
   const result = await registrarMovimiento(ctx, repo, input);
   revalidatePath('/finanzas');
+  return result;
+}
+
+export async function updateMovimientoAction(input: {
+  id: string;
+  direction?: 'in' | 'out';
+  amountMinor?: number;
+  currency?: 'COP' | 'USD';
+  fxRate?: number;
+  projectId?: string;
+  areaId?: string;
+  category?: string | null;
+  description?: string | null;
+  occurredOn?: string;
+}): Promise<Result<TransactionRow>> {
+  const { ctx, repo } = await deps();
+  const result = await updateTransaction(ctx, repo, input);
+  revalidatePath('/finanzas');
+  revalidatePath('/hoy');
+  return result;
+}
+
+export async function deleteMovimientoAction(id: string): Promise<Result<{ id: string }>> {
+  const { ctx, repo } = await deps();
+  const result = await deleteTransaction(ctx, repo, id);
+  revalidatePath('/finanzas');
+  revalidatePath('/hoy');
   return result;
 }
 

@@ -3,17 +3,28 @@
 import { useState, useTransition } from 'react';
 import { money } from '@/lib/format';
 import { listMovimientosAction } from '@/app/actions/finance';
+import { Modal } from '../modal';
+import { EditMovimiento } from './edit-movimiento';
 
 export type MovRow = {
   id: string;
   direction: 'in' | 'out';
   baseAmountMinor: number;
-  occurredOn: string; // ya formateada (día)
+  occurredOn: string; // formateada (día) para mostrar
   title: string; // descripción, o categoría, o "Ingreso/Gasto"
   areaName: string;
   receiptUrl: string | null;
+  // Campos crudos para editar:
+  projectId: string | null;
+  category: string | null;
+  description: string | null;
+  amountMinor: number;
+  currency: string;
+  fxRate: number;
+  occurredOnRaw: string; // YYYY-MM-DD
 };
 
+type Project = { id: string; title: string; areaId: string };
 type Dir = 'all' | 'in' | 'out';
 type Preset = 'recientes' | 'hoy' | '7d' | '30d' | 'mes' | 'custom';
 
@@ -34,15 +45,23 @@ const PRESETS: { v: Preset; label: string }[] = [
   { v: 'custom', label: 'Personalizado' },
 ];
 
-// Movimientos con filtro por fechas (server-side, eficiente) y por dirección
-// (client-side sobre el conjunto ya traído). El agente accede a lo mismo por
-// consultar(vista=movimientos, desde, hasta, direccion).
-export function MovimientosRecientes({ rows, today }: { rows: MovRow[]; today: string }) {
+// Movimientos con filtro por fechas (server-side) y por dirección (client-side).
+// Al tocar una fila se abre el pop-up para editar o borrar el movimiento.
+export function MovimientosRecientes({
+  rows,
+  today,
+  projects,
+}: {
+  rows: MovRow[];
+  today: string;
+  projects: Project[];
+}) {
   const [base, setBase] = useState<MovRow[]>(rows);
   const [preset, setPreset] = useState<Preset>('recientes');
   const [dir, setDir] = useState<Dir>('all');
   const [from, setFrom] = useState(addDays(today, -29));
   const [to, setTo] = useState(today);
+  const [editing, setEditing] = useState<MovRow | null>(null);
   const [pending, startTransition] = useTransition();
 
   function rangeFor(p: Preset): { from?: string; to?: string } {
@@ -64,7 +83,7 @@ export function MovimientosRecientes({ rows, today }: { rows: MovRow[]; today: s
 
   function applyPreset(p: Preset) {
     setPreset(p);
-    if (p === 'custom') return; // espera a "Aplicar"
+    if (p === 'custom') return;
     if (p === 'recientes') {
       setBase(rows);
       return;
@@ -140,40 +159,43 @@ export function MovimientosRecientes({ rows, today }: { rows: MovRow[]; today: s
       ) : (
         <div className="mov-list">
           {shown.map((m) => (
-            <div key={m.id} className="mov-row">
-              {m.receiptUrl ? (
-                <a
-                  className="mov-thumb"
-                  href={m.receiptUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Ver comprobante"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+            <button key={m.id} type="button" className="mov-row" onClick={() => setEditing(m)}>
+              <span className={`mov-thumb mov-thumb-${m.direction}`}>
+                {m.receiptUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={m.receiptUrl} alt="comprobante" />
-                </a>
-              ) : (
-                <div className={`mov-thumb mov-thumb-${m.direction}`}>
+                ) : (
                   <span className="mov-thumb-empty" aria-hidden="true">
                     {m.direction === 'in' ? '↘' : '↗'}
                   </span>
-                </div>
-              )}
-              <div className="mov-body">
+                )}
+              </span>
+              <span className="mov-body">
                 <span className="mov-title">{m.title}</span>
                 <span className="mov-meta">
                   {m.areaName} · {m.occurredOn}
-                  {m.receiptUrl ? ' · 📎 comprobante' : ''}
+                  {m.receiptUrl ? ' · 📎' : ''}
                 </span>
-              </div>
+              </span>
               <span className={`mov-amt ${m.direction === 'in' ? 'fin-pos' : 'fin-neg'}`}>
                 {m.direction === 'in' ? '+' : '−'}
                 {money(m.baseAmountMinor, { compact: true })}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       )}
+
+      <Modal
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        eyebrow="Finanzas"
+        title="Editar movimiento"
+      >
+        {editing && (
+          <EditMovimiento row={editing} projects={projects} onClose={() => setEditing(null)} />
+        )}
+      </Modal>
     </div>
   );
 }

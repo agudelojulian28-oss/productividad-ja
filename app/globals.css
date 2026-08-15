@@ -3109,3 +3109,42 @@ select.field:hover {
 .quick-sb .quick-label {
   font-size: 11.5px;
 }
+
+/* 13) Fila de movimiento como botón (abre el pop-up de edición) + acciones del editor */
+button.mov-row {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+button.mov-row:hover {
+  border-color: var(--border-strong);
+}
+.mov-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mov-title,
+.mov-meta {
+  display: block;
+}
+.mov-edit-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+.mov-del {
+  color: var(--text-muted);
+}
+.mov-del-armed {
+  border-color: var(--negative);
+  color: var(--negative);
+}
+.mov-edit-receipt {
+  display: inline-block;
+  font-size: 13.5px;
+}

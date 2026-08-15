@@ -154,7 +154,7 @@ export const Crear = z
 export const Actualizar = z
   .object({
     tipo: z
-      .enum(['tarea', 'evento', 'meta', 'proyecto', 'area', 'documento', 'recurrente'])
+      .enum(['tarea', 'evento', 'meta', 'proyecto', 'area', 'documento', 'recurrente', 'movimiento'])
       .describe('Qué actualizar'),
     id: z.string().min(1).describe('ID de la entidad (uuid; para evento es el id de Google de consultar agenda)'),
     accion: z
@@ -190,8 +190,12 @@ export const Actualizar = z
       .optional()
       .describe('Texto: descripción (tarea/proyecto/area/meta) o contenido (documento editar/anexar) o notas (evento)'),
     fecha: Instant.optional().describe('tarea reprogramar / evento nueva hora, ISO con offset'),
-    proyecto_id: z.uuid().optional().describe('tarea mover'),
+    proyecto_id: z.uuid().optional().describe('tarea mover · movimiento: nuevo proyecto'),
     meta_id: z.uuid().optional().describe('tarea mover'),
+    direccion: z.enum(['ingreso', 'gasto']).optional().describe('movimiento: cambiar ingreso/gasto'),
+    moneda: z.enum(['COP', 'USD']).optional().describe('movimiento: cambiar moneda'),
+    tasa: z.number().positive().optional().describe('movimiento: tasa COP por USD (si moneda=USD)'),
+    categoria: z.string().trim().max(80).optional().describe('movimiento: categoría'),
     objetivo: z.number().positive().optional().describe('meta factores: cantidad objetivo'),
     desde: Ymd.optional().describe('meta factores: inicio'),
     hasta: Ymd.optional().describe('meta factores: cumplimiento'),
@@ -212,8 +216,8 @@ export const Actualizar = z
 // ── archivar / borrar (unión por tipo) ──────────────────────────────────────
 export const Archivar = z.object({
   tipo: z
-    .enum(['tarea', 'evento', 'documento', 'area', 'recurrente'])
-    .describe('Qué eliminar/archivar. tarea/evento/documento/recurrente se borran; area se archiva'),
+    .enum(['tarea', 'evento', 'documento', 'area', 'recurrente', 'movimiento'])
+    .describe('Qué eliminar/archivar. tarea/evento/documento/recurrente/movimiento se borran; area se archiva'),
   id: z.string().min(1).describe('ID (uuid; para evento el id de Google)'),
   alcance: Alcance.optional().describe('Solo evento: serie o instancia (por defecto serie)'),
 });

@@ -177,6 +177,43 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
       return ((data as DbTransaction[] | null) ?? []).map(toTx);
     },
 
+    async getTransaction(id) {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select(TX_COLS)
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? toTx(data as DbTransaction) : null;
+    },
+
+    async updateTransaction(id, patch) {
+      const { data, error } = await supabase
+        .from('transactions')
+        .update({
+          direction: patch.direction,
+          amount_minor: patch.amountMinor,
+          currency: patch.currency,
+          base_amount_minor: patch.baseAmountMinor,
+          fx_rate: patch.fxRate,
+          area_id: patch.areaId,
+          project_id: patch.projectId,
+          category: patch.category,
+          description: patch.description,
+          occurred_on: patch.occurredOn,
+        })
+        .eq('id', id)
+        .select(TX_COLS)
+        .single();
+      if (error) throw new Error(error.message);
+      return toTx(data as DbTransaction);
+    },
+
+    async deleteTransaction(id) {
+      const { error } = await supabase.from('transactions').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+
     async listTransactions(filter = {}) {
       const { from, to, direction, limit = 200 } = filter;
       let q = supabase

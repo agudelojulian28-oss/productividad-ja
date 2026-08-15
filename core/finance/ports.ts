@@ -38,6 +38,20 @@ export interface TransactionRow {
   description: string | null;
 }
 
+/** Patch de un movimiento (valores efectivos ya calculados por el caso de uso). */
+export interface TransactionPatch {
+  direction: 'in' | 'out';
+  amountMinor: number;
+  currency: string;
+  baseAmountMinor: number;
+  fxRate: number;
+  areaId: string;
+  projectId: string | null;
+  category: string | null;
+  description: string | null;
+  occurredOn: string;
+}
+
 /** Filtro de movimientos por rango de fechas y dirección (todo opcional). */
 export interface TransactionFilter {
   from?: string; // YYYY-MM-DD (inclusive)
@@ -185,6 +199,9 @@ export interface FinanceRepo {
   archiveIncomeSource(id: string): Promise<void>;
 
   insertTransaction(input: TransactionInsert): Promise<TransactionRow>;
+  getTransaction(id: string): Promise<TransactionRow | null>;
+  updateTransaction(id: string, patch: TransactionPatch): Promise<TransactionRow>;
+  deleteTransaction(id: string): Promise<void>;
   listRecentTransactions(limit?: number): Promise<TransactionRow[]>;
   /** Movimientos por rango de fechas (occurred_on) y dirección — filtrado en la BD. */
   listTransactions(filter?: TransactionFilter): Promise<TransactionRow[]>;

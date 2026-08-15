@@ -96,6 +96,13 @@ export default async function FinanzasPage() {
     title: t.description || t.category || (t.direction === 'in' ? 'Ingreso' : 'Gasto'),
     areaName: (t.projectId ? projName.get(t.projectId) : undefined) ?? '—',
     receiptUrl: receiptUrl.get(t.id) ?? null,
+    projectId: t.projectId,
+    category: t.category,
+    description: t.description,
+    amountMinor: t.amountMinor,
+    currency: t.currency,
+    fxRate: t.fxRate,
+    occurredOnRaw: t.occurredOn,
   }));
 
   // Solo proyectos con área pueden recibir dinero (la transacción exige área).
@@ -160,7 +167,7 @@ export default async function FinanzasPage() {
 
           <section className="fin-block">
             <h2 className="fin-h2">Movimientos recientes</h2>
-            <MovimientosRecientes rows={movRows} today={todayInTz(ctx.tz)} />
+            <MovimientosRecientes rows={movRows} today={todayInTz(ctx.tz)} projects={projectOpts} />
           </section>
 
           <section className="fin-block">
