@@ -110,6 +110,11 @@ export async function* runAgent(
 
   const messages: Anthropic.MessageParam[] = [...history, { role: 'user', content: userContent }];
 
+  // Guarda de tiempo: el worker de WhatsApp tiene 60s (maxDuration). Si una tanda
+  // se alarga, salimos al cierre elegante antes de que la plataforma la mate.
+  const startedAt = Date.now();
+  const TIME_BUDGET_MS = 45_000;
+
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const stream = deps.client.messages.stream({
       model: AGENT_MODEL,
@@ -183,11 +188,14 @@ export async function* runAgent(
     }
 
     messages.push({ role: 'user', content: results });
+
+    // Si nos acercamos al límite de tiempo del worker, cerramos antes.
+    if (Date.now() - startedAt > TIME_BUDGET_MS) break;
   }
 
-  // Se alcanzó el tope con trabajo aún pendiente (la última iteración pidió más
-  // herramientas). Cierre sin herramientas para no cortar en seco: el modelo
-  // resume qué logró y qué falta, e invita a escribir "continúa".
+  // Se alcanzó el tope (de pasos o de tiempo) con trabajo aún pendiente. Cierre
+  // sin herramientas para no cortar en seco: el modelo resume qué logró y qué
+  // falta, e invita a escribir "continúa".
   const wrap = deps.client.messages.stream({
     model: AGENT_MODEL,
     max_tokens: 400,
