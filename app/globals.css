@@ -3206,3 +3206,44 @@ button.mov-row:hover {
     backdrop-filter: blur(18px) saturate(1.2);
   }
 }
+
+/* 16) Vidrio también en las tarjetas-módulo prominentes (no en filas de listas). */
+.kpi,
+.fin-chart,
+.chart-table-wrap,
+.donut-wrap,
+.hoy-rail-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 44%),
+    color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(14px) saturate(1.15);
+}
+/* La tarjeta-estrella (naranja) conserva su degradado sólido, sin blur. */
+.hero-aside .kpi:first-child {
+  backdrop-filter: none;
+}
+
+/* 17) Vidrio en el resto de tarjetas/controles (todo lo que aplica). Filas con
+   blur más ligero por rendimiento. Inputs y banners de alerta se quedan sólidos. */
+.row-card,
+.task,
+.event-row,
+.recur-row,
+.mov-row,
+.empty-state,
+.meta-money,
+.proj-bal-cell,
+.chart-tip {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0) 46%),
+    color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(10px) saturate(1.1);
+}
+.seg {
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+  backdrop-filter: blur(10px) saturate(1.1);
+}
+.dia-cell {
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+  backdrop-filter: blur(8px);
+}
