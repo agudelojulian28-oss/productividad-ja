@@ -16,7 +16,15 @@ import {
   confirmRecurringExpense,
   skipRecurringExpense,
 } from '@/core/finance/recurring';
-import type { RecurringExpenseRow, RecurringFrequency } from '@/core/finance/ports';
+import {
+  createTag,
+  updateTag,
+  deleteTag,
+  listTags,
+  setTransactionTags,
+  setRecurringTags,
+} from '@/core/finance/tags';
+import type { RecurringExpenseRow, RecurringFrequency, TagRow } from '@/core/finance/ports';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { uploadImage, signedUrl } from '@/adapters/supabase/storage';
@@ -63,6 +71,15 @@ export async function listMovimientosAction(filter: {
     }),
   );
 
+  // Etiquetas por movimiento (un solo query para todos).
+  const txTags = await finance.listTransactionTags(txs.map((t) => t.id));
+  const tagsByTx = new Map<string, string[]>();
+  for (const { transactionId, tagId } of txTags) {
+    const cur = tagsByTx.get(transactionId) ?? [];
+    cur.push(tagId);
+    tagsByTx.set(transactionId, cur);
+  }
+
   return txs.map((t) => ({
     id: t.id,
     direction: t.direction,
@@ -78,6 +95,7 @@ export async function listMovimientosAction(filter: {
     currency: t.currency,
     fxRate: t.fxRate,
     occurredOnRaw: t.occurredOn,
+    tagIds: tagsByTx.get(t.id) ?? [],
   }));
 }
 
@@ -128,9 +146,13 @@ export async function registrarMovimientoAction(input: {
   description?: string;
   occurredOn?: string;
   fxRate?: number;
+  tagIds?: string[];
 }): Promise<Result<TransactionRow>> {
   const { ctx, repo } = await deps();
   const result = await registrarMovimiento(ctx, repo, input);
+  if (result.ok && input.tagIds) {
+    await setTransactionTags(ctx, repo, { id: result.value.id, tagIds: input.tagIds });
+  }
   revalidatePath('/finanzas');
   return result;
 }
@@ -146,9 +168,13 @@ export async function updateMovimientoAction(input: {
   category?: string | null;
   description?: string | null;
   occurredOn?: string;
+  tagIds?: string[];
 }): Promise<Result<TransactionRow>> {
   const { ctx, repo } = await deps();
   const result = await updateTransaction(ctx, repo, input);
+  if (result.ok && input.tagIds) {
+    await setTransactionTags(ctx, repo, { id: input.id, tagIds: input.tagIds });
+  }
   revalidatePath('/finanzas');
   revalidatePath('/hoy');
   return result;
@@ -162,8 +188,9 @@ export async function deleteMovimientoAction(id: string): Promise<Result<{ id: s
   return result;
 }
 
-// ── Gastos recurrentes ──────────────────────────────────────────────────────
+// ── Gastos / ingresos recurrentes ────────────────────────────────────────────
 export async function createRecurringExpenseAction(input: {
+  direction?: 'in' | 'out';
   projectId: string;
   areaId: string;
   amountMinor: number;
@@ -171,9 +198,13 @@ export async function createRecurringExpenseAction(input: {
   description?: string;
   frequency: RecurringFrequency;
   nextDueOn: string;
+  tagIds?: string[];
 }): Promise<Result<RecurringExpenseRow>> {
   const { ctx, repo } = await deps();
   const result = await createRecurringExpense(ctx, repo, input);
+  if (result.ok && input.tagIds) {
+    await setRecurringTags(ctx, repo, { id: result.value.id, tagIds: input.tagIds });
+  }
   revalidatePath('/finanzas');
   return result;
 }
@@ -186,9 +217,13 @@ export async function updateRecurringExpenseAction(input: {
   frequency?: RecurringFrequency;
   nextDueOn?: string;
   active?: boolean;
+  tagIds?: string[];
 }): Promise<Result<RecurringExpenseRow>> {
   const { ctx, repo } = await deps();
   const result = await updateRecurringExpense(ctx, repo, input);
+  if (result.ok && input.tagIds) {
+    await setRecurringTags(ctx, repo, { id: input.id, tagIds: input.tagIds });
+  }
   revalidatePath('/finanzas');
   return result;
 }
@@ -244,6 +279,41 @@ export async function skipRecurringExpenseAction(
 ): Promise<Result<{ id: string; nextDueOn: string }>> {
   const { ctx, repo } = await deps();
   const result = await skipRecurringExpense(ctx, repo, id);
+  revalidatePath('/finanzas');
+  return result;
+}
+
+// ── Etiquetas ────────────────────────────────────────────────────────────────
+export async function listTagsAction(): Promise<TagRow[]> {
+  const { ctx, repo } = await deps();
+  const r = await listTags(ctx, repo);
+  return r.ok ? r.value : [];
+}
+
+export async function createTagAction(input: {
+  name: string;
+  color?: string | null;
+}): Promise<Result<TagRow>> {
+  const { ctx, repo } = await deps();
+  const result = await createTag(ctx, repo, input);
+  revalidatePath('/finanzas');
+  return result;
+}
+
+export async function updateTagAction(input: {
+  id: string;
+  name?: string;
+  color?: string | null;
+}): Promise<Result<TagRow>> {
+  const { ctx, repo } = await deps();
+  const result = await updateTag(ctx, repo, input);
+  revalidatePath('/finanzas');
+  return result;
+}
+
+export async function deleteTagAction(id: string): Promise<Result<{ id: string }>> {
+  const { ctx, repo } = await deps();
+  const result = await deleteTag(ctx, repo, id);
   revalidatePath('/finanzas');
   return result;
 }

@@ -3256,3 +3256,116 @@ button.mov-row:hover {
     color-mix(in srgb, var(--surface) 66%, transparent);
   backdrop-filter: blur(16px) saturate(1.25);
 }
+
+/* ── Etiquetas (tags) ──────────────────────────────────────────────────────── */
+.tag-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.tag-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tag-picker-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag-opt {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  color: var(--muted-fg);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.tag-opt:hover {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+.tag-opt-on {
+  border-width: 1px;
+}
+.tag-opt-add {
+  border-style: dashed;
+}
+.tag-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.tag-create .field {
+  flex: 1 1 160px;
+}
+
+.tag-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tag-manager-new {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.tag-manager-new .field {
+  flex: 1 1 160px;
+}
+.tag-manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.tag-manager-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.tag-manager-name {
+  flex: 1 1 140px;
+  min-width: 120px;
+}
+.tag-swatches {
+  display: inline-flex;
+  gap: 4px;
+}
+.tag-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.tag-swatch-on {
+  border-color: var(--fg);
+}
+.tag-del {
+  color: var(--danger, #ef4444);
+}

@@ -5,6 +5,7 @@ import { money } from '@/lib/format';
 import { listMovimientosAction } from '@/app/actions/finance';
 import { Modal } from '../modal';
 import { EditMovimiento } from './edit-movimiento';
+import { TagChips, type TagOption } from './tags-ui';
 
 export type MovRow = {
   id: string;
@@ -22,9 +23,11 @@ export type MovRow = {
   currency: string;
   fxRate: number;
   occurredOnRaw: string; // YYYY-MM-DD
+  tagIds: string[];
 };
 
 type Project = { id: string; title: string; areaId: string };
+export type { TagOption };
 type Dir = 'all' | 'in' | 'out';
 type Preset = 'recientes' | 'hoy' | '7d' | '30d' | 'mes' | 'custom';
 
@@ -51,10 +54,12 @@ export function MovimientosRecientes({
   rows,
   today,
   projects,
+  tags = [],
 }: {
   rows: MovRow[];
   today: string;
   projects: Project[];
+  tags?: TagOption[];
 }) {
   const [base, setBase] = useState<MovRow[]>(rows);
   const [preset, setPreset] = useState<Preset>('recientes');
@@ -176,6 +181,7 @@ export function MovimientosRecientes({
                   {m.areaName} · {m.occurredOn}
                   {m.receiptUrl ? ' · 📎' : ''}
                 </span>
+                {m.tagIds.length > 0 && <TagChips tagIds={m.tagIds} catalog={tags} />}
               </span>
               <span className={`mov-amt ${m.direction === 'in' ? 'fin-pos' : 'fin-neg'}`}>
                 {m.direction === 'in' ? '+' : '−'}
@@ -193,7 +199,7 @@ export function MovimientosRecientes({
         title="Editar movimiento"
       >
         {editing && (
-          <EditMovimiento row={editing} projects={projects} onClose={() => setEditing(null)} />
+          <EditMovimiento row={editing} projects={projects} tags={tags} onClose={() => setEditing(null)} />
         )}
       </Modal>
     </div>

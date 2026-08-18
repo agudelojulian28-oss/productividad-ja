@@ -10,16 +10,19 @@ import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
 import type { RecurringFrequency } from '@/core/finance/ports';
 import { Modal } from '../modal';
+import { TagChips, TagPicker, type TagOption } from './tags-ui';
 
 type Project = { id: string; title: string; areaId: string };
 export type RecurRow = {
   id: string;
+  direction: 'in' | 'out';
   projectId: string;
   amountMinor: number;
   category: string | null;
   description: string | null;
   frequency: RecurringFrequency;
   nextDueOn: string;
+  tagIds: string[];
 };
 
 const FREQS: { v: RecurringFrequency; label: string }[] = [
@@ -32,15 +35,27 @@ const FREQS: { v: RecurringFrequency; label: string }[] = [
 ];
 const freqLabel = (f: RecurringFrequency) => FREQS.find((x) => x.v === f)?.label ?? f;
 
-export function GastosRecurrentes({
+// Un solo componente sirve para gastos (out) e ingresos (in) recurrentes: cambian
+// las etiquetas de texto y el signo/color del monto, no la máquina.
+const COPY = {
+  out: { singular: 'gasto recurrente', nuevo: 'Nuevo gasto recurrente', vacio: 'Sin gastos recurrentes todavía.', sign: '−', cls: 'fin-neg' },
+  in: { singular: 'ingreso recurrente', nuevo: 'Nuevo ingreso recurrente', vacio: 'Sin ingresos recurrentes todavía.', sign: '+', cls: 'fin-pos' },
+} as const;
+
+export function Recurrentes({
+  direction,
   projects,
   recurrentes,
   today,
+  tags = [],
 }: {
+  direction: 'in' | 'out';
   projects: Project[];
   recurrentes: RecurRow[];
   today: string;
+  tags?: TagOption[];
 }) {
+  const copy = COPY[direction];
   const [editing, setEditing] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -51,12 +66,12 @@ export function GastosRecurrentes({
         <ul className="fin-list" style={{ marginBottom: 14 }}>
           {recurrentes.map((r) =>
             editing === r.id ? (
-              <EditRow key={r.id} row={r} onDone={() => setEditing(null)} />
+              <EditRow key={r.id} row={r} tags={tags} onDone={() => setEditing(null)} />
             ) : (
               <li key={r.id} className="recur-row">
                 <div className="recur-body">
                   <span className="recur-title">
-                    {r.description || r.category || 'Gasto recurrente'}
+                    {r.description || r.category || copy.singular}
                   </span>
                   <span className="recur-meta">
                     {freqLabel(r.frequency)} · próximo {r.nextDueOn}
@@ -64,8 +79,12 @@ export function GastosRecurrentes({
                       ? ` · ${projects.find((p) => p.id === r.projectId)!.title}`
                       : ''}
                   </span>
+                  {r.tagIds.length > 0 && <TagChips tagIds={r.tagIds} catalog={tags} />}
                 </div>
-                <span className="recur-amt fin-neg">−{money(r.amountMinor, { compact: true })}</span>
+                <span className={`recur-amt ${copy.cls}`}>
+                  {copy.sign}
+                  {money(r.amountMinor, { compact: true })}
+                </span>
                 <div className="recur-actions">
                   <button type="button" className="linkbtn" onClick={() => setEditing(r.id)}>
                     Editar
@@ -89,7 +108,7 @@ export function GastosRecurrentes({
         </ul>
       ) : (
         <p className="muted" style={{ marginBottom: 12 }}>
-          Sin gastos recurrentes todavía.
+          {copy.vacio}
         </p>
       )}
 
@@ -97,31 +116,43 @@ export function GastosRecurrentes({
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
         </svg>
-        Nuevo gasto recurrente
+        {copy.nuevo}
       </button>
 
-      <Modal open={open} onClose={() => setOpen(false)} eyebrow="Finanzas" title="Nuevo gasto recurrente">
-        <RecurForm projects={projects} today={today} onDone={() => setOpen(false)} />
+      <Modal open={open} onClose={() => setOpen(false)} eyebrow="Finanzas" title={copy.nuevo}>
+        <RecurForm
+          direction={direction}
+          projects={projects}
+          today={today}
+          tags={tags}
+          onDone={() => setOpen(false)}
+        />
       </Modal>
     </div>
   );
 }
 
 function RecurForm({
+  direction,
   projects,
   today,
+  tags,
   onDone,
 }: {
+  direction: 'in' | 'out';
   projects: Project[];
   today: string;
+  tags: TagOption[];
   onDone: () => void;
 }) {
+  const copy = COPY[direction];
   const [monto, setMonto] = useState('');
   const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
   const [category, setCategory] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [frequency, setFrequency] = useState<RecurringFrequency>('mensual');
   const [nextDueOn, setNextDueOn] = useState(today);
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -134,6 +165,7 @@ function RecurForm({
     if (!project) return setError('Elige un proyecto');
     startTransition(async () => {
       const r = await createRecurringExpenseAction({
+        direction,
         projectId: project.id,
         areaId: project.areaId,
         amountMinor: minor,
@@ -141,6 +173,7 @@ function RecurForm({
         description: descripcion.trim() || undefined,
         frequency,
         nextDueOn,
+        tagIds,
       });
       if (!r.ok) setError(r.message ?? 'No se pudo crear');
       else onDone();
@@ -188,7 +221,7 @@ function RecurForm({
       </div>
       <input
         type="text"
-        placeholder="Concepto (ej. arriendo, Netflix)"
+        placeholder={direction === 'in' ? 'Concepto (ej. sueldo, arriendo cobrado)' : 'Concepto (ej. arriendo, Netflix)'}
         value={descripcion}
         onChange={(e) => setDescripcion(e.target.value)}
         className="field"
@@ -213,19 +246,24 @@ function RecurForm({
           className="field"
         />
       </label>
+      <div className="cal-field-label">
+        Etiquetas
+        <TagPicker catalog={tags} selected={tagIds} onChange={setTagIds} />
+      </div>
       {error && <p className="error-text">{error}</p>}
       <button type="submit" className="btn-primary" disabled={pending}>
-        {pending ? '…' : 'Agregar gasto recurrente'}
+        {pending ? '…' : `Agregar ${copy.singular}`}
       </button>
     </form>
   );
 }
 
-function EditRow({ row, onDone }: { row: RecurRow; onDone: () => void }) {
+function EditRow({ row, tags, onDone }: { row: RecurRow; tags: TagOption[]; onDone: () => void }) {
   const [monto, setMonto] = useState(String(row.amountMinor / 100));
   const [descripcion, setDescripcion] = useState(row.description ?? '');
   const [frequency, setFrequency] = useState<RecurringFrequency>(row.frequency);
   const [nextDueOn, setNextDueOn] = useState(row.nextDueOn);
+  const [tagIds, setTagIds] = useState<string[]>(row.tagIds);
   const [pending, startTransition] = useTransition();
 
   function save() {
@@ -237,6 +275,7 @@ function EditRow({ row, onDone }: { row: RecurRow; onDone: () => void }) {
         description: descripcion.trim() || null,
         frequency,
         nextDueOn,
+        tagIds,
       });
       onDone();
     });
@@ -280,6 +319,10 @@ function EditRow({ row, onDone }: { row: RecurRow; onDone: () => void }) {
             className="field"
             aria-label="Próxima fecha"
           />
+        </div>
+        <div className="cal-field-label">
+          Etiquetas
+          <TagPicker catalog={tags} selected={tagIds} onChange={setTagIds} />
         </div>
         <div className="new-task-row">
           <button type="button" className="btn-primary" disabled={pending} onClick={save}>

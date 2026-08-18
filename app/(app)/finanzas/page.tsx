@@ -12,7 +12,8 @@ import { CashflowChart } from './cashflow-chart';
 import { MetasDinero } from './metas-dinero';
 import { FinStats } from './fin-stats';
 import { MovimientosRecientes, type MovRow } from './movimientos-recientes';
-import { GastosRecurrentes, type RecurRow } from './gastos-recurrentes';
+import { Recurrentes, type RecurRow } from './gastos-recurrentes';
+import { TagManager } from './tags-ui';
 import { PageHero } from '../page-hero';
 import { EmptyState, emptyIcons } from '../empty-state';
 
@@ -24,22 +25,35 @@ export default async function FinanzasPage() {
   const finance = financeRepo(supabase, ctx.userId);
   const work = workRepo(supabase, ctx.userId);
 
-  const [projects, cashflow, byProj, metas, recurrentes] = await Promise.all([
+  const [projects, cashflow, byProj, metas, recurrentes, tags] = await Promise.all([
     work.listProjects(),
     finance.cashflowMonthly(),
     finance.byProject(),
     finance.moneyGoalsProgress(),
     finance.listRecurringExpenses(),
+    finance.listTags(),
   ]);
+  // Etiquetas de cada recurrente (una consulta para todas).
+  const recTags = await finance.listRecurringTags(recurrentes.map((r) => r.id));
+  const tagsByRec = new Map<string, string[]>();
+  for (const { recurringId, tagId } of recTags) {
+    const cur = tagsByRec.get(recurringId) ?? [];
+    cur.push(tagId);
+    tagsByRec.set(recurringId, cur);
+  }
   const recurRows: RecurRow[] = recurrentes.map((r) => ({
     id: r.id,
+    direction: r.direction,
     projectId: r.projectId,
     amountMinor: r.amountMinor,
     category: r.category,
     description: r.description,
     frequency: r.frequency,
     nextDueOn: r.nextDueOn,
+    tagIds: tagsByRec.get(r.id) ?? [],
   }));
+  const gastosRecur = recurRows.filter((r) => r.direction === 'out');
+  const ingresosRecur = recurRows.filter((r) => r.direction === 'in');
 
   const resumen = resumenFinanciero(cashflow, ctx.tz);
   const serie = serieMensual(cashflow, 6);
@@ -88,6 +102,13 @@ export default async function FinanzasPage() {
       receiptUrl.set(txId, await signedUrl(supabase, path));
     }),
   );
+  const txTags = await finance.listTransactionTags(recientes.map((t) => t.id));
+  const tagsByTx = new Map<string, string[]>();
+  for (const { transactionId, tagId } of txTags) {
+    const cur = tagsByTx.get(transactionId) ?? [];
+    cur.push(tagId);
+    tagsByTx.set(transactionId, cur);
+  }
   const movRows: MovRow[] = recientes.map((t) => ({
     id: t.id,
     direction: t.direction,
@@ -103,6 +124,7 @@ export default async function FinanzasPage() {
     currency: t.currency,
     fxRate: t.fxRate,
     occurredOnRaw: t.occurredOn,
+    tagIds: tagsByTx.get(t.id) ?? [],
   }));
 
   // Solo proyectos con área pueden recibir dinero (la transacción exige área).
@@ -150,7 +172,7 @@ export default async function FinanzasPage() {
           escritorio este se oculta (se usa el del rail). */}
       {projectOpts.length > 0 && (
         <div className="fin-capture-top">
-          <MovimientoLauncher projects={projectOpts} today={todayInTz(ctx.tz)} />
+          <MovimientoLauncher projects={projectOpts} today={todayInTz(ctx.tz)} tags={tags} />
         </div>
       )}
 
@@ -175,16 +197,42 @@ export default async function FinanzasPage() {
 
           <section className="fin-block">
             <h2 className="fin-h2">Movimientos recientes</h2>
-            <MovimientosRecientes rows={movRows} today={todayInTz(ctx.tz)} projects={projectOpts} />
+            <MovimientosRecientes
+              rows={movRows}
+              today={todayInTz(ctx.tz)}
+              projects={projectOpts}
+              tags={tags}
+            />
           </section>
 
           <section className="fin-block">
             <h2 className="fin-h2">Gastos recurrentes</h2>
-            <GastosRecurrentes
+            <Recurrentes
+              direction="out"
               projects={projectOpts}
-              recurrentes={recurRows}
+              recurrentes={gastosRecur}
               today={todayInTz(ctx.tz)}
+              tags={tags}
             />
+          </section>
+
+          <section className="fin-block">
+            <h2 className="fin-h2">Ingresos recurrentes</h2>
+            <Recurrentes
+              direction="in"
+              projects={projectOpts}
+              recurrentes={ingresosRecur}
+              today={todayInTz(ctx.tz)}
+              tags={tags}
+            />
+          </section>
+
+          <section className="fin-block">
+            <h2 className="fin-h2">Etiquetas</h2>
+            <p className="muted" style={{ marginBottom: 12 }}>
+              Un corte transversal para clasificar ingresos y gastos bajo cualquier proyecto.
+            </p>
+            <TagManager catalog={tags} />
           </section>
 
           {/* Pipeline y discrepancias llegan con las ventas (Etapa 5). */}
@@ -209,7 +257,7 @@ export default async function FinanzasPage() {
           ) : (
             <>
               <section className="fin-block fin-capture">
-                <MovimientoLauncher projects={projectOpts} today={todayInTz(ctx.tz)} />
+                <MovimientoLauncher projects={projectOpts} today={todayInTz(ctx.tz)} tags={tags} />
               </section>
 
               <section className="fin-block">

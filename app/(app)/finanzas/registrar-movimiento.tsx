@@ -5,6 +5,7 @@ import { registrarMovimientoAction, attachReceiptAction } from '@/app/actions/fi
 import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
 import { SegSelect } from '../seg-select';
+import { TagPicker, type TagOption } from './tags-ui';
 
 type Receipt = { data: string; preview: string };
 
@@ -31,10 +32,12 @@ type Project = { id: string; title: string; areaId: string };
 export function RegistrarMovimiento({
   projects,
   today,
+  tags = [],
   onDone,
 }: {
   projects: Project[];
   today: string;
+  tags?: TagOption[];
   /** Si se pasa, se invoca tras registrar con éxito (p. ej. cerrar el modal). */
   onDone?: (summary: string) => void;
 }) {
@@ -47,6 +50,7 @@ export function RegistrarMovimiento({
   const [descripcion, setDescripcion] = useState('');
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [occurredOn, setOccurredOn] = useState(today);
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const receiptRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
@@ -83,6 +87,7 @@ export function RegistrarMovimiento({
         description: descripcion.trim() || undefined,
         occurredOn,
         fxRate: currency === 'USD' ? fxRate : undefined,
+        tagIds,
       });
       if (!res.ok) setError(res.message ?? 'No se pudo registrar');
       else {
@@ -100,6 +105,7 @@ export function RegistrarMovimiento({
         setDescripcion('');
         setReceipt(null);
         setFx('');
+        setTagIds([]);
         const summary = `${direction === 'in' ? 'Ingreso' : 'Gasto'} registrado: ${money(res.value.baseAmountMinor)}${receipt ? ' · con comprobante' : ''}`;
         if (onDone) onDone(summary);
         else setOkMsg(summary);
@@ -245,6 +251,11 @@ export function RegistrarMovimiento({
             📎 Adjuntar foto del comprobante
           </button>
         )}
+      </div>
+
+      <div className="cal-field-label">
+        Etiquetas (opcional)
+        <TagPicker catalog={tags} selected={tagIds} onChange={setTagIds} />
       </div>
 
       <label className="cal-field-label">

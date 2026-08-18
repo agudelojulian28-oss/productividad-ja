@@ -5,6 +5,7 @@ import { updateMovimientoAction, deleteMovimientoAction } from '@/app/actions/fi
 import { parseAmountToMinor } from '@/lib/parse-amount';
 import { SegSelect } from '../seg-select';
 import type { MovRow } from './movimientos-recientes';
+import { TagPicker, type TagOption } from './tags-ui';
 
 type Project = { id: string; title: string; areaId: string };
 
@@ -13,10 +14,12 @@ type Project = { id: string; title: string; areaId: string };
 export function EditMovimiento({
   row,
   projects,
+  tags = [],
   onClose,
 }: {
   row: MovRow;
   projects: Project[];
+  tags?: TagOption[];
   onClose: () => void;
 }) {
   const [direction, setDirection] = useState<'out' | 'in'>(row.direction);
@@ -27,6 +30,7 @@ export function EditMovimiento({
   const [category, setCategory] = useState(row.category ?? '');
   const [descripcion, setDescripcion] = useState(row.description ?? '');
   const [occurredOn, setOccurredOn] = useState(row.occurredOnRaw);
+  const [tagIds, setTagIds] = useState<string[]>(row.tagIds);
   const [error, setError] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -53,6 +57,7 @@ export function EditMovimiento({
         category: category.trim() || null,
         description: descripcion.trim() || null,
         occurredOn,
+        tagIds,
       });
       if (!res.ok) setError(res.message ?? 'No se pudo guardar');
       else onClose();
@@ -159,6 +164,11 @@ export function EditMovimiento({
           className="field"
         />
       </label>
+
+      <div className="cal-field-label">
+        Etiquetas
+        <TagPicker catalog={tags} selected={tagIds} onChange={setTagIds} />
+      </div>
 
       {row.receiptUrl && (
         <a className="link mov-edit-receipt" href={row.receiptUrl} target="_blank" rel="noopener noreferrer">

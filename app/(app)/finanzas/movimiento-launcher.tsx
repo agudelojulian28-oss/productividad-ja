@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../modal';
 import { RegistrarMovimiento } from './registrar-movimiento';
+import type { TagOption } from './tags-ui';
 
 type Project = { id: string; title: string; areaId: string };
 
@@ -14,9 +15,11 @@ type Project = { id: string; title: string; areaId: string };
 export function MovimientoLauncher({
   projects,
   today,
+  tags = [],
 }: {
   projects: Project[];
   today: string;
+  tags?: TagOption[];
 }) {
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -54,6 +57,7 @@ export function MovimientoLauncher({
         <RegistrarMovimiento
           projects={projects}
           today={today}
+          tags={tags}
           onDone={(summary) => {
             setOpen(false);
             setToast(summary);
