@@ -13,7 +13,7 @@ import { MetasDinero } from './metas-dinero';
 import { FinStats } from './fin-stats';
 import { MovimientosRecientes, type MovRow } from './movimientos-recientes';
 import { Recurrentes, type RecurRow } from './gastos-recurrentes';
-import { TagManager } from './tags-ui';
+import { TagsSection } from './tags-section';
 import { PageHero } from '../page-hero';
 import { EmptyState, emptyIcons } from '../empty-state';
 
@@ -229,10 +229,10 @@ export default async function FinanzasPage() {
 
           <section className="fin-block">
             <h2 className="fin-h2">Etiquetas</h2>
-            <p className="muted" style={{ marginBottom: 12 }}>
-              Un corte transversal para clasificar ingresos y gastos bajo cualquier proyecto.
-            </p>
-            <TagManager catalog={tags} />
+            <TagsSection
+              tags={tags}
+              projects={projectOpts.map((p) => ({ id: p.id, title: p.title }))}
+            />
           </section>
 
           {/* Pipeline y discrepancias llegan con las ventas (Etapa 5). */}

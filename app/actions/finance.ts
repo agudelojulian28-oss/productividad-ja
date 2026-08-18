@@ -283,16 +283,17 @@ export async function skipRecurringExpenseAction(
   return result;
 }
 
-// ── Etiquetas ────────────────────────────────────────────────────────────────
-export async function listTagsAction(): Promise<TagRow[]> {
+// ── Etiquetas (por proyecto) ──────────────────────────────────────────────────
+export async function listTagsAction(projectId?: string): Promise<TagRow[]> {
   const { ctx, repo } = await deps();
-  const r = await listTags(ctx, repo);
+  const r = await listTags(ctx, repo, projectId);
   return r.ok ? r.value : [];
 }
 
 export async function createTagAction(input: {
   name: string;
   color?: string | null;
+  projectId: string;
 }): Promise<Result<TagRow>> {
   const { ctx, repo } = await deps();
   const result = await createTag(ctx, repo, input);

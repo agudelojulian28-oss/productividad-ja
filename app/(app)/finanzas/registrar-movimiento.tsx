@@ -177,7 +177,10 @@ export function RegistrarMovimiento({
         Proyecto
         <select
           value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
+          onChange={(e) => {
+            setProjectId(e.target.value);
+            setTagIds([]); // las etiquetas son por proyecto; se limpian al cambiar
+          }}
           className="field"
         >
           {projects.length === 0 && <option value="">Crea un proyecto primero</option>}
@@ -255,7 +258,7 @@ export function RegistrarMovimiento({
 
       <div className="cal-field-label">
         Etiquetas (opcional)
-        <TagPicker catalog={tags} selected={tagIds} onChange={setTagIds} />
+        <TagPicker catalog={tags} projectId={projectId} selected={tagIds} onChange={setTagIds} />
       </div>
 
       <label className="cal-field-label">

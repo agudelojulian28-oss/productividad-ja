@@ -124,7 +124,14 @@ export function EditMovimiento({
 
       <label className="cal-field-label">
         Proyecto
-        <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="field">
+        <select
+          value={projectId}
+          onChange={(e) => {
+            setProjectId(e.target.value);
+            setTagIds([]); // las etiquetas son por proyecto; se limpian al cambiar
+          }}
+          className="field"
+        >
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.title}
@@ -167,7 +174,7 @@ export function EditMovimiento({
 
       <div className="cal-field-label">
         Etiquetas
-        <TagPicker catalog={tags} selected={tagIds} onChange={setTagIds} />
+        <TagPicker catalog={tags} projectId={projectId} selected={tagIds} onChange={setTagIds} />
       </div>
 
       {row.receiptUrl && (

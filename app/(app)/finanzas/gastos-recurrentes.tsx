@@ -184,7 +184,10 @@ function RecurForm({
     <form onSubmit={onCreate} className="fin-form">
       <select
         value={projectId}
-        onChange={(e) => setProjectId(e.target.value)}
+        onChange={(e) => {
+          setProjectId(e.target.value);
+          setTagIds([]); // etiquetas por proyecto
+        }}
         className="field"
         aria-label="Proyecto"
       >
@@ -248,7 +251,7 @@ function RecurForm({
       </label>
       <div className="cal-field-label">
         Etiquetas
-        <TagPicker catalog={tags} selected={tagIds} onChange={setTagIds} />
+        <TagPicker catalog={tags} projectId={projectId} selected={tagIds} onChange={setTagIds} />
       </div>
       {error && <p className="error-text">{error}</p>}
       <button type="submit" className="btn-primary" disabled={pending}>
@@ -322,7 +325,7 @@ function EditRow({ row, tags, onDone }: { row: RecurRow; tags: TagOption[]; onDo
         </div>
         <div className="cal-field-label">
           Etiquetas
-          <TagPicker catalog={tags} selected={tagIds} onChange={setTagIds} />
+          <TagPicker catalog={tags} projectId={row.projectId} selected={tagIds} onChange={setTagIds} />
         </div>
         <div className="new-task-row">
           <button type="button" className="btn-primary" disabled={pending} onClick={save}>
