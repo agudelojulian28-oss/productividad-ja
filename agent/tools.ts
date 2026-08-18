@@ -292,8 +292,18 @@ export async function runTool(
         );
       }
       if (vista === 'etiquetas') {
-        const tags = await fin.listTags();
-        return ok(tags.map((t) => ({ id: t.id, nombre: t.name, color: t.color })));
+        const tags = await fin.listTags(p.value.proyecto_id);
+        const projects = await repo.listProjects();
+        const nombre = new Map(projects.map((pr) => [pr.id, pr.title] as const));
+        return ok(
+          tags.map((t) => ({
+            id: t.id,
+            nombre: t.name,
+            color: t.color,
+            proyecto_id: t.projectId,
+            proyecto: nombre.get(t.projectId) ?? '—',
+          })),
+        );
       }
       if (vista === 'por_cobrar') {
         const rows = await fin.receivables();
@@ -452,8 +462,12 @@ export async function runTool(
         }
         case 'etiqueta': {
           if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
-          const r = await createTag(ctx, deps.finance, { name: v.titulo!, color: v.color_hex ?? null });
-          return r.ok ? ok({ etiqueta_id: r.value.id, nombre: r.value.name }) : r;
+          const r = await createTag(ctx, deps.finance, {
+            name: v.titulo!,
+            color: v.color_hex ?? null,
+            projectId: v.proyecto_id!,
+          });
+          return r.ok ? ok({ etiqueta_id: r.value.id, nombre: r.value.name, proyecto_id: r.value.projectId }) : r;
         }
       }
       return err('INVALID_INPUT', 'Tipo desconocido');

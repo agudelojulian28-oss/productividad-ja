@@ -60,7 +60,7 @@ export const Consultar = z.object({
     .enum(['ingreso', 'gasto'])
     .optional()
     .describe('Solo vista=movimientos: filtra a ingresos o gastos'),
-  proyecto_id: z.uuid().optional().describe('Solo vista=documentacion: limita a ese proyecto'),
+  proyecto_id: z.uuid().optional().describe('vista=documentacion o vista=etiquetas: limita a ese proyecto'),
   duracion_min: z.number().int().min(15).max(480).optional().describe('Solo vista=huecos: minutos (60 def)'),
 });
 
@@ -97,7 +97,7 @@ export const Crear = z
       .uuid()
       .optional()
       .describe(
-        'Proyecto. El dinero (movimiento y meta_dinero) SIEMPRE se atribuye a un proyecto. Requerido: meta, meta_dinero, movimiento. Opcional: tarea, evento, documento',
+        'Proyecto. El dinero (movimiento y meta_dinero) SIEMPRE se atribuye a un proyecto. Requerido: meta, meta_dinero, movimiento, recurrente, etiqueta (las etiquetas son por proyecto). Opcional: tarea, evento, documento',
       ),
     meta_id: z.uuid().optional().describe('Meta. Opcional: tarea, evento'),
     fecha: Instant.optional().describe('Inicio con offset. tarea (vence, opcional), evento (inicio, requerido)'),
@@ -160,7 +160,7 @@ export const Crear = z
         case 'recurrente':
           return !!d.proyecto_id && d.monto != null && !!d.frecuencia && !!d.desde;
         case 'etiqueta':
-          return !!d.titulo;
+          return !!d.titulo && !!d.proyecto_id;
         default:
           return false;
       }
@@ -298,7 +298,7 @@ const descriptions: Record<ToolName, string> = {
   crear:
     'Crea CUALQUIER cosa del dominio según tipo: tarea, evento (Google Calendar), proyecto, meta, ' +
     'area, meta_dinero, documento (del método), movimiento (ingreso/gasto), recurrente (gasto o ingreso que se ' +
-    'repite; usa direccion) o etiqueta (para clasificar movimientos). El dinero (movimiento, meta_dinero, recurrente) ' +
+    'repite; usa direccion) o etiqueta (por proyecto, para clasificar sus movimientos; requiere proyecto_id). El dinero (movimiento, meta_dinero, recurrente) ' +
     'SIEMPRE se atribuye a un proyecto (proyecto_id). Para asignar etiquetas a un movimiento/recurrente al crearlo, pasa sus IDs en etiquetas.',
   actualizar:
     'Actualiza según tipo: tarea (completar/reabrir/reprogramar/descripción/mover), meta (factores/' +

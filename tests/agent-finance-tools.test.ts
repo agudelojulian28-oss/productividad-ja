@@ -168,9 +168,18 @@ describe('runTool · etiquetas', () => {
     const d = deps();
     const proyecto_id = await unProyecto(d);
 
-    const t = await runTool(d, 'crear', { tipo: 'etiqueta', titulo: 'Personal', color_hex: '#22c55e' });
+    const t = await runTool(d, 'crear', {
+      tipo: 'etiqueta',
+      titulo: 'Personal',
+      color_hex: '#22c55e',
+      proyecto_id,
+    });
     expect(t.ok).toBe(true);
     const etiquetaId = t.ok ? (t.value as { etiqueta_id: string }).etiqueta_id : '';
+
+    // Crear etiqueta sin proyecto → rechazada.
+    const sinProj = await runTool(d, 'crear', { tipo: 'etiqueta', titulo: 'x' });
+    expect(sinProj.ok).toBe(false);
 
     const c = await runTool(d, 'crear', {
       tipo: 'movimiento',
@@ -186,8 +195,8 @@ describe('runTool · etiquetas', () => {
       { transactionId: movId, tagId: etiquetaId },
     ]);
 
-    // consultar etiquetas trae el id.
-    const lst = await runTool(d, 'consultar', { vista: 'etiquetas' });
+    // consultar etiquetas filtrando por proyecto trae el id.
+    const lst = await runTool(d, 'consultar', { vista: 'etiquetas', proyecto_id });
     expect(lst.ok).toBe(true);
     if (lst.ok) expect((lst.value as { id: string }[])[0]!.id).toBe(etiquetaId);
 
