@@ -706,3 +706,34 @@ con opción de editar el monto y adjuntar comprobante.
 
 **Consecuencias.** Cero cron nuevo (reusa el resumen). El pop-up corre un fetch ligero en el
 layout por navegación. La confirmación reusa `registrarMovimiento` y el adjunto de comprobante.
+
+---
+
+## ADR-028 · Etiquetas de movimientos + ingresos recurrentes
+
+**Estado:** aceptado · **Fecha:** 2026-08-18
+
+**Contexto.** Julián quería (1) etiquetas propias para clasificar ingresos y gastos como un
+corte transversal bajo la jerarquía de proyectos (crear/editar/borrar, poner/quitar a voluntad,
+también en recurrentes), y (2) un área de **ingresos recurrentes** con la misma máquina de los
+gastos recurrentes. Y que el agente pueda gestionarlo todo al 100%.
+
+**Decisión.**
+- **Etiquetas GLOBALES por usuario** (`tags`: id, user_id, name único case-insensitive, color
+  hex opcional). No por proyecto: una sola lista reutilizable es más simple y encaja con
+  "un solo usuario". Vínculos many-to-many con `user_id` desnormalizado para RLS:
+  `transaction_tags` y `recurring_tags` (PK compuesta, `ON DELETE CASCADE` en ambos lados).
+  Solo `tags` lleva `audit_row()` + `touch_updated_at()`; las tablas puente no (no tienen `id`
+  ni `updated_at`; su historia se deduce de sus filas).
+- **Ingresos recurrentes = misma tabla `recurring_expenses` + columna `direction ('in'|'out')`**
+  (default `'out'`; los existentes quedan como gasto). Confirmar un recurrente crea el
+  movimiento con `rec.direction` (un recurrente de ingreso genera un movimiento `in`). El
+  componente de UI `Recurrentes` sirve para ambas direcciones (cambia copy y signo, no lógica).
+- **Agente (ADR-024, verbos generales).** Sin herramientas nuevas: `etiqueta` entra como
+  `tipo` en crear/actualizar/archivar; `consultar vista=etiquetas` da los IDs; movimiento y
+  recurrente aceptan un arreglo `etiquetas` (IDs) que REEMPLAZA su conjunto; `recurrente` gana
+  `direccion`. El core de etiquetas (`core/finance/tags.ts`) valida existencia y unicidad.
+
+**Consecuencias.** Poner/quitar etiquetas es idempotente (set-replace). Borrar una etiqueta la
+quita de todo por cascada. El catálogo del agente sigue en ~7 verbos. Sin cambios de auditoría
+en las tablas puente (aceptado: su verdad son las filas mismas).
