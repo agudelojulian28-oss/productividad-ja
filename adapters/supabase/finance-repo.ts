@@ -9,6 +9,7 @@ import type {
   ByProjectRow,
   RecurringExpenseRow,
   RecurringFrequency,
+  TagRow,
   ExpenseCategoryRow,
   ReceivableRow,
   PipelineRow,
@@ -69,6 +70,7 @@ function toTx(r: DbTransaction): TransactionRow {
 
 interface DbRecurring {
   id: string;
+  direction: 'in' | 'out';
   project_id: string;
   area_id: string;
   amount_minor: number | string;
@@ -81,11 +83,12 @@ interface DbRecurring {
 }
 
 const REC_COLS =
-  'id,project_id,area_id,amount_minor,currency,category,description,frequency,next_due_on,active';
+  'id,direction,project_id,area_id,amount_minor,currency,category,description,frequency,next_due_on,active';
 
 function toRecurring(r: DbRecurring): RecurringExpenseRow {
   return {
     id: r.id,
+    direction: r.direction,
     projectId: r.project_id,
     areaId: r.area_id,
     amountMinor: n(r.amount_minor),
@@ -332,6 +335,7 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
         .from('recurring_expenses')
         .insert({
           user_id: userId,
+          direction: input.direction ?? 'out',
           project_id: input.projectId,
           area_id: input.areaId,
           amount_minor: input.amountMinor,
@@ -388,6 +392,115 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
     async deleteRecurringExpense(id) {
       const { error } = await supabase.from('recurring_expenses').delete().eq('id', id);
       if (error) throw new Error(error.message);
+    },
+
+    // ── Etiquetas ──────────────────────────────────────────────────────────
+    async listTags() {
+      const { data, error } = await supabase
+        .from('tags')
+        .select('id,name,color')
+        .order('name', { ascending: true });
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map(
+        (r): TagRow => ({ id: r.id as string, name: r.name as string, color: (r.color as string | null) ?? null }),
+      );
+    },
+
+    async getTag(id) {
+      const { data, error } = await supabase
+        .from('tags')
+        .select('id,name,color')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data
+        ? { id: data.id as string, name: data.name as string, color: (data.color as string | null) ?? null }
+        : null;
+    },
+
+    async insertTag(input) {
+      const { data, error } = await supabase
+        .from('tags')
+        .insert({ user_id: userId, name: input.name, color: input.color ?? null })
+        .select('id,name,color')
+        .single();
+      if (error) throw new Error(error.message);
+      return { id: data.id as string, name: data.name as string, color: (data.color as string | null) ?? null };
+    },
+
+    async updateTag(id, patch) {
+      const upd: Record<string, unknown> = {};
+      if (patch.name !== undefined) upd.name = patch.name;
+      if (patch.color !== undefined) upd.color = patch.color;
+      const { data, error } = await supabase
+        .from('tags')
+        .update(upd)
+        .eq('id', id)
+        .select('id,name,color')
+        .single();
+      if (error) throw new Error(error.message);
+      return { id: data.id as string, name: data.name as string, color: (data.color as string | null) ?? null };
+    },
+
+    async deleteTag(id) {
+      const { error } = await supabase.from('tags').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+
+    async setTransactionTags(transactionId, tagIds) {
+      // Reemplaza el conjunto: borra los actuales y vuelve a insertar.
+      const del = await supabase
+        .from('transaction_tags')
+        .delete()
+        .eq('transaction_id', transactionId);
+      if (del.error) throw new Error(del.error.message);
+      if (tagIds.length === 0) return;
+      const rows = tagIds.map((tagId) => ({
+        transaction_id: transactionId,
+        tag_id: tagId,
+        user_id: userId,
+      }));
+      const { error } = await supabase.from('transaction_tags').insert(rows);
+      if (error) throw new Error(error.message);
+    },
+
+    async listTransactionTags(transactionIds) {
+      if (transactionIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('transaction_tags')
+        .select('transaction_id,tag_id')
+        .in('transaction_id', transactionIds);
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map((r) => ({
+        transactionId: r.transaction_id as string,
+        tagId: r.tag_id as string,
+      }));
+    },
+
+    async setRecurringTags(recurringId, tagIds) {
+      const del = await supabase.from('recurring_tags').delete().eq('recurring_id', recurringId);
+      if (del.error) throw new Error(del.error.message);
+      if (tagIds.length === 0) return;
+      const rows = tagIds.map((tagId) => ({
+        recurring_id: recurringId,
+        tag_id: tagId,
+        user_id: userId,
+      }));
+      const { error } = await supabase.from('recurring_tags').insert(rows);
+      if (error) throw new Error(error.message);
+    },
+
+    async listRecurringTags(recurringIds) {
+      if (recurringIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('recurring_tags')
+        .select('recurring_id,tag_id')
+        .in('recurring_id', recurringIds);
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map((r) => ({
+        recurringId: r.recurring_id as string,
+        tagId: r.tag_id as string,
+      }));
     },
 
     async expensesByCategory() {

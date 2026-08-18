@@ -84,6 +84,7 @@ export type RecurringFrequency =
 
 export interface RecurringExpenseRow {
   id: string;
+  direction: 'in' | 'out';
   projectId: string;
   areaId: string;
   amountMinor: number;
@@ -96,6 +97,7 @@ export interface RecurringExpenseRow {
 }
 
 export interface RecurringExpenseInsert {
+  direction?: 'in' | 'out';
   projectId: string;
   areaId: string;
   amountMinor: number;
@@ -104,6 +106,13 @@ export interface RecurringExpenseInsert {
   description?: string;
   frequency: RecurringFrequency;
   nextDueOn: string;
+}
+
+/** Etiqueta global del usuario (corte transversal de movimientos y recurrentes). */
+export interface TagRow {
+  id: string;
+  name: string;
+  color: string | null;
 }
 
 export interface RecurringExpensePatch {
@@ -212,6 +221,19 @@ export interface FinanceRepo {
   getRecurringExpense(id: string): Promise<RecurringExpenseRow | null>;
   updateRecurringExpense(id: string, patch: RecurringExpensePatch): Promise<RecurringExpenseRow>;
   deleteRecurringExpense(id: string): Promise<void>;
+
+  // Etiquetas (globales) + sus vínculos con movimientos y recurrentes.
+  listTags(): Promise<TagRow[]>;
+  getTag(id: string): Promise<TagRow | null>;
+  insertTag(input: { name: string; color?: string | null }): Promise<TagRow>;
+  updateTag(id: string, patch: { name?: string; color?: string | null }): Promise<TagRow>;
+  deleteTag(id: string): Promise<void>;
+  /** Reemplaza el conjunto de etiquetas de un movimiento por `tagIds`. */
+  setTransactionTags(transactionId: string, tagIds: string[]): Promise<void>;
+  /** Etiquetas por movimiento para una lista de ids: { transactionId, tagId }. */
+  listTransactionTags(transactionIds: string[]): Promise<{ transactionId: string; tagId: string }[]>;
+  setRecurringTags(recurringId: string, tagIds: string[]): Promise<void>;
+  listRecurringTags(recurringIds: string[]): Promise<{ recurringId: string; tagId: string }[]>;
 
   insertMoneyGoal(input: MoneyGoalInsert): Promise<{ id: string }>;
   moneyGoalsProgress(): Promise<MoneyGoalProgressRow[]>;

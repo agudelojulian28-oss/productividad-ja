@@ -8,6 +8,7 @@ import type {
   MoneyGoalInsert,
   MoneyGoalProgressRow,
   RecurringExpenseRow,
+  TagRow,
 } from '@/core/finance/ports';
 
 export function makeFakeFinanceRepo(): FinanceRepo & {
@@ -15,11 +16,17 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
   _txs: TransactionRow[];
   _goals: MoneyGoalProgressRow[];
   _recurring: Map<string, RecurringExpenseRow>;
+  _tags: Map<string, TagRow>;
+  _txTags: { transactionId: string; tagId: string }[];
+  _recTags: { recurringId: string; tagId: string }[];
 } {
   const sources = new Map<string, IncomeSourceRow>();
   const txs: TransactionRow[] = [];
   const goals: MoneyGoalProgressRow[] = [];
   const recurring = new Map<string, RecurringExpenseRow>();
+  const tags = new Map<string, TagRow>();
+  let txTags: { transactionId: string; tagId: string }[] = [];
+  let recTags: { recurringId: string; tagId: string }[] = [];
   let seq = 0;
   const uuid = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`;
 
@@ -28,9 +35,13 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
     _txs: txs,
     _goals: goals,
     _recurring: recurring,
+    _tags: tags,
+    _txTags: txTags,
+    _recTags: recTags,
     async insertRecurringExpense(input) {
       const row: RecurringExpenseRow = {
         id: uuid(),
+        direction: input.direction ?? 'out',
         projectId: input.projectId,
         areaId: input.areaId,
         amountMinor: input.amountMinor,
@@ -67,6 +78,48 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
     },
     async deleteRecurringExpense(id: string) {
       recurring.delete(id);
+    },
+    async listTags(): Promise<TagRow[]> {
+      return [...tags.values()].sort((a, b) => a.name.localeCompare(b.name));
+    },
+    async getTag(id: string): Promise<TagRow | null> {
+      return tags.get(id) ?? null;
+    },
+    async insertTag(input): Promise<TagRow> {
+      const row: TagRow = { id: uuid(), name: input.name, color: input.color ?? null };
+      tags.set(row.id, row);
+      return row;
+    },
+    async updateTag(id, patch): Promise<TagRow> {
+      const cur = tags.get(id);
+      if (!cur) throw new Error('updateTag: no existe');
+      const next: TagRow = {
+        ...cur,
+        name: patch.name ?? cur.name,
+        color: patch.color === undefined ? cur.color : patch.color,
+      };
+      tags.set(id, next);
+      return next;
+    },
+    async deleteTag(id: string): Promise<void> {
+      tags.delete(id);
+      // Cascada de los vínculos (en memoria).
+      txTags = txTags.filter((r) => r.tagId !== id);
+      recTags = recTags.filter((r) => r.tagId !== id);
+    },
+    async setTransactionTags(transactionId: string, tagIds: string[]): Promise<void> {
+      txTags = txTags.filter((r) => r.transactionId !== transactionId);
+      for (const tagId of tagIds) txTags.push({ transactionId, tagId });
+    },
+    async listTransactionTags(transactionIds: string[]) {
+      return txTags.filter((r) => transactionIds.includes(r.transactionId));
+    },
+    async setRecurringTags(recurringId: string, tagIds: string[]): Promise<void> {
+      recTags = recTags.filter((r) => r.recurringId !== recurringId);
+      for (const tagId of tagIds) recTags.push({ recurringId, tagId });
+    },
+    async listRecurringTags(recurringIds: string[]) {
+      return recTags.filter((r) => recurringIds.includes(r.recurringId));
     },
     async insertMoneyGoal(input: MoneyGoalInsert): Promise<{ id: string }> {
       const id = uuid();

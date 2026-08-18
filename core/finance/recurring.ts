@@ -48,6 +48,7 @@ export function nextDue(frequency: RecurringFrequency, fromYmd: string): string 
 }
 
 const RecurringCreate = z.object({
+  direction: z.enum(['in', 'out']).default('out'),
   projectId: z.uuid(),
   areaId: z.uuid(),
   amountMinor: z.number().int().positive().max(1_000_000_000_000),
@@ -128,7 +129,7 @@ export async function confirmRecurringExpense(
   if (!rec) return err('NOT_FOUND', 'Ese gasto recurrente no existe');
 
   const tx = await registrarMovimiento(ctx, repo, {
-    direction: 'out',
+    direction: rec.direction,
     amountMinor: parsed.data.amountMinor ?? rec.amountMinor,
     currency: rec.currency,
     areaId: rec.areaId,
