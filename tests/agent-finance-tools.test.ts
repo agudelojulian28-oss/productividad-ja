@@ -162,3 +162,71 @@ describe('runTool · consultar dinero', () => {
     }
   });
 });
+
+describe('runTool · etiquetas', () => {
+  it('crea etiqueta, la asigna a un movimiento y la lista/borra', async () => {
+    const d = deps();
+    const proyecto_id = await unProyecto(d);
+
+    const t = await runTool(d, 'crear', { tipo: 'etiqueta', titulo: 'Personal', color_hex: '#22c55e' });
+    expect(t.ok).toBe(true);
+    const etiquetaId = t.ok ? (t.value as { etiqueta_id: string }).etiqueta_id : '';
+
+    const c = await runTool(d, 'crear', {
+      tipo: 'movimiento',
+      direccion: 'gasto',
+      monto: 20000,
+      moneda: 'COP',
+      proyecto_id,
+      etiquetas: [etiquetaId],
+    });
+    expect(c.ok).toBe(true);
+    const movId = c.ok ? (c.value as { registrado: string }).registrado : '';
+    expect(await d.fin.listTransactionTags([movId])).toEqual([
+      { transactionId: movId, tagId: etiquetaId },
+    ]);
+
+    // consultar etiquetas trae el id.
+    const lst = await runTool(d, 'consultar', { vista: 'etiquetas' });
+    expect(lst.ok).toBe(true);
+    if (lst.ok) expect((lst.value as { id: string }[])[0]!.id).toBe(etiquetaId);
+
+    // actualizar movimiento con etiquetas=[] las quita.
+    await runTool(d, 'actualizar', { tipo: 'movimiento', id: movId, etiquetas: [] });
+    expect(await d.fin.listTransactionTags([movId])).toEqual([]);
+
+    // renombrar la etiqueta.
+    const ren = await runTool(d, 'actualizar', { tipo: 'etiqueta', id: etiquetaId, titulo: 'Personales' });
+    expect(ren.ok && (ren.value as { nombre: string }).nombre).toBe('Personales');
+
+    // borrar la etiqueta.
+    const del = await runTool(d, 'archivar', { tipo: 'etiqueta', id: etiquetaId });
+    expect(del.ok).toBe(true);
+    expect((await d.fin.listTags()).length).toBe(0);
+  });
+});
+
+describe('runTool · recurrente de ingreso', () => {
+  it('crea un ingreso recurrente y consultar recurrentes lo marca como ingreso', async () => {
+    const d = deps();
+    const proyecto_id = await unProyecto(d);
+    const r = await runTool(d, 'crear', {
+      tipo: 'recurrente',
+      direccion: 'ingreso',
+      monto: 2_000_000,
+      proyecto_id,
+      frecuencia: 'mensual',
+      desde: '2026-09-01',
+      descripcion: 'Sueldo',
+    });
+    expect(r.ok).toBe(true);
+    expect(r.ok && (r.value as { tipo: string }).tipo).toBe('ingreso recurrente');
+
+    const lst = await runTool(d, 'consultar', { vista: 'recurrentes' });
+    expect(lst.ok).toBe(true);
+    if (lst.ok) {
+      const rows = lst.value as { tipo: string; concepto: string }[];
+      expect(rows[0]!.tipo).toBe('ingreso recurrente');
+    }
+  });
+});

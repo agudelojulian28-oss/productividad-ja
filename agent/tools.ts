@@ -21,6 +21,13 @@ import {
   skipRecurringExpense,
 } from '@/core/finance/recurring';
 import { createMoneyGoal } from '@/core/finance/goals';
+import {
+  createTag,
+  updateTag,
+  deleteTag,
+  setTransactionTags,
+  setRecurringTags,
+} from '@/core/finance/tags';
 import { resumenFinanciero, topGastos } from '@/core/finance/queries';
 import { detectarChoques, huecosLibres } from '@/lib/agenda';
 import type { StructureRepo } from '@/core/structure/ports';
@@ -274,7 +281,8 @@ export async function runTool(
         return ok(
           list.map((r) => ({
             id: r.id,
-            concepto: r.description || r.category || 'gasto recurrente',
+            tipo: r.direction === 'in' ? 'ingreso recurrente' : 'gasto recurrente',
+            concepto: r.description || r.category || (r.direction === 'in' ? 'ingreso recurrente' : 'gasto recurrente'),
             monto: money(r.amountMinor),
             frecuencia: r.frequency,
             proximo: r.nextDueOn,
@@ -282,6 +290,10 @@ export async function runTool(
             vencido: r.nextDueOn <= hoy,
           })),
         );
+      }
+      if (vista === 'etiquetas') {
+        const tags = await fin.listTags();
+        return ok(tags.map((t) => ({ id: t.id, nombre: t.name, color: t.color })));
       }
       if (vista === 'por_cobrar') {
         const rows = await fin.receivables();
@@ -405,17 +417,20 @@ export async function runTool(
             occurredOn: v.desde, // opcional; el core usa hoy si falta
             fxRate: v.tasa,
           });
-          return r.ok
-            ? ok({ registrado: r.value.id, monto: money(r.value.baseAmountMinor), moneda: r.value.currency })
-            : r;
+          if (!r.ok) return r;
+          if (v.etiquetas && v.etiquetas.length > 0) {
+            await setTransactionTags(ctx, deps.finance, { id: r.value.id, tagIds: v.etiquetas });
+          }
+          return ok({ registrado: r.value.id, monto: money(r.value.baseAmountMinor), moneda: r.value.currency });
         }
         case 'recurrente': {
           if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
           const proj = v.proyecto_id ? await repo.getProject(v.proyecto_id) : null;
           if (!proj) {
-            return err('NOT_FOUND', 'Indica un proyecto válido (proyecto_id) para el gasto recurrente');
+            return err('NOT_FOUND', 'Indica un proyecto válido (proyecto_id) para el recurrente');
           }
           const r = await createRecurringExpense(ctx, deps.finance, {
+            direction: v.direccion === 'ingreso' ? 'in' : 'out',
             projectId: proj.id,
             areaId: proj.areaId,
             amountMinor: Math.round(v.monto! * 100),
@@ -424,9 +439,21 @@ export async function runTool(
             frequency: v.frecuencia!,
             nextDueOn: v.desde!,
           });
-          return r.ok
-            ? ok({ recurrente_id: r.value.id, monto: money(r.value.amountMinor), frecuencia: r.value.frequency })
-            : r;
+          if (!r.ok) return r;
+          if (v.etiquetas && v.etiquetas.length > 0) {
+            await setRecurringTags(ctx, deps.finance, { id: r.value.id, tagIds: v.etiquetas });
+          }
+          return ok({
+            recurrente_id: r.value.id,
+            tipo: r.value.direction === 'in' ? 'ingreso recurrente' : 'gasto recurrente',
+            monto: money(r.value.amountMinor),
+            frecuencia: r.value.frequency,
+          });
+        }
+        case 'etiqueta': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          const r = await createTag(ctx, deps.finance, { name: v.titulo!, color: v.color_hex ?? null });
+          return r.ok ? ok({ etiqueta_id: r.value.id, nombre: r.value.name }) : r;
         }
       }
       return err('INVALID_INPUT', 'Tipo desconocido');
@@ -543,7 +570,11 @@ export async function runTool(
             frequency: v.frecuencia,
             nextDueOn: v.desde,
           });
-          return r.ok ? ok({ recurrente_id: r.value.id }) : r;
+          if (!r.ok) return r;
+          if (v.etiquetas) {
+            await setRecurringTags(ctx, deps.finance, { id: v.id, tagIds: v.etiquetas });
+          }
+          return ok({ recurrente_id: r.value.id });
         }
         case 'movimiento': {
           if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
@@ -567,9 +598,20 @@ export async function runTool(
             description: v.descripcion,
             occurredOn: v.desde,
           });
-          return r.ok
-            ? ok({ actualizado: r.value.id, monto: money(r.value.baseAmountMinor) })
-            : r;
+          if (!r.ok) return r;
+          if (v.etiquetas) {
+            await setTransactionTags(ctx, deps.finance, { id: v.id, tagIds: v.etiquetas });
+          }
+          return ok({ actualizado: r.value.id, monto: money(r.value.baseAmountMinor) });
+        }
+        case 'etiqueta': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          const r = await updateTag(ctx, deps.finance, {
+            id: v.id,
+            name: v.titulo,
+            color: v.color_hex,
+          });
+          return r.ok ? ok({ etiqueta_id: r.value.id, nombre: r.value.name, color: r.value.color }) : r;
         }
       }
       return err('INVALID_INPUT', 'Tipo desconocido');
@@ -599,6 +641,11 @@ export async function runTool(
           if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
           const r = await deleteTransaction(ctx, deps.finance, v.id);
           return r.ok ? ok({ borrado: v.id }) : r;
+        }
+        case 'etiqueta': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          const r = await deleteTag(ctx, deps.finance, v.id);
+          return r.ok ? ok({ borrada: v.id }) : r;
         }
         case 'area': {
           if (!deps.structure) return err('EXTERNAL_ERROR', 'No disponible');
