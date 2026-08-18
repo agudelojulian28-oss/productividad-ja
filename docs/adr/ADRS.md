@@ -737,3 +737,26 @@ gastos recurrentes. Y que el agente pueda gestionarlo todo al 100%.
 **Consecuencias.** Poner/quitar etiquetas es idempotente (set-replace). Borrar una etiqueta la
 quita de todo por cascada. El catálogo del agente sigue en ~7 verbos. Sin cambios de auditoría
 en las tablas puente (aceptado: su verdad son las filas mismas).
+
+---
+
+## ADR-029 · Etiquetas por proyecto (supersede la parte "global" de ADR-028)
+
+**Estado:** aceptado · **Fecha:** 2026-08-18
+
+**Contexto.** ADR-028 hizo las etiquetas **globales** por usuario (una sola lista). Al probarlo,
+Julián pidió que cada etiqueta quede **ligada a un proyecto específico** y que al etiquetar un
+movimiento o recurrente **solo aparezcan las etiquetas de ese proyecto**. El corte transversal
+global no era lo que quería: prefiere clasificar dentro de la jerarquía del proyecto.
+
+**Decisión.** `tags` gana `project_id NOT NULL references projects(id) on delete cascade`. La
+unicidad del nombre pasa de `(user_id, lower(name))` a `(user_id, project_id, lower(name))` — el
+mismo nombre puede existir en proyectos distintos. `createTag` exige proyecto; `listTags(projectId?)`
+filtra; **al asignar** (`setTransactionTags`/`setRecurringTags`) el core valida que cada etiqueta
+pertenezca al **mismo proyecto** del movimiento/recurrente (coherencia por diseño, `RULE_VIOLATION`
+si no). El agente: `crear tipo=etiqueta` requiere `proyecto_id`; `consultar vista=etiquetas` acepta
+`proyecto_id` para filtrar. UI: el selector de etiquetas filtra por el proyecto elegido en el
+formulario; el gestor agrupa por proyecto y crea bajo un proyecto.
+
+**Consecuencias.** Se borraron las etiquetas de prueba de ADR-028 (no tenían proyecto). Borrar un
+proyecto borra sus etiquetas (cascada). Los vínculos `transaction_tags`/`recurring_tags` no cambian.

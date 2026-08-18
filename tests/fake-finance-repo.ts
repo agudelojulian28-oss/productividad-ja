@@ -79,14 +79,16 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
     async deleteRecurringExpense(id: string) {
       recurring.delete(id);
     },
-    async listTags(): Promise<TagRow[]> {
-      return [...tags.values()].sort((a, b) => a.name.localeCompare(b.name));
+    async listTags(projectId?: string): Promise<TagRow[]> {
+      return [...tags.values()]
+        .filter((t) => !projectId || t.projectId === projectId)
+        .sort((a, b) => a.name.localeCompare(b.name));
     },
     async getTag(id: string): Promise<TagRow | null> {
       return tags.get(id) ?? null;
     },
     async insertTag(input): Promise<TagRow> {
-      const row: TagRow = { id: uuid(), name: input.name, color: input.color ?? null };
+      const row: TagRow = { id: uuid(), projectId: input.projectId, name: input.name, color: input.color ?? null };
       tags.set(row.id, row);
       return row;
     },

@@ -85,6 +85,15 @@ interface DbRecurring {
 const REC_COLS =
   'id,direction,project_id,area_id,amount_minor,currency,category,description,frequency,next_due_on,active';
 
+function toTag(r: Record<string, unknown>): TagRow {
+  return {
+    id: r.id as string,
+    projectId: r.project_id as string,
+    name: r.name as string,
+    color: (r.color as string | null) ?? null,
+  };
+}
+
 function toRecurring(r: DbRecurring): RecurringExpenseRow {
   return {
     id: r.id,
@@ -394,38 +403,33 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
       if (error) throw new Error(error.message);
     },
 
-    // ── Etiquetas ──────────────────────────────────────────────────────────
-    async listTags() {
-      const { data, error } = await supabase
-        .from('tags')
-        .select('id,name,color')
-        .order('name', { ascending: true });
+    // ── Etiquetas (por proyecto) ───────────────────────────────────────────
+    async listTags(projectId) {
+      let q = supabase.from('tags').select('id,project_id,name,color').order('name', { ascending: true });
+      if (projectId) q = q.eq('project_id', projectId);
+      const { data, error } = await q;
       if (error) throw new Error(error.message);
-      return ((data as Record<string, unknown>[] | null) ?? []).map(
-        (r): TagRow => ({ id: r.id as string, name: r.name as string, color: (r.color as string | null) ?? null }),
-      );
+      return ((data as Record<string, unknown>[] | null) ?? []).map(toTag);
     },
 
     async getTag(id) {
       const { data, error } = await supabase
         .from('tags')
-        .select('id,name,color')
+        .select('id,project_id,name,color')
         .eq('id', id)
         .maybeSingle();
       if (error) throw new Error(error.message);
-      return data
-        ? { id: data.id as string, name: data.name as string, color: (data.color as string | null) ?? null }
-        : null;
+      return data ? toTag(data as Record<string, unknown>) : null;
     },
 
     async insertTag(input) {
       const { data, error } = await supabase
         .from('tags')
-        .insert({ user_id: userId, name: input.name, color: input.color ?? null })
-        .select('id,name,color')
+        .insert({ user_id: userId, project_id: input.projectId, name: input.name, color: input.color ?? null })
+        .select('id,project_id,name,color')
         .single();
       if (error) throw new Error(error.message);
-      return { id: data.id as string, name: data.name as string, color: (data.color as string | null) ?? null };
+      return toTag(data as Record<string, unknown>);
     },
 
     async updateTag(id, patch) {
@@ -436,10 +440,10 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
         .from('tags')
         .update(upd)
         .eq('id', id)
-        .select('id,name,color')
+        .select('id,project_id,name,color')
         .single();
       if (error) throw new Error(error.message);
-      return { id: data.id as string, name: data.name as string, color: (data.color as string | null) ?? null };
+      return toTag(data as Record<string, unknown>);
     },
 
     async deleteTag(id) {

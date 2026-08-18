@@ -108,9 +108,10 @@ export interface RecurringExpenseInsert {
   nextDueOn: string;
 }
 
-/** Etiqueta global del usuario (corte transversal de movimientos y recurrentes). */
+/** Etiqueta de un proyecto (clasifica movimientos y recurrentes de ese proyecto). */
 export interface TagRow {
   id: string;
+  projectId: string;
   name: string;
   color: string | null;
 }
@@ -222,10 +223,10 @@ export interface FinanceRepo {
   updateRecurringExpense(id: string, patch: RecurringExpensePatch): Promise<RecurringExpenseRow>;
   deleteRecurringExpense(id: string): Promise<void>;
 
-  // Etiquetas (globales) + sus vínculos con movimientos y recurrentes.
-  listTags(): Promise<TagRow[]>;
+  // Etiquetas (por proyecto) + sus vínculos con movimientos y recurrentes.
+  listTags(projectId?: string): Promise<TagRow[]>;
   getTag(id: string): Promise<TagRow | null>;
-  insertTag(input: { name: string; color?: string | null }): Promise<TagRow>;
+  insertTag(input: { name: string; color?: string | null; projectId: string }): Promise<TagRow>;
   updateTag(id: string, patch: { name?: string; color?: string | null }): Promise<TagRow>;
   deleteTag(id: string): Promise<void>;
   /** Reemplaza el conjunto de etiquetas de un movimiento por `tagIds`. */
