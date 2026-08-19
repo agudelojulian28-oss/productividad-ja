@@ -11,7 +11,11 @@
 
 const DEFAULT_BASE = 'https://api.openai.com/v1';
 const DEFAULT_MODEL = 'gpt-4o-mini-tts';
-const DEFAULT_VOICE = 'nova';
+// Voz femenina, cálida y fluida. 'coral'/'shimmer'/'sage' son femeninas en OpenAI.
+const DEFAULT_VOICE = 'coral';
+// gpt-4o-mini-tts acepta 'instructions' para dirigir tono/idioma/ritmo.
+const VOICE_INSTRUCTIONS =
+  'Habla en español latino con voz de mujer, cálida, natural y fluida, a ritmo conversacional (ni lento ni robótico). Tono cercano y amable.';
 // Tope de caracteres a locutar: las respuestas del agente son cortas; evita costo y
 // latencia si alguna vez se alarga.
 const MAX_CHARS = 1200;
@@ -38,7 +42,9 @@ export async function synthesizeSpeech(text: string): Promise<Buffer> {
       model: process.env.TTS_MODEL ?? DEFAULT_MODEL,
       voice: process.env.TTS_VOICE ?? DEFAULT_VOICE,
       input,
+      instructions: VOICE_INSTRUCTIONS,
       response_format: 'mp3',
+      speed: 1.06,
     }),
   });
   if (!res.ok) throw new Error('synthesizeSpeech: ' + (await res.text()));

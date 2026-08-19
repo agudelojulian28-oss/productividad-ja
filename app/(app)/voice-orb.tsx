@@ -13,8 +13,10 @@ type Estado = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error';
 
 type Turno = { role: 'user' | 'assistant'; text: string };
 
-const SILENCE_MS = 1300; // corta la grabación tras este silencio (tras detectar voz)
-const MAX_REC_MS = 15000; // tope duro por si nunca hay silencio
+const SILENCE_MS = 1150; // corta la grabación tras este silencio (tras detectar voz)
+const MIN_SPEECH_MS = 500; // exige algo de voz antes de permitir el corte por silencio
+const VAD_THRESHOLD = 7; // nivel para considerar "hay voz" (más bajo = más sensible)
+const MAX_REC_MS = 20000; // tope duro por si nunca hay silencio
 const VOICE_ON_KEY = 'voz:activada'; // recuerda si prefieres voz o texto
 
 export function VoiceOrb() {
@@ -38,6 +40,10 @@ export function VoiceOrb() {
   const voiceOnRef = useRef(true);
   // Rompe el ciclo grabar → agente → volver a escuchar sin referencias adelantadas.
   const startListeningRef = useRef<() => void>(() => {});
+  // Cola de voz: se locuta frase por frase mientras el agente aún responde (menos espera).
+  const speakQueueRef = useRef<string[]>([]);
+  const speakingRef = useRef(false);
+  const cancelSpeakRef = useRef(false);
 
   useEffect(() => {
     convRef.current = conversando;
@@ -53,6 +59,12 @@ export function VoiceOrb() {
         setVoiceOn(false);
         voiceOnRef.current = false;
       }
+    } catch {
+      /* no-op */
+    }
+    // Precarga las voces del navegador (se pueblan de forma asíncrona).
+    try {
+      window.speechSynthesis?.getVoices();
     } catch {
       /* no-op */
     }
@@ -75,10 +87,10 @@ export function VoiceOrb() {
     acRef.current = null;
   }, []);
 
-  // Reproduce la respuesta por voz. Nube (/api/speak) y, si no hay proveedor, navegador.
-  const speak = useCallback(async (text: string): Promise<void> => {
-    if (!voiceOnRef.current || !text.trim()) return;
-    // 1) Voz de nube.
+  // Locuta UN fragmento. Nube (/api/speak) y, si no hay proveedor, voz del navegador.
+  const speakChunk = useCallback(async (text: string): Promise<void> => {
+    if (cancelSpeakRef.current || !text.trim()) return;
+    // 1) Voz de nube (femenina, natural).
     try {
       const res = await fetch('/api/speak', {
         method: 'POST',
@@ -87,9 +99,11 @@ export function VoiceOrb() {
       });
       if (res.ok) {
         const buf = await res.arrayBuffer();
+        if (cancelSpeakRef.current) return;
         const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }));
         await new Promise<void>((resolve) => {
           const a = new Audio(url);
+          a.volume = 1;
           audioRef.current = a;
           a.onended = a.onerror = () => {
             URL.revokeObjectURL(url);
@@ -102,14 +116,16 @@ export function VoiceOrb() {
     } catch {
       /* cae al navegador */
     }
-    // 2) Voz del navegador (gratis).
+    // 2) Voz del navegador (gratis) — elige una voz de MUJER en español.
     try {
       if ('speechSynthesis' in window) {
         await new Promise<void>((resolve) => {
           const u = new SpeechSynthesisUtterance(text);
           u.lang = 'es-ES';
-          const es = speechSynthesis.getVoices().find((v) => v.lang.startsWith('es'));
-          if (es) u.voice = es;
+          u.rate = 1.05;
+          u.pitch = 1.1;
+          const v = pickFemaleSpanishVoice();
+          if (v) u.voice = v;
           u.onend = u.onerror = () => resolve();
           speechSynthesis.speak(u);
         });
@@ -119,13 +135,80 @@ export function VoiceOrb() {
     }
   }, []);
 
+  // Corre la cola de voz en orden. Se llama cada vez que se encola una frase.
+  const runSpeakQueue = useCallback(async () => {
+    if (speakingRef.current) return;
+    speakingRef.current = true;
+    setEstado('speaking');
+    while (speakQueueRef.current.length && !cancelSpeakRef.current) {
+      const next = speakQueueRef.current.shift();
+      if (next) await speakChunk(next);
+    }
+    speakingRef.current = false;
+  }, [speakChunk]);
+
+  const enqueueSpeak = useCallback(
+    (text: string) => {
+      if (!voiceOnRef.current || !text.trim()) return;
+      cancelSpeakRef.current = false;
+      speakQueueRef.current.push(text.trim());
+      void runSpeakQueue();
+    },
+    [runSpeakQueue],
+  );
+
+  const stopSpeaking = useCallback(() => {
+    cancelSpeakRef.current = true;
+    speakQueueRef.current = [];
+    speakingRef.current = false;
+    try {
+      audioRef.current?.pause();
+      speechSynthesis?.cancel();
+    } catch {
+      /* no-op */
+    }
+  }, []);
+
+  // Espera a que la cola de voz termine de sonar.
+  const waitSpeakDone = useCallback(
+    () =>
+      new Promise<void>((resolve) => {
+        const check = () =>
+          !speakingRef.current && speakQueueRef.current.length === 0
+            ? resolve()
+            : setTimeout(check, 120);
+        check();
+      }),
+    [],
+  );
+
   // ── Pipeline de un turno: grabar → transcribir → agente → hablar ────────────
   const enviarTexto = useCallback(
     async (texto: string) => {
       setTurns((p) => [...p, { role: 'user', text: texto }]);
       setEstado('thinking');
       setPartial('');
+      cancelSpeakRef.current = false;
       let assistant = '';
+      let spokenLen = 0;
+      // Extrae las frases completas aún no locutadas y las encola (para hablar ya).
+      const flush = (final: boolean) => {
+        const re = /[^.!?…\n]*[.!?…\n]+/g;
+        const pending = assistant.slice(spokenLen);
+        let m: RegExpExecArray | null;
+        let lastEnd = 0;
+        while ((m = re.exec(pending))) {
+          const frase = cleanForSpeech(m[0]);
+          if (frase) enqueueSpeak(frase);
+          lastEnd = re.lastIndex;
+        }
+        spokenLen += lastEnd;
+        if (final) {
+          const rest = cleanForSpeech(assistant.slice(spokenLen));
+          if (rest) enqueueSpeak(rest);
+          spokenLen = assistant.length;
+        }
+      };
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
@@ -149,6 +232,7 @@ export function VoiceOrb() {
               if (ev.type === 'text') {
                 assistant += ev.text ?? '';
                 setPartial(assistant);
+                flush(false); // habla las frases completas apenas llegan
               } else if (ev.type === 'error') {
                 assistant += `\n⚠️ ${ev.message ?? ''}`;
               }
@@ -162,13 +246,13 @@ export function VoiceOrb() {
       }
       setTurns((p) => [...p, { role: 'assistant', text: assistant }]);
       setPartial('');
-      setEstado('speaking');
-      await speak(assistant);
+      flush(true); // locuta lo que quede
+      await waitSpeakDone();
       setEstado('idle');
       // Modo conversación: vuelve a escuchar solo.
       if (convRef.current) setTimeout(() => startListeningRef.current(), 250);
     },
-    [speak],
+    [enqueueSpeak, waitSpeakDone],
   );
 
   const finishRecording = useCallback(async (blob: Blob) => {
@@ -209,7 +293,15 @@ export function VoiceOrb() {
     }
     setAviso(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // autoGainControl sube el volumen de micrófonos flojos; noiseSuppression limpia
+      // el ruido → mejor transcripción y menos "no te escuché".
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
       streamRef.current = stream;
       const mime = MediaRecorder.isTypeSupported('audio/webm')
         ? 'audio/webm'
@@ -241,21 +333,23 @@ export function VoiceOrb() {
       const data = new Uint8Array(an.frequencyBinCount);
       const startedAt = Date.now();
       let lastLoud = Date.now();
-      let hablo = false;
+      let speechStart = 0;
       const tick = () => {
         if (!recRef.current) return;
         an.getByteFrequencyData(data);
         let sum = 0;
         for (const v of data) sum += v;
         const avg = sum / data.length;
-        if (avg > 12) {
-          lastLoud = Date.now();
-          hablo = true;
-        }
         const now = Date.now();
+        if (avg > VAD_THRESHOLD) {
+          lastLoud = now;
+          if (!speechStart) speechStart = now;
+        }
+        // Solo corta si YA hubo voz suficiente y luego vino un silencio sostenido.
+        const hubated = speechStart && now - speechStart > MIN_SPEECH_MS;
         const silencio = now - lastLoud > SILENCE_MS;
         // No auto-cortar en walkie-talkie (se corta al soltar); sí en conversación.
-        if (!heldRef.current && hablo && silencio) {
+        if (!heldRef.current && hubated && silencio) {
           rec.stop();
           return;
         }
@@ -313,15 +407,10 @@ export function VoiceOrb() {
     convRef.current = false;
     stopListening();
     stopStream();
-    try {
-      audioRef.current?.pause();
-      speechSynthesis?.cancel();
-    } catch {
-      /* no-op */
-    }
+    stopSpeaking();
     setEstado('idle');
     setOpen(false);
-  }, [stopListening, stopStream]);
+  }, [stopListening, stopStream, stopSpeaking]);
 
   // ── Gestos del orbe: tap abre conversación, mantener = walkie-talkie ────────
   const onPointerDown = () => {
@@ -459,6 +548,33 @@ export function VoiceOrb() {
       )}
     </>
   );
+}
+
+// Voces de mujer en español conocidas por plataforma (Apple/Google/Microsoft).
+const FEMALE_ES = [
+  'mónica', 'monica', 'paulina', 'sabina', 'helena', 'laura', 'dalia', 'elvira',
+  'lucia', 'lucía', 'marisol', 'angelica', 'angélica', 'esperanza', 'google español',
+];
+const MALE_ES = ['jorge', 'diego', 'carlos', 'juan', 'pablo', 'miguel', 'raul', 'raúl'];
+
+/** Elige una voz de MUJER en español del navegador (fallback cuando no hay voz de nube). */
+function pickFemaleSpanishVoice(): SpeechSynthesisVoice | null {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+  const es = speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith('es'));
+  if (!es.length) return null;
+  const female = es.find((v) => FEMALE_ES.some((n) => v.name.toLowerCase().includes(n)));
+  if (female) return female;
+  const notMale = es.find((v) => !MALE_ES.some((n) => v.name.toLowerCase().includes(n)));
+  return notMale ?? es[0]!;
+}
+
+/** Limpia el texto para locutar: sin emojis, sin markdown, espacios normales. */
+function cleanForSpeech(s: string): string {
+  return s
+    .replace(/[*_`#>~]+/g, '')
+    .replace(/\p{Extended_Pictographic}/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** Cara del orbe: el logo (círculo naranja) con un glifo que cambia según el estado. */
