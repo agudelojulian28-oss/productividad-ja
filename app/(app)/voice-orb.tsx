@@ -57,6 +57,11 @@ const SILENCE_MS = 1150; // corta la grabación tras este silencio (tras detecta
 const MIN_SPEECH_MS = 500; // exige algo de voz antes de permitir el corte por silencio
 const VAD_THRESHOLD = 7; // nivel para considerar "hay voz" (más bajo = más sensible)
 const MAX_REC_MS = 20000; // tope duro por si nunca hay silencio
+// Barge-in: interrumpir a Aura mientras habla. Umbral alto + sostenido para que su
+// propia voz (con cancelación de eco) no dispare falsos.
+const BARGE_THRESHOLD = 20;
+const BARGE_SUSTAIN_MS = 260;
+const BARGE_GRACE_MS = 350; // ignora el arranque del audio
 const VOICE_ON_KEY = 'voz:activada'; // recuerda si prefieres voz o texto
 
 export function VoiceOrb() {
@@ -88,6 +93,13 @@ export function VoiceOrb() {
   const speakQueueRef = useRef<string[]>([]);
   const speakingRef = useRef(false);
   const cancelSpeakRef = useRef(false);
+  // Barge-in: monitor de micrófono mientras Aura habla, para detectar que la interrumpes.
+  const bargeStreamRef = useRef<MediaStream | null>(null);
+  const bargeAcRef = useRef<AudioContext | null>(null);
+  const bargeRafRef = useRef<number | null>(null);
+  const interruptedRef = useRef(false);
+  const bargeStartRef = useRef<() => void>(() => {});
+  const bargeStopRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     convRef.current = conversando;
@@ -184,11 +196,13 @@ export function VoiceOrb() {
     if (speakingRef.current) return;
     speakingRef.current = true;
     setEstado('speaking');
+    if (convRef.current) bargeStartRef.current(); // permite interrumpir a Aura hablando
     while (speakQueueRef.current.length && !cancelSpeakRef.current) {
       const next = speakQueueRef.current.shift();
       if (next) await speakChunk(next);
     }
     speakingRef.current = false;
+    bargeStopRef.current();
   }, [speakChunk]);
 
   const enqueueSpeak = useCallback(
@@ -226,6 +240,72 @@ export function VoiceOrb() {
     [],
   );
 
+  // ── Barge-in: interrumpir a Aura mientras habla ────────────────────────────
+  const stopBargeMonitor = useCallback(() => {
+    if (bargeRafRef.current) cancelAnimationFrame(bargeRafRef.current);
+    bargeRafRef.current = null;
+    bargeStreamRef.current?.getTracks().forEach((t) => t.stop());
+    bargeStreamRef.current = null;
+    bargeAcRef.current?.close().catch(() => {});
+    bargeAcRef.current = null;
+  }, []);
+
+  const onBargeIn = useCallback(() => {
+    interruptedRef.current = true;
+    stopBargeMonitor();
+    stopSpeaking(); // Aura se calla al instante
+    setTimeout(() => startListeningRef.current(), 60); // y te escucha
+  }, [stopBargeMonitor, stopSpeaking]);
+
+  const startBargeMonitor = useCallback(async () => {
+    stopBargeMonitor();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      bargeStreamRef.current = stream;
+      const ac = new AudioContext();
+      bargeAcRef.current = ac;
+      const src = ac.createMediaStreamSource(stream);
+      const an = ac.createAnalyser();
+      an.fftSize = 512;
+      src.connect(an);
+      const data = new Uint8Array(an.frequencyBinCount);
+      const startedAt = Date.now();
+      let loudSince = 0;
+      const tick = () => {
+        if (!bargeAcRef.current) return;
+        an.getByteFrequencyData(data);
+        let sum = 0;
+        for (const v of data) sum += v;
+        const avg = sum / data.length;
+        const now = Date.now();
+        if (now - startedAt < BARGE_GRACE_MS) {
+          bargeRafRef.current = requestAnimationFrame(tick);
+          return;
+        }
+        if (avg > BARGE_THRESHOLD) {
+          if (!loudSince) loudSince = now;
+          if (now - loudSince > BARGE_SUSTAIN_MS) {
+            onBargeIn();
+            return;
+          }
+        } else {
+          loudSince = 0;
+        }
+        bargeRafRef.current = requestAnimationFrame(tick);
+      };
+      bargeRafRef.current = requestAnimationFrame(tick);
+    } catch {
+      /* sin micrófono → sin barge-in, no pasa nada */
+    }
+  }, [stopBargeMonitor, onBargeIn]);
+
+  useEffect(() => {
+    bargeStartRef.current = () => void startBargeMonitor();
+    bargeStopRef.current = stopBargeMonitor;
+  }, [startBargeMonitor, stopBargeMonitor]);
+
   // ── Pipeline de un turno: grabar → transcribir → agente → hablar ────────────
   const enviarTexto = useCallback(
     async (texto: string) => {
@@ -234,6 +314,7 @@ export function VoiceOrb() {
       setPartial('');
       setHeard('');
       cancelSpeakRef.current = false;
+      interruptedRef.current = false;
       let assistant = '';
       let spokenLen = 0;
       // Extrae las frases completas aún no locutadas y las encola (para hablar ya).
@@ -293,6 +374,11 @@ export function VoiceOrb() {
       setPartial('');
       flush(true); // locuta lo que quede
       await waitSpeakDone();
+      // Si te interrumpió (barge-in), ya reinició la escucha: no la pises.
+      if (interruptedRef.current) {
+        interruptedRef.current = false;
+        return;
+      }
       setEstado('idle');
       // Modo conversación: vuelve a escuchar solo.
       if (convRef.current) setTimeout(() => startListeningRef.current(), 250);
@@ -530,9 +616,10 @@ export function VoiceOrb() {
     stopListening();
     stopStream();
     stopSpeaking();
+    stopBargeMonitor();
     setEstado('idle');
     setOpen(false);
-  }, [stopListening, stopStream, stopSpeaking]);
+  }, [stopListening, stopStream, stopSpeaking, stopBargeMonitor]);
 
   // ── Gestos del orbe: tap abre conversación, mantener = walkie-talkie ────────
   const onPointerDown = () => {
