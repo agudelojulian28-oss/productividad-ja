@@ -345,7 +345,7 @@ export function VoiceOrb() {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ message: texto }),
+          body: JSON.stringify({ message: texto, voz: true }),
         });
         if (!res.body) throw new Error('sin respuesta');
         const reader = res.body.getReader();

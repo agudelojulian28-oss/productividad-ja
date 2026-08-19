@@ -15,6 +15,7 @@ export async function POST(req: Request) {
   const body = (await req.json()) as {
     message?: string;
     images?: { mediaType?: string; data?: string }[];
+    voz?: boolean; // true cuando el turno viene del asistente de voz (Aura)
   };
   const message = (body.message ?? '').trim();
   // Saneo las imágenes: solo formatos que Claude acepta, base64 no vacío, máx. 5.
@@ -36,7 +37,17 @@ export async function POST(req: Request) {
 
   // Sube las imágenes al bucket para poder guardarlas si el usuario lo pide luego.
   const adjuntoIds = await ingestImages(supabase, ctx, images);
-  const userText = (message || 'Mira esta imagen.') + adjuntoNote(adjuntoIds);
+  let userText = (message || 'Mira esta imagen.') + adjuntoNote(adjuntoIds);
+
+  // Pista de VOZ (por turno; no se guarda ni va en el prompt cacheado): prioriza la
+  // conversación hablada y ejecutar acciones, no describirlas.
+  if (body.voz) {
+    userText =
+      '[Entrada por VOZ — el usuario te habla y te escuchará.] Responde MUY breve (1-2 frases), ' +
+      'natural para oír, sin markdown, listas ni emojis. Si te pide algo que puedas hacer con tus ' +
+      'herramientas, EJECÚTALO de una vez y confírmalo en una frase; no te limites a describirlo.\n\n' +
+      userText;
+  }
 
   const deps = buildAgentDeps(supabase, ctx);
 
