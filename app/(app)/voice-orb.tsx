@@ -53,10 +53,14 @@ type Estado = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error';
 
 type Turno = { role: 'user' | 'assistant'; text: string };
 
-const SILENCE_MS = 1150; // corta la grabación tras este silencio (tras detectar voz)
+// Silencio "prudente" que esperamos tras dejar de hablar antes de dar el turno por
+// terminado. Más alto = te deja pensar sin cortarte; más bajo = responde antes.
+const END_SILENCE_MS = 1500;
+const SILENCE_MS = END_SILENCE_MS; // vía de respaldo (grabación + VAD)
 const MIN_SPEECH_MS = 500; // exige algo de voz antes de permitir el corte por silencio
 const VAD_THRESHOLD = 7; // nivel para considerar "hay voz" (más bajo = más sensible)
 const MAX_REC_MS = 20000; // tope duro por si nunca hay silencio
+const NO_SPEECH_TIMEOUT_MS = 8000; // si nunca hablas, cierra la escucha
 // Barge-in: interrumpir a Aura mientras habla. Umbral alto + sostenido para que su
 // propia voz (con cancelación de eco) no dispare falsos.
 const BARGE_THRESHOLD = 20;
@@ -75,6 +79,8 @@ export function VoiceOrb() {
   const [heard, setHeard] = useState(''); // lo que Aura va oyendo (en vivo)
 
   const recognitionRef = useRef<SpeechRec | null>(null);
+  const recEndTimerRef = useRef<ReturnType<typeof setInterval> | null>(null); // endpointing propio
+  const listenAbortRef = useRef(false); // cerrar sin enviar lo escuchado
   const emptyCountRef = useRef(0); // silencios seguidos (para cortar la conversación sin inventar)
   const heardSpeechRef = useRef(false); // ¿el VAD detectó voz real en esta grabación?
   const recRef = useRef<MediaRecorder | null>(null);
@@ -408,6 +414,11 @@ export function VoiceOrb() {
   }, []);
 
   const finishRecording = useCallback(async (blob: Blob) => {
+    if (listenAbortRef.current) {
+      listenAbortRef.current = false;
+      setEstado('idle');
+      return;
+    }
     if (blob.size === 0 || !heardSpeechRef.current) {
       handleNoSpeech();
       return;
@@ -439,13 +450,19 @@ export function VoiceOrb() {
   const startSpeechRecognition = useCallback((): boolean => {
     const Ctor = getSpeechRecCtor();
     if (!Ctor) return false;
+    const clearEndTimer = () => {
+      if (recEndTimerRef.current) clearInterval(recEndTimerRef.current);
+      recEndTimerRef.current = null;
+    };
     try {
       const rec = new Ctor();
       rec.lang = 'es-ES';
       rec.interimResults = true;
-      rec.continuous = false;
+      rec.continuous = true; // no cortamos en cada pausa: el endpointing lo hacemos nosotros
       rec.maxAlternatives = 1;
       let finalText = '';
+      let lastResultAt = Date.now();
+      const startedAt = Date.now();
       recognitionRef.current = rec;
       setEstado('listening');
       rec.onresult = (e) => {
@@ -457,13 +474,19 @@ export function VoiceOrb() {
           if (r.isFinal) finalText += alt.transcript;
           else interim += alt.transcript;
         }
+        lastResultAt = Date.now(); // hubo actividad de voz → reinicia el conteo de silencio
         setHeard(`${finalText} ${interim}`.trim());
       };
       rec.onerror = () => {
         /* onend se encarga */
       };
       rec.onend = () => {
+        clearEndTimer();
         recognitionRef.current = null;
+        if (listenAbortRef.current) {
+          listenAbortRef.current = false;
+          return; // se cerró: no enviar lo escuchado
+        }
         const text = finalText.trim();
         if (isMeaningful(text)) {
           emptyCountRef.current = 0;
@@ -473,8 +496,23 @@ export function VoiceOrb() {
         }
       };
       rec.start();
+      // Endpointing propio: cierra tras END_SILENCE_MS de silencio (ya habiendo hablado),
+      // o si nunca hablas tras NO_SPEECH_TIMEOUT_MS.
+      recEndTimerRef.current = setInterval(() => {
+        const idle = Date.now() - lastResultAt;
+        const haveText = finalText.trim().length > 0;
+        if ((haveText && idle > END_SILENCE_MS) || (!haveText && Date.now() - startedAt > NO_SPEECH_TIMEOUT_MS)) {
+          clearEndTimer();
+          try {
+            rec.stop();
+          } catch {
+            /* no-op */
+          }
+        }
+      }, 200);
       return true;
     } catch {
+      clearEndTimer();
       return false;
     }
   }, [enviarTexto, handleNoSpeech]);
@@ -492,6 +530,7 @@ export function VoiceOrb() {
     setAviso(null);
     setHeard('');
     heardSpeechRef.current = false;
+    listenAbortRef.current = false;
     // Reconocimiento nativo del navegador: instantáneo y no inventa en silencio.
     if (!heldRef.current && startSpeechRecognition()) return;
     try {
@@ -575,6 +614,10 @@ export function VoiceOrb() {
   }, [startListening]);
 
   const stopListening = useCallback(() => {
+    if (recEndTimerRef.current) {
+      clearInterval(recEndTimerRef.current);
+      recEndTimerRef.current = null;
+    }
     try {
       recognitionRef.current?.stop();
     } catch {
@@ -613,6 +656,7 @@ export function VoiceOrb() {
   const cerrar = useCallback(() => {
     setConversando(false);
     convRef.current = false;
+    listenAbortRef.current = true; // no envíes lo que se estaba escuchando
     stopListening();
     stopStream();
     stopSpeaking();
