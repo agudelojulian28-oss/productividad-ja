@@ -67,6 +67,8 @@ const BARGE_THRESHOLD = 20;
 const BARGE_SUSTAIN_MS = 260;
 const BARGE_GRACE_MS = 350; // ignora el arranque del audio
 const VOICE_ON_KEY = 'voz:activada'; // recuerda si prefieres voz o texto
+const WAKE_ON_KEY = 'voz:despertar'; // recuerda si "escuchar 'Aura'" está activo
+const WAKE_WORD = /\baura\b/i; // palabra clave para despertar (con la app abierta)
 
 export function VoiceOrb() {
   const [open, setOpen] = useState(false);
@@ -77,7 +79,12 @@ export function VoiceOrb() {
   const [voiceOn, setVoiceOn] = useState(true);
   const [conversando, setConversando] = useState(false); // modo conversación continua
   const [heard, setHeard] = useState(''); // lo que Aura va oyendo (en vivo)
+  const [wakeOn, setWakeOn] = useState(false); // escuchar la palabra "Aura" (app abierta)
 
+  const wakeOnRef = useRef(false);
+  const openRef = useRef(false);
+  const wakeRecRef = useRef<SpeechRec | null>(null);
+  const startWakeRef = useRef<() => void>(() => {});
   const recognitionRef = useRef<SpeechRec | null>(null);
   const recEndTimerRef = useRef<ReturnType<typeof setInterval> | null>(null); // endpointing propio
   const listenAbortRef = useRef(false); // cerrar sin enviar lo escuchado
@@ -113,6 +120,12 @@ export function VoiceOrb() {
   useEffect(() => {
     voiceOnRef.current = voiceOn;
   }, [voiceOn]);
+  useEffect(() => {
+    wakeOnRef.current = wakeOn;
+  }, [wakeOn]);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   useEffect(() => {
     try {
@@ -120,6 +133,10 @@ export function VoiceOrb() {
       if (v === '0') {
         setVoiceOn(false);
         voiceOnRef.current = false;
+      }
+      if (localStorage.getItem(WAKE_ON_KEY) === '1') {
+        setWakeOn(true);
+        wakeOnRef.current = true;
       }
     } catch {
       /* no-op */
@@ -403,7 +420,11 @@ export function VoiceOrb() {
         setConversando(false);
         convRef.current = false;
         setEstado('idle');
-        setAviso('Te dejé de escuchar. Toca el orbe cuando quieras seguir.');
+        if (wakeOnRef.current) {
+          setOpen(false); // vuelve a quedar a la escucha de "Aura"
+        } else {
+          setAviso('Te dejé de escuchar. Toca el orbe cuando quieras seguir.');
+        }
         return;
       }
       setEstado('idle');
@@ -665,6 +686,76 @@ export function VoiceOrb() {
     setOpen(false);
   }, [stopListening, stopStream, stopSpeaking, stopBargeMonitor]);
 
+  // ── Despertar con "Aura" (solo con la app abierta y en primer plano) ────────
+  const stopWake = useCallback(() => {
+    const r = wakeRecRef.current;
+    wakeRecRef.current = null;
+    try {
+      r?.abort();
+    } catch {
+      /* no-op */
+    }
+  }, []);
+
+  const startWake = useCallback(() => {
+    const Ctor = getSpeechRecCtor();
+    if (!Ctor || wakeRecRef.current || !wakeOnRef.current || openRef.current) return;
+    try {
+      const rec = new Ctor();
+      rec.lang = 'es-ES';
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.maxAlternatives = 1;
+      wakeRecRef.current = rec;
+      rec.onresult = (e) => {
+        let txt = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const alt = e.results[i]?.[0];
+          if (alt) txt += ` ${alt.transcript}`;
+        }
+        if (WAKE_WORD.test(txt)) {
+          stopWake();
+          abrir(true); // abre la conversación y empieza a escuchar
+        }
+      };
+      rec.onerror = () => {
+        /* onend se encarga del reinicio */
+      };
+      rec.onend = () => {
+        wakeRecRef.current = null;
+        // El navegador corta el reconocimiento cada tanto: si sigue activo, reinícialo.
+        if (wakeOnRef.current && !openRef.current) {
+          setTimeout(() => startWakeRef.current(), 500);
+        }
+      };
+      rec.start();
+    } catch {
+      wakeRecRef.current = null;
+    }
+  }, [stopWake, abrir]);
+
+  useEffect(() => {
+    startWakeRef.current = startWake;
+  }, [startWake]);
+
+  // Ciclo de vida del "despertar": corre solo cuando está activo y el panel está cerrado.
+  useEffect(() => {
+    if (wakeOn && !open) startWake();
+    else stopWake();
+    return () => stopWake();
+  }, [wakeOn, open, startWake, stopWake]);
+
+  const toggleWake = () => {
+    const next = !wakeOn;
+    setWakeOn(next);
+    wakeOnRef.current = next;
+    try {
+      localStorage.setItem(WAKE_ON_KEY, next ? '1' : '0');
+    } catch {
+      /* no-op */
+    }
+  };
+
   // ── Gestos del orbe: tap abre conversación, mantener = walkie-talkie ────────
   const onPointerDown = () => {
     heldRef.current = false;
@@ -795,6 +886,10 @@ export function VoiceOrb() {
                   }}
                 />
                 Conversación continua
+              </label>
+              <label className="voice-conv-toggle">
+                <input type="checkbox" checked={wakeOn} onChange={toggleWake} />
+                Despertar diciendo “Aura”
               </label>
             </div>
           </div>
