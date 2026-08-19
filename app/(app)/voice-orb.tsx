@@ -68,7 +68,8 @@ const BARGE_SUSTAIN_MS = 260;
 const BARGE_GRACE_MS = 350; // ignora el arranque del audio
 const VOICE_ON_KEY = 'voz:activada'; // recuerda si prefieres voz o texto
 const WAKE_ON_KEY = 'voz:despertar'; // recuerda si "escuchar 'Aura'" está activo
-const WAKE_WORD = /\baura\b/i; // palabra clave para despertar (con la app abierta)
+// Frase para despertar: exige "oye/hey" antes de "aura" (evita falsos con Laura/aurora).
+const WAKE_WORD = /\b(oye|hey|ey)\s*,?\s+aura\b/i;
 
 export function VoiceOrb() {
   const [open, setOpen] = useState(false);
@@ -889,7 +890,7 @@ export function VoiceOrb() {
               </label>
               <label className="voice-conv-toggle">
                 <input type="checkbox" checked={wakeOn} onChange={toggleWake} />
-                Despertar diciendo “Aura”
+                Despertar diciendo “Oye Aura”
               </label>
             </div>
           </div>
