@@ -2,6 +2,46 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+// ── Tipos mínimos del reconocimiento de voz nativo (no están en el lib de TS) ──
+interface SRAlternative {
+  transcript: string;
+}
+interface SRResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  readonly [index: number]: SRAlternative;
+}
+interface SRResultList {
+  readonly length: number;
+  readonly [index: number]: SRResult;
+}
+interface SREvent {
+  readonly resultIndex: number;
+  readonly results: SRResultList;
+}
+interface SpeechRec {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  maxAlternatives: number;
+  onresult: ((e: SREvent) => void) | null;
+  onerror: ((e: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+type SpeechRecCtor = new () => SpeechRec;
+
+function getSpeechRecCtor(): SpeechRecCtor | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecCtor;
+    webkitSpeechRecognition?: SpeechRecCtor;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
 // Asistente de voz. Orbe flotante (logo naranja + blur) presente en todas las páginas.
 //  · Toca el orbe → abre el modo conversación (escucha, responde por voz, y vuelve a escuchar).
 //  · Mantén presionado el orbe → walkie-talkie: hablas mientras sostienes, sueltas y responde.
@@ -27,7 +67,11 @@ export function VoiceOrb() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [voiceOn, setVoiceOn] = useState(true);
   const [conversando, setConversando] = useState(false); // modo conversación continua
+  const [heard, setHeard] = useState(''); // lo que Aura va oyendo (en vivo)
 
+  const recognitionRef = useRef<SpeechRec | null>(null);
+  const emptyCountRef = useRef(0); // silencios seguidos (para cortar la conversación sin inventar)
+  const heardSpeechRef = useRef(false); // ¿el VAD detectó voz real en esta grabación?
   const recRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -188,6 +232,7 @@ export function VoiceOrb() {
       setTurns((p) => [...p, { role: 'user', text: texto }]);
       setEstado('thinking');
       setPartial('');
+      setHeard('');
       cancelSpeakRef.current = false;
       let assistant = '';
       let spokenLen = 0;
@@ -255,9 +300,30 @@ export function VoiceOrb() {
     [enqueueSpeak, waitSpeakDone],
   );
 
-  const finishRecording = useCallback(async (blob: Blob) => {
-    if (blob.size === 0) {
+  // Silencio / nada entendible: NO manda nada al agente (así no "inventa"). En modo
+  // conversación da un par de oportunidades y luego se detiene con aviso amable.
+  const handleNoSpeech = useCallback(() => {
+    setHeard('');
+    if (convRef.current) {
+      emptyCountRef.current += 1;
+      if (emptyCountRef.current >= 2) {
+        emptyCountRef.current = 0;
+        setConversando(false);
+        convRef.current = false;
+        setEstado('idle');
+        setAviso('Te dejé de escuchar. Toca el orbe cuando quieras seguir.');
+        return;
+      }
       setEstado('idle');
+      setTimeout(() => startListeningRef.current(), 200);
+      return;
+    }
+    setEstado('idle');
+  }, []);
+
+  const finishRecording = useCallback(async (blob: Blob) => {
+    if (blob.size === 0 || !heardSpeechRef.current) {
+      handleNoSpeech();
       return;
     }
     setEstado('thinking');
@@ -269,20 +335,66 @@ export function VoiceOrb() {
         body: JSON.stringify({ data, mime: blob.type }),
       });
       const j = (await res.json()) as { text?: string; message?: string };
-      if (res.ok && j.text) {
+      if (res.ok && isMeaningful(j.text)) {
+        emptyCountRef.current = 0;
         await enviarTexto(j.text);
       } else {
-        setAviso(j.message ?? 'No te entendí. Inténtalo de nuevo.');
-        setEstado('idle');
+        handleNoSpeech();
       }
     } catch {
       setAviso('No pude procesar el audio.');
       setEstado('idle');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enviarTexto]);
+  }, [enviarTexto, handleNoSpeech]);
 
-  // Graba con detección de silencio (VAD ligero): corta sola tras hablar.
+  // Ruta rápida: reconocimiento de voz nativo del navegador. Transcribe al instante,
+  // corta solo en silencio y NO inventa (en silencio no devuelve texto).
+  const startSpeechRecognition = useCallback((): boolean => {
+    const Ctor = getSpeechRecCtor();
+    if (!Ctor) return false;
+    try {
+      const rec = new Ctor();
+      rec.lang = 'es-ES';
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.maxAlternatives = 1;
+      let finalText = '';
+      recognitionRef.current = rec;
+      setEstado('listening');
+      rec.onresult = (e) => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const r = e.results[i];
+          const alt = r?.[0];
+          if (!alt) continue;
+          if (r.isFinal) finalText += alt.transcript;
+          else interim += alt.transcript;
+        }
+        setHeard(`${finalText} ${interim}`.trim());
+      };
+      rec.onerror = () => {
+        /* onend se encarga */
+      };
+      rec.onend = () => {
+        recognitionRef.current = null;
+        const text = finalText.trim();
+        if (isMeaningful(text)) {
+          emptyCountRef.current = 0;
+          void enviarTexto(text);
+        } else {
+          handleNoSpeech();
+        }
+      };
+      rec.start();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [enviarTexto, handleNoSpeech]);
+
+  // Escucha. Vía rápida = reconocimiento nativo (tap/conversación). Walkie-talkie (mantener
+  // presionado) usa grabación + VAD, para no cortar en las pausas mientras sostienes.
   const startListening = useCallback(async () => {
     if (recRef.current || audioRef.current) {
       try {
@@ -292,6 +404,10 @@ export function VoiceOrb() {
       }
     }
     setAviso(null);
+    setHeard('');
+    heardSpeechRef.current = false;
+    // Reconocimiento nativo del navegador: instantáneo y no inventa en silencio.
+    if (!heldRef.current && startSpeechRecognition()) return;
     try {
       // autoGainControl sube el volumen de micrófonos flojos; noiseSuppression limpia
       // el ruido → mejor transcripción y menos "no te escuché".
@@ -344,6 +460,7 @@ export function VoiceOrb() {
         if (avg > VAD_THRESHOLD) {
           lastLoud = now;
           if (!speechStart) speechStart = now;
+          heardSpeechRef.current = true;
         }
         // Solo corta si YA hubo voz suficiente y luego vino un silencio sostenido.
         const hubated = speechStart && now - speechStart > MIN_SPEECH_MS;
@@ -365,13 +482,18 @@ export function VoiceOrb() {
       setEstado('idle');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finishRecording, stopStream]);
+  }, [finishRecording, stopStream, startSpeechRecognition]);
 
   useEffect(() => {
     startListeningRef.current = startListening;
   }, [startListening]);
 
   const stopListening = useCallback(() => {
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      /* no-op */
+    }
     try {
       recRef.current?.stop();
     } catch {
@@ -504,8 +626,9 @@ export function VoiceOrb() {
                   {t.text}
                 </p>
               ))}
+              {heard && <p className="voice-line voice-user voice-partial">{heard}</p>}
               {partial && <p className="voice-line voice-assistant voice-partial">{partial}</p>}
-              {turns.length === 0 && !partial && (
+              {turns.length === 0 && !partial && !heard && (
                 <p className="voice-hint">
                   {conversando
                     ? 'Habla cuando quieras. Te escucho y te respondo.'
@@ -566,6 +689,25 @@ function pickFemaleSpanishVoice(): SpeechSynthesisVoice | null {
   if (female) return female;
   const notMale = es.find((v) => !MALE_ES.some((n) => v.name.toLowerCase().includes(n)));
   return notMale ?? es[0]!;
+}
+
+// Frases que Whisper suele "alucinar" a partir de silencio/ruido (no las mandamos al agente).
+const HALLUCINATIONS = [
+  'gracias por ver',
+  'gracias por su atención',
+  'subtítulos',
+  'suscríbete',
+  'suscríbanse',
+  'no olvides suscribirte',
+];
+/** ¿El texto transcrito es de verdad algo dicho por el usuario (y no ruido/alucinación)? */
+function isMeaningful(text: string | undefined | null): text is string {
+  const t = (text ?? '').trim().toLowerCase();
+  if (t.length < 3) return false;
+  if (HALLUCINATIONS.some((h) => t.includes(h))) return false;
+  // Al menos una letra (evita transcripciones de puro signo o "...").
+  if (!/[a-záéíóúñü]/i.test(t)) return false;
+  return true;
 }
 
 /** Limpia el texto para locutar: sin emojis, sin markdown, espacios normales. */
