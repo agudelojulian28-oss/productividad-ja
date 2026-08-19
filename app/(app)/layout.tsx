@@ -6,6 +6,7 @@ import { todayInTz } from '@/lib/format';
 import { BottomNav } from './bottom-nav';
 import { Sidebar } from './sidebar';
 import { RecurrentesGate } from './recurrentes-gate';
+import { VoiceOrb } from './voice-orb';
 import type { QuickData } from './quick-actions';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -51,6 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <BottomNav />
       </div>
+      <VoiceOrb />
     </div>
   );
 }

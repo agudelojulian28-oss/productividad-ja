@@ -15,5 +15,16 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
       { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
     ],
+    // Entrada "desde fuera de la app": manteniendo presionado el ícono en la pantalla
+    // de inicio aparece "Hablar con Aura", que abre directo con el orbe escuchando.
+    shortcuts: [
+      {
+        name: 'Hablar con Aura',
+        short_name: 'Aura',
+        description: 'Abrir el asistente de voz escuchando',
+        url: '/hoy?voz=1',
+        icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' }],
+      },
+    ],
   };
 }
