@@ -3358,9 +3358,13 @@ button.mov-row:hover {
   align-items: center;
 }
 .tag-swatch {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   flex: 0 0 auto; /* no encoger: si no, el flex los deforma en óvalos */
+  /* La regla global button{min-height:44px} (objetivo táctil) estiraba el swatch a
+     un óvalo alto; lo anulamos aquí para que sea un círculo real. */
+  min-height: 0;
+  min-width: 0;
   aspect-ratio: 1 / 1;
   border-radius: 50%;
   border: 2px solid transparent;
