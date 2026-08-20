@@ -6,7 +6,7 @@ import { todayInTz, dateInTz } from '@/lib/format';
 import type { TaskRow } from '@/core/work/ports';
 import { detectarChoques } from '@/lib/agenda';
 import { TareaLauncher } from './tarea-launcher';
-import { ResumenDia, type ProjIncome } from './resumen-dia';
+import { ResumenDia } from './resumen-dia';
 import { TaskItem } from './task-item';
 import { EventItem } from './event-item';
 import { RealtimeRefresh } from '../realtime-refresh';
@@ -16,37 +16,58 @@ import { EmptyState, emptyIcons } from '../empty-state';
 
 export const dynamic = 'force-dynamic';
 
+/** Suma días a un 'YYYY-MM-DD' (calendario, sin tz). */
+function addDaysYmd(s: string, n: number): string {
+  const [y, m, d] = s.split('-').map(Number);
+  const dt = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
+}
+
 export default async function HoyPage() {
   const { supabase, ctx } = await requireContext();
   const repo = workRepo(supabase, ctx.userId);
   const finance = financeRepo(supabase, ctx.userId);
   const today = todayInTz(ctx.tz);
 
-  const [tasks, projects, events, recientes] = await Promise.all([
+  const from14 = addDaysYmd(today, -13); // 14 días: hoy y los 13 anteriores
+  const [tasks, projects, events, txWin] = await Promise.all([
     repo.listTasks({ status: 'pending' }),
     repo.listProjects(),
     getDayEvents(supabase, ctx, today),
-    finance.listRecentTransactions(120),
+    finance.listTransactions({ from: from14, to: today, limit: 1000 }),
   ]);
   const projectName = new Map(projects.map((p) => [p.id, p.title] as const));
 
-  // Movimientos de hoy: facturado (ingresos) por proyecto + neto del día.
-  let inToday = 0;
-  let outToday = 0;
-  const inflowByProject = new Map<string, number>();
-  for (const t of recientes) {
-    if (t.occurredOn !== today) continue;
+  // Serie de 14 días: ingresos vs gastos por día, con desglose de ingresos por proyecto.
+  const dayKeys = Array.from({ length: 14 }, (_, i) => addDaysYmd(from14, i));
+  const byDay = new Map<string, { inflow: number; outflow: number; projIn: Map<string, number> }>();
+  for (const k of dayKeys) byDay.set(k, { inflow: 0, outflow: 0, projIn: new Map() });
+  for (const t of txWin) {
+    const b = byDay.get(t.occurredOn);
+    if (!b) continue;
     if (t.direction === 'in') {
-      inToday += t.baseAmountMinor;
-      const key = t.projectId ?? '';
-      inflowByProject.set(key, (inflowByProject.get(key) ?? 0) + t.baseAmountMinor);
+      b.inflow += t.baseAmountMinor;
+      const label = t.projectId ? (projectName.get(t.projectId) ?? '—') : '—';
+      b.projIn.set(label, (b.projIn.get(label) ?? 0) + t.baseAmountMinor);
     } else {
-      outToday += t.baseAmountMinor;
+      b.outflow += t.baseAmountMinor;
     }
   }
-  const facturadoHoy: ProjIncome[] = [...inflowByProject.entries()]
-    .map(([pid, value]) => ({ label: projectName.get(pid) ?? '—', value }))
-    .sort((a, b) => b.value - a.value);
+  const days = dayKeys.map((k) => {
+    const b = byDay.get(k)!;
+    return {
+      date: k,
+      inflow: b.inflow,
+      outflow: b.outflow,
+      projIn: [...b.projIn.entries()]
+        .sort((a, c) => c[1] - a[1])
+        .map(([label, value]) => ({ label, value })),
+    };
+  });
+  const todayBucket = byDay.get(today)!;
+  const inToday = todayBucket.inflow;
+  const outToday = todayBucket.outflow;
 
   // Metas por proyecto, para el selector opcional del formulario de tareas.
   const goalsByProject: Record<string, { id: string; title: string }[]> = {};
@@ -155,7 +176,7 @@ export default async function HoyPage() {
 
         {/* Main: las tareas, el foco del trabajo. En escritorio, columna izquierda. */}
         <div className="hoy-main">
-          <ResumenDia inToday={inToday} outToday={outToday} byProject={facturadoHoy} />
+          <ResumenDia inToday={inToday} outToday={outToday} days={days} />
           {totalPend === 0 ? (
             <EmptyState
               icon={emptyIcons.tasks}

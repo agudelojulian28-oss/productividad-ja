@@ -1,24 +1,25 @@
 import { money } from '@/lib/format';
 import { Disclosure } from '../disclosure';
+import { DiaCashChart, type DayPoint } from './dia-cash-chart';
 
 export type ProjIncome = { label: string; value: number };
 
 /**
- * Resumen financiero del día en Hoy: ingresos/gastos/neto y el desglose de lo
- * facturado por proyecto. Desplegable (colapsa en móvil, abierto en escritorio).
- * Datos ya resueltos en el servidor.
+ * Resumen financiero del día en Hoy: ingresos/gastos/neto de hoy, y una gráfica de
+ * ingresos (verde) vs gastos (rojo) de los últimos días, con desglose por proyecto al
+ * pasar el cursor. Datos ya resueltos en el servidor.
  */
 export function ResumenDia({
   inToday,
   outToday,
-  byProject,
+  days,
 }: {
   inToday: number;
   outToday: number;
-  byProject: ProjIncome[];
+  days: DayPoint[];
 }) {
   const net = inToday - outToday;
-  const max = Math.max(1, ...byProject.map((p) => p.value));
+  const hayDatos = days.some((d) => d.inflow > 0 || d.outflow > 0);
 
   return (
     <section className="task-section dia-section">
@@ -40,25 +41,10 @@ export function ResumenDia({
           </div>
         </div>
 
-        {byProject.length === 0 ? (
-          <p className="muted dia-empty">Aún no has facturado hoy.</p>
+        {hayDatos ? (
+          <DiaCashChart days={days} />
         ) : (
-          <div className="dia-bars">
-            {byProject.map((p) => (
-              <div key={p.label} className="dia-bar-row">
-                <div className="dia-bar-head">
-                  <span className="dia-bar-name">{p.label}</span>
-                  <span className="dia-bar-val">{money(p.value, { compact: true })}</span>
-                </div>
-                <div className="dia-bar-track">
-                  <div
-                    className="dia-bar-fill"
-                    style={{ width: `${Math.max(3, Math.round((p.value / max) * 100))}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+          <p className="muted dia-empty">Sin movimientos en los últimos días.</p>
         )}
       </Disclosure>
     </section>
