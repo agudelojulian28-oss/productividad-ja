@@ -73,6 +73,64 @@ export function resumenFinanciero(
   };
 }
 
+export type Periodo = 'mes' | 'mes_pasado' | 'anio' | 'todo';
+
+const PERIODO_LABEL: Record<Periodo, string> = {
+  mes: 'este mes',
+  mes_pasado: 'el mes pasado',
+  anio: 'este año',
+  todo: 'histórico',
+};
+
+/** 'YYYY-MM' del mes anterior a `monthKey`. */
+function mesAnterior(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number);
+  const d = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, 1));
+  d.setUTCMonth(d.getUTCMonth() - 1);
+  return d.toISOString().slice(0, 7);
+}
+
+/** ¿La fila de mes `monthYmd` ('YYYY-MM-01') cae en el periodo pedido? */
+export function enPeriodo(monthYmd: string, periodo: Periodo, tz: string, now: Date = new Date()): boolean {
+  const monthKey = mesActual(tz, now);
+  switch (periodo) {
+    case 'mes':
+      return monthYmd.startsWith(monthKey);
+    case 'mes_pasado':
+      return monthYmd.startsWith(mesAnterior(monthKey));
+    case 'anio':
+      return monthYmd.startsWith(monthKey.slice(0, 4));
+    case 'todo':
+      return true;
+  }
+}
+
+/** Ingresos/gastos/neto de un periodo (este mes, mes pasado, este año, todo). */
+export function resumenPorPeriodo(
+  cashflow: CashflowMonthRow[],
+  tz: string,
+  periodo: Periodo,
+  now: Date = new Date(),
+): { periodo: Periodo; etiqueta: string; inflowMinor: number; outflowMinor: number; netMinor: number; movements: number } {
+  let inflowMinor = 0;
+  let outflowMinor = 0;
+  let movements = 0;
+  for (const r of cashflow) {
+    if (!enPeriodo(r.month, periodo, tz, now)) continue;
+    inflowMinor += r.inflowMinor;
+    outflowMinor += r.outflowMinor;
+    movements += r.movements;
+  }
+  return {
+    periodo,
+    etiqueta: PERIODO_LABEL[periodo],
+    inflowMinor,
+    outflowMinor,
+    netMinor: inflowMinor - outflowMinor,
+    movements,
+  };
+}
+
 /** Serie mensual (últimos `months` meses con datos) para el gráfico de flujo. */
 export function serieMensual(cashflow: CashflowMonthRow[], months = 6): SerieMes[] {
   const byMonth = new Map<string, SerieMes>();

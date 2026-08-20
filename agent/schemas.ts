@@ -61,6 +61,12 @@ export const Consultar = z.object({
     .optional()
     .describe('Solo vista=movimientos: filtra a ingresos o gastos'),
   proyecto_id: z.uuid().optional().describe('vista=documentacion o vista=etiquetas: limita a ese proyecto'),
+  periodo: z
+    .enum(['mes', 'mes_pasado', 'anio', 'todo'])
+    .optional()
+    .describe(
+      'vista=resumen_financiero o por_proyecto: periodo del agregado (mes=este mes [def], mes_pasado, anio=este año, todo=histórico)',
+    ),
   duracion_min: z.number().int().min(15).max(480).optional().describe('Solo vista=huecos: minutos (60 def)'),
 });
 

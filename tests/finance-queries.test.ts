@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   resumenFinanciero,
+  resumenPorPeriodo,
+  enPeriodo,
   serieMensual,
   topGastos,
   mesActual,
@@ -61,6 +63,48 @@ describe('resumenFinanciero', () => {
     expect(r.netMinor).toBe(0);
     expect(r.lastRecordedAt).toBeNull();
     expect(r.stale).toBe(false);
+  });
+});
+
+describe('resumenPorPeriodo', () => {
+  const rows = [
+    cf({ month: '2026-07-01', inflowMinor: 100, outflowMinor: 40, movements: 2 }), // este mes
+    cf({ month: '2026-06-01', inflowMinor: 50, outflowMinor: 10, movements: 1 }), // mes pasado
+    cf({ month: '2026-01-01', inflowMinor: 7, outflowMinor: 3, movements: 1 }), // este año
+    cf({ month: '2025-12-01', inflowMinor: 999, outflowMinor: 1, movements: 5 }), // año pasado
+  ];
+
+  it('mes = solo el mes actual', () => {
+    const r = resumenPorPeriodo(rows, TZ, 'mes', NOW);
+    expect(r.netMinor).toBe(60);
+    expect(r.movements).toBe(2);
+    expect(r.etiqueta).toBe('este mes');
+  });
+
+  it('mes_pasado = solo el mes anterior', () => {
+    const r = resumenPorPeriodo(rows, TZ, 'mes_pasado', NOW);
+    expect(r.inflowMinor).toBe(50);
+    expect(r.netMinor).toBe(40);
+  });
+
+  it('anio = todos los meses del año en curso', () => {
+    const r = resumenPorPeriodo(rows, TZ, 'anio', NOW);
+    expect(r.inflowMinor).toBe(157); // 100 + 50 + 7
+    expect(r.movements).toBe(4);
+  });
+
+  it('todo = histórico completo', () => {
+    const r = resumenPorPeriodo(rows, TZ, 'todo', NOW);
+    expect(r.inflowMinor).toBe(1156);
+    expect(r.movements).toBe(9);
+  });
+
+  it('enPeriodo distingue el mes actual del pasado', () => {
+    expect(enPeriodo('2026-07-01', 'mes', TZ, NOW)).toBe(true);
+    expect(enPeriodo('2026-06-01', 'mes', TZ, NOW)).toBe(false);
+    expect(enPeriodo('2026-06-01', 'mes_pasado', TZ, NOW)).toBe(true);
+    expect(enPeriodo('2025-12-01', 'anio', TZ, NOW)).toBe(false);
+    expect(enPeriodo('2025-12-01', 'todo', TZ, NOW)).toBe(true);
   });
 });
 

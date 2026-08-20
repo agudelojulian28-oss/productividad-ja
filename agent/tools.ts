@@ -28,7 +28,7 @@ import {
   setTransactionTags,
   setRecurringTags,
 } from '@/core/finance/tags';
-import { resumenFinanciero, topGastos } from '@/core/finance/queries';
+import { resumenFinanciero, resumenPorPeriodo, enPeriodo, topGastos } from '@/core/finance/queries';
 import { detectarChoques, huecosLibres } from '@/lib/agenda';
 import type { StructureRepo } from '@/core/structure/ports';
 import { createArea, archiveArea, setAreaDescription } from '@/core/structure/areas';
@@ -216,23 +216,28 @@ export async function runTool(
       if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
       const fin = deps.finance;
       if (vista === 'resumen_financiero') {
-        const r = resumenFinanciero(await fin.cashflowMonthly(), ctx.tz);
+        const cf = await fin.cashflowMonthly();
+        const periodo = p.value.periodo ?? 'mes';
+        const per = resumenPorPeriodo(cf, ctx.tz, periodo);
+        const base = resumenFinanciero(cf, ctx.tz); // para el aviso de desactualización (global)
         return ok({
-          mes: r.monthKey,
-          ingresos: money(r.inflowMinor),
-          gastos: money(r.outflowMinor),
-          neto: money(r.netMinor),
-          movimientos: r.movements,
-          desactualizado: r.stale,
-          ultimo_registro_hace_dias: r.staleDays,
+          periodo: per.etiqueta,
+          ingresos: money(per.inflowMinor),
+          gastos: money(per.outflowMinor),
+          neto: money(per.netMinor),
+          movimientos: per.movements,
+          desactualizado: base.stale,
+          ultimo_registro_hace_dias: base.staleDays,
         });
       }
       if (vista === 'por_proyecto') {
+        const periodo = p.value.periodo ?? 'todo';
         const rows = await fin.byProject();
         const projects = await repo.listProjects();
         const nombre = new Map(projects.map((p) => [p.id, p.title] as const));
         const agg = new Map<string, { inflow: number; outflow: number }>();
         for (const r of rows) {
+          if (!enPeriodo(r.month, periodo, ctx.tz)) continue;
           const cur = agg.get(r.projectId) ?? { inflow: 0, outflow: 0 };
           cur.inflow += r.inflowMinor;
           cur.outflow += r.outflowMinor;
