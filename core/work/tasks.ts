@@ -1,6 +1,6 @@
 import { ok, err, type Result, type ActorContext } from '@/core/types';
-import { TaskCreate, TaskReschedule } from './schemas';
-import type { WorkRepo, TaskRow } from './ports';
+import { TaskCreate, TaskReschedule, TaskEdit } from './schemas';
+import type { WorkRepo, TaskRow, TaskPatch } from './ports';
 
 // Casos de uso: validar → autorizar → reglas → ejecutar → devolver Result<T>.
 // La autorización de propiedad la garantiza RLS (el repo usa la sesión del usuario).
@@ -86,6 +86,50 @@ export async function setTaskDescription(
   const task = await repo.getTask(id);
   if (!task) return err('NOT_FOUND', 'La tarea no existe');
   return ok(await repo.updateTask(id, { notes: desc || null }));
+}
+
+/** Edición completa: título, notas, fecha, proyecto y meta (con coherencia proyecto↔meta). */
+export async function editTask(
+  _ctx: ActorContext,
+  repo: WorkRepo,
+  raw: unknown,
+): Promise<Result<TaskRow>> {
+  const parsed = TaskEdit.safeParse(raw);
+  if (!parsed.success) return err('INVALID_INPUT', 'Datos inválidos', parsed.error.issues);
+  const { id, title, notes, projectId, goalId, dueAt } = parsed.data;
+
+  const task = await repo.getTask(id);
+  if (!task) return err('NOT_FOUND', 'La tarea no existe');
+
+  const patch: TaskPatch = {};
+  if (title !== undefined) patch.title = title;
+  if (notes !== undefined) patch.notes = notes; // null limpia
+  if (dueAt !== undefined) patch.dueAt = dueAt; // null limpia la fecha
+
+  if (goalId !== undefined && goalId !== null) {
+    // Meta nueva: debe existir; el proyecto se deriva de la meta si no coincide/no viene.
+    const goal = await repo.getGoal(goalId);
+    if (!goal) return err('NOT_FOUND', 'La meta no existe');
+    if (projectId != null && goal.projectId && goal.projectId !== projectId) {
+      return err('RULE_VIOLATION', 'La meta no pertenece a ese proyecto');
+    }
+    patch.goalId = goalId;
+    patch.projectId = projectId !== undefined ? projectId : (goal.projectId ?? null);
+  } else {
+    // Sin meta nueva (o se limpia). Aplica el cambio de proyecto si viene.
+    if (goalId === null) patch.goalId = null;
+    if (projectId !== undefined) {
+      patch.projectId = projectId;
+      // Si la meta actual ya no pertenece al nuevo proyecto, límpiala.
+      if (goalId === undefined && task.goalId) {
+        const cur = await repo.getGoal(task.goalId);
+        if (cur && cur.projectId && cur.projectId !== projectId) patch.goalId = null;
+      }
+    }
+  }
+
+  if (Object.keys(patch).length === 0) return ok(task);
+  return ok(await repo.updateTask(id, patch));
 }
 
 export async function rescheduleTask(

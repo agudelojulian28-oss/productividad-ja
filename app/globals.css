@@ -3975,3 +3975,34 @@ button.mov-row:hover {
   border-top: 1px solid var(--border);
   margin: 12px 0;
 }
+
+/* Editor completo de tarea (página de detalle) */
+.task-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.task-notes {
+  resize: vertical;
+  min-height: 88px;
+  line-height: 1.5;
+}
+.task-clear-date {
+  align-self: flex-start;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.task-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+.task-editor-actions .btn-primary {
+  flex: 1;
+  min-width: 160px;
+}
+.task-del {
+  color: var(--danger, #ef4444);
+}

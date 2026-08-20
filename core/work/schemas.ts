@@ -45,3 +45,14 @@ export const TaskReschedule = z.object({
   dueAt: Instant,
 });
 export type TaskRescheduleInput = z.infer<typeof TaskReschedule>;
+
+// Edición completa de una tarea. Cada campo es opcional; `null` limpia (fecha/proyecto/meta).
+export const TaskEdit = z.object({
+  id: z.uuid(),
+  title: z.string().trim().min(1, 'El título es obligatorio').max(200).optional(),
+  notes: z.string().max(5000).nullable().optional(),
+  projectId: z.uuid().nullable().optional(),
+  goalId: z.uuid().nullable().optional(),
+  dueAt: Instant.nullable().optional(),
+});
+export type TaskEditInput = z.infer<typeof TaskEdit>;

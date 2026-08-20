@@ -3,9 +3,8 @@ import { notFound } from 'next/navigation';
 import { requireContext } from '@/lib/auth';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { timeInTz, dayLabelInTz } from '@/lib/format';
-import { DescriptionEditor } from '../../description-editor';
 import { PageHero } from '../../page-hero';
-import { setTaskDescriptionAction } from '@/app/actions/tasks';
+import { TaskEditor } from './task-editor';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,21 +19,26 @@ export default async function TaskDetailPage({
   const task = await repo.getTask(id);
   if (!task) notFound();
 
-  const [project, goal] = await Promise.all([
+  const [project, goal, projects] = await Promise.all([
     task.projectId ? repo.getProject(task.projectId) : Promise.resolve(null),
     task.goalId ? repo.getGoal(task.goalId) : Promise.resolve(null),
+    repo.listProjects(),
   ]);
+  // Metas de todos los proyectos (para el selector; se filtran por proyecto en el cliente).
+  const goalsByProject = await Promise.all(projects.map((p) => repo.listGoals(p.id)));
+  const goals = goalsByProject.flat().map((g) => ({ id: g.id, title: g.title, projectId: g.projectId }));
 
   const cuando = task.dueAt
     ? `${dayLabelInTz(task.dueAt, ctx.tz)} · ${timeInTz(task.dueAt, ctx.tz)}`
     : 'Sin fecha';
+  const estado = task.status === 'done' ? 'Hecha' : task.status === 'cancelled' ? 'Cancelada' : 'Pendiente';
 
   return (
     <div className="page">
       <Link href="/hoy" className="back-link">
         ← Hoy
       </Link>
-      <PageHero eyebrow="Tarea" title={task.title} subtitle={`${cuando} · ${task.status}`} />
+      <PageHero eyebrow="Tarea" title={task.title} subtitle={`${cuando} · ${estado}`} />
       {(project || goal) && (
         <p className="muted" style={{ marginBottom: 16 }}>
           {project && (
@@ -50,9 +54,19 @@ export default async function TaskDetailPage({
           )}
         </p>
       )}
-      <DescriptionEditor
-        initial={task.notes ?? ''}
-        action={setTaskDescriptionAction.bind(null, task.id)}
+
+      <TaskEditor
+        task={{
+          id: task.id,
+          title: task.title,
+          notes: task.notes,
+          dueAt: task.dueAt,
+          projectId: task.projectId,
+          goalId: task.goalId,
+          status: task.status,
+        }}
+        projects={projects.map((p) => ({ id: p.id, title: p.title }))}
+        goals={goals}
       />
     </div>
   );

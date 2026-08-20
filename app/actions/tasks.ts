@@ -10,6 +10,7 @@ import {
   rescheduleTask,
   deleteTask,
   setTaskDescription,
+  editTask,
 } from '@/core/work/tasks';
 import type { Result } from '@/core/types';
 import type { TaskRow } from '@/core/work/ports';
@@ -71,5 +72,20 @@ export async function rescheduleTaskAction(
   const { ctx, repo } = await deps();
   const result = await rescheduleTask(ctx, repo, { id, dueAt });
   revalidatePath('/hoy');
+  return result;
+}
+
+export async function updateTaskAction(input: {
+  id: string;
+  title?: string;
+  notes?: string | null;
+  projectId?: string | null;
+  goalId?: string | null;
+  dueAt?: string | null;
+}): Promise<Result<TaskRow>> {
+  const { ctx, repo } = await deps();
+  const result = await editTask(ctx, repo, input);
+  revalidatePath('/hoy');
+  revalidatePath(`/tareas/${input.id}`);
   return result;
 }
