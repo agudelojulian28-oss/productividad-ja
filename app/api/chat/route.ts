@@ -27,7 +27,8 @@ export async function POST(req: Request) {
   if (!message && images.length === 0) return new Response('Falta el mensaje', { status: 400 });
 
   const conversationId = await getWebConversation(supabase, ctx.userId);
-  const prior = await loadMessages(supabase, conversationId);
+  // Por voz mandamos menos historial: menos tokens = primer token/respuesta más rápida.
+  const prior = await loadMessages(supabase, conversationId, body.voz ? 16 : 60);
   const history: Anthropic.MessageParam[] = prior.map((m) => ({ role: m.role, content: m.text }));
 
   // Las imágenes no se persisten en el historial (la tabla messages es texto);

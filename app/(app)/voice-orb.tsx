@@ -55,7 +55,7 @@ type Turno = { role: 'user' | 'assistant'; text: string };
 
 // Silencio "prudente" que esperamos tras dejar de hablar antes de dar el turno por
 // terminado. Más alto = te deja pensar sin cortarte; más bajo = responde antes.
-const END_SILENCE_MS = 1500;
+const END_SILENCE_MS = 1000;
 const SILENCE_MS = END_SILENCE_MS; // vía de respaldo (grabación + VAD)
 const MIN_SPEECH_MS = 350; // exige algo de voz antes de permitir el corte por silencio
 const VAD_THRESHOLD = 4; // nivel para considerar "hay voz" (más bajo = más sensible)
@@ -405,7 +405,7 @@ export function VoiceOrb() {
       }
       setEstado('idle');
       // Modo conversación: vuelve a escuchar solo.
-      if (convRef.current) setTimeout(() => startListeningRef.current(), 250);
+      if (convRef.current) setTimeout(() => startListeningRef.current(), 120);
     },
     [enqueueSpeak, waitSpeakDone],
   );
