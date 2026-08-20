@@ -78,14 +78,13 @@ export default async function FinanzasPage() {
       value: r.inflowMinor,
       valueLabel: money(r.inflowMinor),
     }));
-  const gastos = thisMonth
-    .filter((r) => r.outflowMinor > 0)
-    .sort((a, b) => b.outflowMinor - a.outflowMinor)
-    .map((r) => ({
-      label: projName.get(r.projectId) ?? '—',
-      value: r.outflowMinor,
-      valueLabel: money(r.outflowMinor),
-    }));
+  // Filas por proyecto y mes (todas) para el bloque de Ingresos/Gastos/Balance filtrable.
+  const statRows = byProj.map((r) => ({
+    label: projName.get(r.projectId) ?? '—',
+    month: r.month, // 'YYYY-MM-01'
+    inflow: r.inflowMinor,
+    outflow: r.outflowMinor,
+  }));
 
   // Movimientos recientes con su comprobante (si tiene). Una consulta para todos.
   const recientes = await finance.listRecentTransactions(20);
@@ -188,12 +187,7 @@ export default async function FinanzasPage() {
             />
           </section>
 
-          <FinStats
-            inflowLabel={money(resumen.inflowMinor, { compact: true })}
-            outflowLabel={money(resumen.outflowMinor, { compact: true })}
-            fuentes={fuentes}
-            gastos={gastos}
-          />
+          <FinStats rows={statRows} monthKey={resumen.monthKey} />
 
           <section className="fin-block">
             <h2 className="fin-h2">Movimientos recientes</h2>

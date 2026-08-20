@@ -2348,6 +2348,17 @@ a.mov-thumb:hover {
 }
 
 /* Estadística Ingresos/Gastos con toggle (referencia móvil) */
+.fin-period-seg {
+  margin-bottom: 12px;
+}
+.fin-stats-balance {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
 .fin-stats-seg {
   margin-bottom: 14px;
 }
