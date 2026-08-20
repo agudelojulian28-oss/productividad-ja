@@ -2386,6 +2386,53 @@ a.mov-thumb:hover {
   display: block;
 }
 
+/* Lista por proyecto con montañita mensual (reemplaza las barras de llenado). */
+.ptrend {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ptrend-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ptrend-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ptrend-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text);
+}
+.ptrend-val {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.mini-mtn {
+  position: relative;
+}
+.mini-mtn-tip {
+  position: absolute;
+  top: -6px;
+  transform: translate(-50%, -100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 7px;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (min-width: 1024px) {
   /* Escritorio: hay espacio → muestra ambas y esconde el toggle. */
   .fin-stats-seg {
