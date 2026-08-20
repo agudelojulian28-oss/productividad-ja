@@ -4,9 +4,10 @@ import { useMemo, useState } from 'react';
 import { money } from '@/lib/format';
 import { MiniMountain } from './mini-mountain';
 
-// Ingresos/Gastos/Balance con filtro de periodo. Por defecto "Este mes" (ADR-026).
-// Por cada proyecto se muestra una montañita (área) con su serie mensual.
+// Ingresos/Gastos/Balance con filtro de periodo. Por cada proyecto, una montañita con
+// sus últimas 6 cubetas SEGÚN el filtro: mensual → 6 semanas; anual/todo → 6 meses.
 export type StatRow = { label: string; month: string; inflow: number; outflow: number };
+export type TrendTx = { label: string; dir: 'in' | 'out'; amount: number; date: string };
 type Period = 'mes' | 'mesPasado' | 'anio' | 'todo';
 
 const PERIODS: { v: Period; label: string }[] = [
@@ -15,7 +16,14 @@ const PERIODS: { v: Period; label: string }[] = [
   { v: 'anio', label: 'Este año' },
   { v: 'todo', label: 'Todo' },
 ];
-const TREND_MONTHS = 8; // meses visibles en la montañita
+const BUCKETS = 6;
+const DAY = 86_400_000;
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+const ymdMs = (s: string) => {
+  const [y, m, d] = s.split('-').map(Number);
+  return Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1);
+};
 
 /** 'YYYY-MM' del mes anterior a `monthKey`. */
 function prevMonthKey(monthKey: string): string {
@@ -27,11 +35,21 @@ function prevMonthKey(monthKey: string): string {
 
 type ProjTrend = { label: string; valueLabel: string; series: number[] };
 
-export function FinStats({ rows, monthKey }: { rows: StatRow[]; monthKey: string }) {
+export function FinStats({
+  rows,
+  monthKey,
+  trendTx = [],
+  today,
+}: {
+  rows: StatRow[];
+  monthKey: string;
+  trendTx?: TrendTx[];
+  today: string;
+}) {
   const [period, setPeriod] = useState<Period>('mes');
   const [tab, setTab] = useState<'in' | 'out'>('in');
 
-  const { inflow, outflow, months, fuentes, gastos } = useMemo(() => {
+  const { inflow, outflow, labels, fuentes, gastos } = useMemo(() => {
     const prev = prevMonthKey(monthKey);
     const year = monthKey.slice(0, 4);
     const inPeriod = (m: string) => {
@@ -40,48 +58,70 @@ export function FinStats({ rows, monthKey }: { rows: StatRow[]; monthKey: string
       if (period === 'anio') return m.startsWith(year);
       return true; // 'todo'
     };
-    // Ventana de meses para la montañita (con datos, cronológica).
-    const months = [...new Set(rows.map((r) => r.month))].sort().slice(-TREND_MONTHS);
 
-    // Serie mensual por proyecto (para la montañita) y totales del periodo (para la cifra).
-    const inMonthly = new Map<string, Map<string, number>>();
-    const outMonthly = new Map<string, Map<string, number>>();
+    // ── Cubetas de la montañita, según el filtro ──────────────────────────────
+    const weekly = period === 'mes' || period === 'mesPasado';
+    let labels: string[];
+    let assign: (date: string) => number; // índice de cubeta 0..5, o -1 si queda fuera
+    if (weekly) {
+      const todayMs = ymdMs(today);
+      labels = Array.from({ length: BUCKETS }, (_, i) => {
+        const start = todayMs - ((BUCKETS - 1 - i) * 7 + 6) * DAY;
+        const d = new Date(start);
+        return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`;
+      });
+      assign = (date) => {
+        const daysAgo = Math.floor((todayMs - ymdMs(date)) / DAY);
+        if (daysAgo < 0 || daysAgo >= BUCKETS * 7) return -1;
+        return BUCKETS - 1 - Math.floor(daysAgo / 7);
+      };
+    } else {
+      const [y, m] = monthKey.split('-').map(Number);
+      const ms = Array.from({ length: BUCKETS }, (_, i) =>
+        new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1 - (BUCKETS - 1 - i), 1)).toISOString().slice(0, 7),
+      );
+      labels = ms.map((mm) => MESES[Number(mm.slice(5, 7)) - 1] ?? mm);
+      assign = (date) => ms.indexOf(date.slice(0, 7));
+    }
+
+    const inSeries = new Map<string, number[]>();
+    const outSeries = new Map<string, number[]>();
+    for (const t of trendTx) {
+      const idx = assign(t.date);
+      if (idx < 0) continue;
+      const map = t.dir === 'in' ? inSeries : outSeries;
+      let arr = map.get(t.label);
+      if (!arr) {
+        arr = new Array(BUCKETS).fill(0);
+        map.set(t.label, arr);
+      }
+      arr[idx] = (arr[idx] ?? 0) + t.amount;
+    }
+
+    // ── Totales del periodo (la cifra a la derecha) ───────────────────────────
     const inTotal = new Map<string, number>();
     const outTotal = new Map<string, number>();
     let inflow = 0;
     let outflow = 0;
-    const bump = (map: Map<string, Map<string, number>>, label: string, month: string, v: number) => {
-      let m = map.get(label);
-      if (!m) {
-        m = new Map();
-        map.set(label, m);
-      }
-      m.set(month, (m.get(month) ?? 0) + v);
-    };
     for (const r of rows) {
-      if (r.inflow > 0) bump(inMonthly, r.label, r.month, r.inflow);
-      if (r.outflow > 0) bump(outMonthly, r.label, r.month, r.outflow);
-      if (inPeriod(r.month)) {
-        inflow += r.inflow;
-        outflow += r.outflow;
-        if (r.inflow > 0) inTotal.set(r.label, (inTotal.get(r.label) ?? 0) + r.inflow);
-        if (r.outflow > 0) outTotal.set(r.label, (outTotal.get(r.label) ?? 0) + r.outflow);
-      }
+      if (!inPeriod(r.month)) continue;
+      inflow += r.inflow;
+      outflow += r.outflow;
+      if (r.inflow > 0) inTotal.set(r.label, (inTotal.get(r.label) ?? 0) + r.inflow);
+      if (r.outflow > 0) outTotal.set(r.label, (outTotal.get(r.label) ?? 0) + r.outflow);
     }
-    const build = (
-      totals: Map<string, number>,
-      monthly: Map<string, Map<string, number>>,
-    ): ProjTrend[] =>
+
+    const build = (totals: Map<string, number>, series: Map<string, number[]>): ProjTrend[] =>
       [...totals.entries()]
         .sort((a, b) => b[1] - a[1])
         .map(([label, total]) => ({
           label,
           valueLabel: money(total),
-          series: months.map((m) => monthly.get(label)?.get(m) ?? 0),
+          series: series.get(label) ?? new Array(BUCKETS).fill(0),
         }));
 
-    return { inflow, outflow, months, fuentes: build(inTotal, inMonthly), gastos: build(outTotal, outMonthly) };
-  }, [rows, monthKey, period]);
+    return { inflow, outflow, labels, fuentes: build(inTotal, inSeries), gastos: build(outTotal, outSeries) };
+  }, [rows, monthKey, period, trendTx, today]);
 
   const balance = inflow - outflow;
   const periodLabel = PERIODS.find((p) => p.v === period)!.label.toLowerCase();
@@ -97,7 +137,7 @@ export function FinStats({ rows, monthKey }: { rows: StatRow[]; monthKey: string
               <span className="ptrend-label">{it.label}</span>
               <span className="ptrend-val">{it.valueLabel}</span>
             </div>
-            <MiniMountain months={months} values={it.series} tone={tone} />
+            <MiniMountain labels={labels} values={it.series} tone={tone} />
           </div>
         ))}
       </div>

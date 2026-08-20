@@ -86,6 +86,22 @@ export default async function FinanzasPage() {
     outflow: r.outflowMinor,
   }));
 
+  // Movimientos de los últimos ~6 meses para las montañitas por proyecto (semanas o meses).
+  const trendFrom = (() => {
+    const d = new Date(`${todayInTz(ctx.tz)}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - 190);
+    return d.toISOString().slice(0, 10);
+  })();
+  const trendTxs = await finance.listTransactions({ from: trendFrom, limit: 1000 });
+  const trendData = trendTxs
+    .filter((t) => t.projectId)
+    .map((t) => ({
+      label: projName.get(t.projectId as string) ?? '—',
+      dir: t.direction,
+      amount: t.baseAmountMinor,
+      date: t.occurredOn,
+    }));
+
   // Movimientos recientes con su comprobante (si tiene). Una consulta para todos.
   const recientes = await finance.listRecentTransactions(20);
   const receipts = await structure.listAttachmentsForTransactions(recientes.map((t) => t.id));
@@ -187,7 +203,12 @@ export default async function FinanzasPage() {
             />
           </section>
 
-          <FinStats rows={statRows} monthKey={resumen.monthKey} />
+          <FinStats
+            rows={statRows}
+            monthKey={resumen.monthKey}
+            trendTx={trendData}
+            today={todayInTz(ctx.tz)}
+          />
 
           <section className="fin-block">
             <h2 className="fin-h2">Movimientos recientes</h2>

@@ -3,11 +3,9 @@
 import { useId, useState } from 'react';
 import { money } from '@/lib/format';
 
-// Sparkline de "montaña" (área) por mes para un proyecto. Una sola serie → un solo
-// tono (dataviz): naranja para ingresos, neutro para gastos. Con hover por punto.
-const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-const mesCorto = (m: string) => MESES[Number(m.slice(5, 7)) - 1] ?? m.slice(5, 7);
-
+// Sparkline de "montaña" (área) para un proyecto. Una sola serie → un solo tono
+// (dataviz): naranja para ingresos, neutro para gastos. Con hover por punto. Las
+// cubetas (semanas o meses) las decide quien lo usa y llegan ya etiquetadas.
 const W = 240;
 const H = 44;
 const PAD = 4;
@@ -32,11 +30,11 @@ function smoothPath(pts: [number, number][]): string {
 }
 
 export function MiniMountain({
-  months,
+  labels,
   values,
   tone = 'accent',
 }: {
-  months: string[];
+  labels: string[];
   values: number[];
   tone?: 'accent' | 'muted';
 }) {
@@ -51,8 +49,8 @@ export function MiniMountain({
   const line = smoothPath(pts);
   const areaD = n > 0 ? `${line} L${x(n - 1)},${bottom} L${x(0)},${bottom} Z` : '';
   const color = tone === 'accent' ? 'var(--accent)' : 'var(--text-muted)';
-  const aria = months
-    .map((m, i) => `${mesCorto(m)} ${money(values[i] ?? 0, { compact: true })}`)
+  const aria = labels
+    .map((l, i) => `${l} ${money(values[i] ?? 0, { compact: true })}`)
     .join(', ');
 
   return (
@@ -63,7 +61,7 @@ export function MiniMountain({
         height={H}
         preserveAspectRatio="none"
         role="img"
-        aria-label={`Tendencia mensual: ${aria}`}
+        aria-label={`Tendencia: ${aria}`}
         style={{ display: 'block' }}
         onMouseLeave={() => setHover(null)}
       >
@@ -92,9 +90,9 @@ export function MiniMountain({
           />
         ))}
       </svg>
-      {hover !== null && months[hover] && (
+      {hover !== null && labels[hover] && (
         <span className="mini-mtn-tip" style={{ left: `${(x(hover) / W) * 100}%` }} role="status">
-          {mesCorto(months[hover]!)} · {money(values[hover] ?? 0, { compact: true })}
+          {labels[hover]} · {money(values[hover] ?? 0, { compact: true })}
         </span>
       )}
     </div>
