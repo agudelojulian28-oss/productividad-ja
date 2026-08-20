@@ -110,7 +110,7 @@ describe('editTask', () => {
     const repo = makeFakeRepo();
     const pA = await repo.insertProject({ title: 'Proyecto A', areaId: 'area-1' });
     const pB = await repo.insertProject({ title: 'Proyecto B', areaId: 'area-1' });
-    const gA = await repo.insertGoal({ projectId: pA.id, title: 'Meta A' });
+    const gA = await repo.insertGoal({ projectId: pA.id, title: 'Meta A', tz: 'America/Bogota' });
     const t = await createTask(ctx(), repo, { title: 'Original', projectId: pA.id, goalId: gA.id });
     if (!t.ok) throw new Error('setup');
     return { repo, pA, pB, gA, task: t.value };
