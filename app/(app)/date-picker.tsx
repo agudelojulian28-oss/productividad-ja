@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 // Selectores propios de fecha y hora (tema oscuro/naranja). Reemplazan los pickers
 // nativos por un panel moderno: calendario + chips para la fecha, chips + rueda para
@@ -59,16 +60,53 @@ function label12(hhmm: string): string {
   return `${h12}:${pad(mn ?? 0)} ${ap}`;
 }
 
-/** Cierra el panel al hacer clic fuera o con Escape. */
-function useDismiss(open: boolean, close: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
+/** Panel flotante en un PORTAL a document.body (escapa el z-index/overflow de las
+ *  tarjetas) con posición fija junto al disparador. Cierra al clic fuera o Escape. */
+function Popover({
+  anchor,
+  onClose,
+  width = 280,
+  children,
+}: {
+  anchor: HTMLElement | null;
+  onClose: () => void;
+  width?: number;
+  children: React.ReactNode;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!anchor) return;
+    const place = () => {
+      const r = anchor.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      let left = Math.min(r.left, vw - 8 - width);
+      if (left < 8) left = 8;
+      const h = panelRef.current?.offsetHeight ?? 340;
+      let top = r.bottom + 6;
+      if (top + h > vh - 8 && r.top - 6 - h > 8) top = r.top - 6 - h; // abre hacia arriba si no cabe
+      if (top < 8) top = 8;
+      setPos({ top, left });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true); // sigue el disparador al hacer scroll
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [anchor, width]);
+
   useEffect(() => {
-    if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) close();
+      const t = e.target as Node;
+      if (panelRef.current?.contains(t) || anchor?.contains(t)) return;
+      onClose();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
+      if (e.key === 'Escape') onClose();
     };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
@@ -76,8 +114,19 @@ function useDismiss(open: boolean, close: () => void) {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open, close]);
-  return ref;
+  }, [anchor, onClose]);
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <div
+      ref={panelRef}
+      className="dp-panel dp-portal"
+      style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width }}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
 }
 
 // ── Calendario ────────────────────────────────────────────────────────────────
@@ -190,10 +239,11 @@ export function DateField({
   ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
+  const triggerRef = useRef<HTMLButtonElement>(null);
   return (
-    <div className="dp-wrap" ref={ref}>
+    <div className="dp-wrap">
       <button
+        ref={triggerRef}
         type="button"
         id={id}
         aria-label={ariaLabel ?? 'Fecha'}
@@ -207,7 +257,7 @@ export function DateField({
         </svg>
       </button>
       {open && (
-        <div className="dp-panel">
+        <Popover anchor={triggerRef.current} onClose={() => setOpen(false)}>
           <Calendar
             value={value}
             min={min}
@@ -218,7 +268,7 @@ export function DateField({
               setOpen(false);
             }}
           />
-        </div>
+        </Popover>
       )}
     </div>
   );
@@ -294,10 +344,11 @@ export function TimeField({
   ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
+  const triggerRef = useRef<HTMLButtonElement>(null);
   return (
-    <div className="dp-wrap" ref={ref}>
+    <div className="dp-wrap">
       <button
+        ref={triggerRef}
         type="button"
         id={id}
         aria-label={ariaLabel ?? 'Hora'}
@@ -311,9 +362,9 @@ export function TimeField({
         </svg>
       </button>
       {open && (
-        <div className="dp-panel">
+        <Popover anchor={triggerRef.current} onClose={() => setOpen(false)}>
           <TimePanel value={value} onPick={(t) => onChange(t)} />
-        </div>
+        </Popover>
       )}
     </div>
   );
@@ -338,7 +389,7 @@ export function DateTimeField({
   ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [datePart, timePart] = value ? value.split('T') : ['', ''];
   const d = datePart ?? '';
   const t = timePart ?? '';
@@ -347,8 +398,9 @@ export function DateTimeField({
   const maxD = max?.split('T')[0];
 
   return (
-    <div className="dp-wrap" ref={ref}>
+    <div className="dp-wrap">
       <button
+        ref={triggerRef}
         type="button"
         id={id}
         aria-label={ariaLabel ?? 'Fecha y hora'}
@@ -364,11 +416,11 @@ export function DateTimeField({
         </svg>
       </button>
       {open && (
-        <div className="dp-panel dp-panel-dt">
+        <Popover anchor={triggerRef.current} onClose={() => setOpen(false)} width={300}>
           <Calendar value={d} min={minD} max={maxD} today={today} onPick={(nd) => emit(nd, t)} />
           <div className="dp-dt-sep" />
           <TimePanel value={t} onPick={(nt) => emit(d, nt)} />
-        </div>
+        </Popover>
       )}
     </div>
   );
