@@ -57,8 +57,8 @@ type Turno = { role: 'user' | 'assistant'; text: string };
 // terminado. Más alto = te deja pensar sin cortarte; más bajo = responde antes.
 const END_SILENCE_MS = 1500;
 const SILENCE_MS = END_SILENCE_MS; // vía de respaldo (grabación + VAD)
-const MIN_SPEECH_MS = 500; // exige algo de voz antes de permitir el corte por silencio
-const VAD_THRESHOLD = 7; // nivel para considerar "hay voz" (más bajo = más sensible)
+const MIN_SPEECH_MS = 350; // exige algo de voz antes de permitir el corte por silencio
+const VAD_THRESHOLD = 4; // nivel para considerar "hay voz" (más bajo = más sensible)
 const MAX_REC_MS = 20000; // tope duro por si nunca hay silencio
 const NO_SPEECH_TIMEOUT_MS = 8000; // si nunca hablas, cierra la escucha
 // Barge-in: interrumpir a Aura mientras habla. Umbral alto + sostenido para que su

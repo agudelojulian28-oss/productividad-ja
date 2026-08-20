@@ -3382,6 +3382,14 @@ button.mov-row:hover {
   color: var(--danger, #ef4444);
 }
 
+/* Filtro por etiqueta en Movimientos recientes. */
+.mov-tagfilter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 /* Lista de solo lectura (sección del panel), agrupada por proyecto. */
 .tag-list-view {
   display: flex;

@@ -64,6 +64,7 @@ export function MovimientosRecientes({
   const [base, setBase] = useState<MovRow[]>(rows);
   const [preset, setPreset] = useState<Preset>('recientes');
   const [dir, setDir] = useState<Dir>('all');
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [from, setFrom] = useState(addDays(today, -29));
   const [to, setTo] = useState(today);
   const [editing, setEditing] = useState<MovRow | null>(null);
@@ -103,7 +104,9 @@ export function MovimientosRecientes({
     });
   }
 
-  const shown = dir === 'all' ? base : base.filter((r) => r.direction === dir);
+  const shown = base
+    .filter((r) => dir === 'all' || r.direction === dir)
+    .filter((r) => !tagFilter || r.tagIds.includes(tagFilter));
 
   return (
     <div className="mov-wrap">
@@ -155,11 +158,37 @@ export function MovimientosRecientes({
         ))}
       </div>
 
+      {tags.length > 0 && (
+        <div className="mov-tagfilter" role="group" aria-label="Filtrar por etiqueta">
+          <button
+            type="button"
+            className={`tag-opt${!tagFilter ? ' tag-opt-on' : ''}`}
+            aria-pressed={!tagFilter}
+            onClick={() => setTagFilter(null)}
+          >
+            Todas
+          </button>
+          {tags.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`tag-opt${tagFilter === t.id ? ' tag-opt-on' : ''}`}
+              aria-pressed={tagFilter === t.id}
+              onClick={() => setTagFilter(tagFilter === t.id ? null : t.id)}
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {pending ? (
         <p className="muted mov-empty">Cargando…</p>
       ) : shown.length === 0 ? (
         <p className="muted mov-empty">
-          {base.length === 0 ? 'No hay movimientos en este rango.' : `Sin ${dir === 'in' ? 'ingresos' : 'gastos'} en este rango.`}
+          {base.length === 0
+            ? 'No hay movimientos en este rango.'
+            : 'Ningún movimiento coincide con el filtro.'}
         </p>
       ) : (
         <div className="mov-list">
