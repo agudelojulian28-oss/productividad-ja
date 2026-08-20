@@ -49,7 +49,7 @@ export function FinStats({
   const [period, setPeriod] = useState<Period>('mes');
   const [tab, setTab] = useState<'in' | 'out'>('in');
 
-  const { inflow, outflow, labels, fuentes, gastos } = useMemo(() => {
+  const { inflow, outflow, labels, inAgg, outAgg, netAgg, fuentes, gastos } = useMemo(() => {
     const prev = prevMonthKey(monthKey);
     const year = monthKey.slice(0, 4);
     const inPeriod = (m: string) => {
@@ -86,6 +86,8 @@ export function FinStats({
 
     const inSeries = new Map<string, number[]>();
     const outSeries = new Map<string, number[]>();
+    const inAgg = new Array<number>(BUCKETS).fill(0); // total general (no por proyecto)
+    const outAgg = new Array<number>(BUCKETS).fill(0);
     for (const t of trendTx) {
       const idx = assign(t.date);
       if (idx < 0) continue;
@@ -96,7 +98,10 @@ export function FinStats({
         map.set(t.label, arr);
       }
       arr[idx] = (arr[idx] ?? 0) + t.amount;
+      const agg = t.dir === 'in' ? inAgg : outAgg;
+      agg[idx] = (agg[idx] ?? 0) + t.amount;
     }
+    const netAgg = inAgg.map((v, i) => v - (outAgg[i] ?? 0));
 
     // ── Totales del periodo (la cifra a la derecha) ───────────────────────────
     const inTotal = new Map<string, number>();
@@ -120,7 +125,16 @@ export function FinStats({
           series: series.get(label) ?? new Array(BUCKETS).fill(0),
         }));
 
-    return { inflow, outflow, labels, fuentes: build(inTotal, inSeries), gastos: build(outTotal, outSeries) };
+    return {
+      inflow,
+      outflow,
+      labels,
+      inAgg,
+      outAgg,
+      netAgg,
+      fuentes: build(inTotal, inSeries),
+      gastos: build(outTotal, outSeries),
+    };
   }, [rows, monthKey, period, trendTx, today]);
 
   const balance = inflow - outflow;
@@ -160,13 +174,22 @@ export function FinStats({
         ))}
       </div>
 
-      <div className="fin-stats-balance">
-        <span className="fin-stats-k">Balance · {periodLabel}</span>
-        <span className={`fin-stats-num ${balance >= 0 ? 'fin-pos' : 'fin-neg'}`}>
-          {money(balance, { compact: true })}
-        </span>
+      <p className="fin-gen-cap">General · {periodLabel}</p>
+      <div className="fin-general">
+        <GenTile
+          label="Balance"
+          value={balance}
+          series={netAgg}
+          labels={labels}
+          tone="accent"
+          numClass={balance >= 0 ? 'fin-pos' : 'fin-neg'}
+          hero
+        />
+        <GenTile label="Ingresos" value={inflow} series={inAgg} labels={labels} tone="accent" numClass="fin-pos" />
+        <GenTile label="Gastos" value={outflow} series={outAgg} labels={labels} tone="muted" numClass="fin-neg" />
       </div>
 
+      <p className="fin-stats-sub">Por proyecto</p>
       <div className="seg fin-stats-seg">
         <button
           type="button"
@@ -185,20 +208,38 @@ export function FinStats({
       </div>
 
       <div className={`fin-stats-pane${tab === 'in' ? ' on' : ''}`}>
-        <div className="fin-stats-head">
-          <span className="fin-stats-k">Entró</span>
-          <span className="fin-stats-num fin-pos">{money(inflow, { compact: true })}</span>
-        </div>
         {pane(fuentes, 'accent', `Sin ingresos por proyecto en ${periodLabel}.`)}
       </div>
 
       <div className={`fin-stats-pane${tab === 'out' ? ' on' : ''}`}>
-        <div className="fin-stats-head">
-          <span className="fin-stats-k">Salió</span>
-          <span className="fin-stats-num fin-neg">{money(outflow, { compact: true })}</span>
-        </div>
         {pane(gastos, 'muted', `Sin gastos en ${periodLabel}.`)}
       </div>
     </section>
+  );
+}
+
+function GenTile({
+  label,
+  value,
+  series,
+  labels,
+  tone,
+  numClass,
+  hero = false,
+}: {
+  label: string;
+  value: number;
+  series: number[];
+  labels: string[];
+  tone: 'accent' | 'muted';
+  numClass: string;
+  hero?: boolean;
+}) {
+  return (
+    <div className={`fin-gen-tile${hero ? ' hero' : ''}`}>
+      <span className="fin-gen-k">{label}</span>
+      <span className={`fin-gen-v ${numClass}`}>{money(value, { compact: true })}</span>
+      <MiniMountain labels={labels} values={series} tone={tone} />
+    </div>
   );
 }

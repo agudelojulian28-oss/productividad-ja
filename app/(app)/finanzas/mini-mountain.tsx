@@ -41,13 +41,17 @@ export function MiniMountain({
   const gid = useId();
   const [hover, setHover] = useState<number | null>(null);
   const n = values.length;
-  const max = Math.max(1, ...values);
+  // Rango con cero incluido: si hay valores negativos (p. ej. balance), la línea base
+  // es el cero y el área se rellena hasta ahí. Con todo positivo, base = fondo (igual).
+  const max = Math.max(0, ...values);
+  const min = Math.min(0, ...values);
+  const range = max - min || 1;
   const x = (i: number) => (n <= 1 ? W / 2 : PAD + ((W - 2 * PAD) * i) / (n - 1));
-  const y = (v: number) => PAD + (H - 2 * PAD) * (1 - v / max);
-  const bottom = H - PAD;
+  const y = (v: number) => PAD + (H - 2 * PAD) * (1 - (v - min) / range);
+  const baseY = y(0);
   const pts = values.map((v, i): [number, number] => [x(i), y(v)]);
   const line = smoothPath(pts);
-  const areaD = n > 0 ? `${line} L${x(n - 1)},${bottom} L${x(0)},${bottom} Z` : '';
+  const areaD = n > 0 ? `${line} L${x(n - 1)},${baseY} L${x(0)},${baseY} Z` : '';
   const color = tone === 'accent' ? 'var(--accent)' : 'var(--text-muted)';
   const aria = labels
     .map((l, i) => `${l} ${money(values[i] ?? 0, { compact: true })}`)
