@@ -82,12 +82,18 @@ function Popover({
       const r = anchor.getBoundingClientRect();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      let left = Math.min(r.left, vw - 8 - width);
-      if (left < 8) left = 8;
-      const h = panelRef.current?.offsetHeight ?? 340;
-      let top = r.bottom + 6;
-      if (top + h > vh - 8 && r.top - 6 - h > 8) top = r.top - 6 - h; // abre hacia arriba si no cabe
-      if (top < 8) top = 8;
+      const margin = 8;
+      let left = Math.min(r.left, vw - margin - width);
+      if (left < margin) left = margin;
+      // Altura efectiva: el panel nunca supera el alto de la pantalla (tiene scroll).
+      const maxH = vh - margin * 2;
+      const h = Math.min(panelRef.current?.offsetHeight ?? 340, maxH);
+      let top = r.bottom + 6; // preferido: debajo del disparador
+      if (top + h > vh - margin) {
+        // No cabe abajo → intenta arriba; si tampoco, pégalo al borde para que quepa entero.
+        const above = r.top - 6 - h;
+        top = above >= margin ? above : Math.max(margin, vh - margin - h);
+      }
       setPos({ top, left });
     };
     place();
