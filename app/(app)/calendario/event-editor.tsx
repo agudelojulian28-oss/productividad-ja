@@ -13,6 +13,7 @@ import {
 } from '@/app/actions/tasks';
 import { COLOR_NAMES, nameToColorId, hexForColorId } from '@/lib/calendar-colors';
 import type { CalItem } from './calendar-view';
+import { DateTimeField } from '../date-picker';
 
 export type EditorTarget =
   | { mode: 'create'; slotIso: string }
@@ -160,15 +161,10 @@ export function EventEditor({
         {isTask ? (
           <>
             <p className="cal-modal-tasktitle">{titulo}</p>
-            <label className="cal-field-label">
+            <div className="cal-field-label">
               Reprogramar
-              <input
-                type="datetime-local"
-                className="field"
-                value={when}
-                onChange={(e) => setWhen(e.target.value)}
-              />
-            </label>
+              <DateTimeField value={when} onChange={setWhen} ariaLabel="Reprogramar" />
+            </div>
             <div className="cal-modal-actions">
               <button className="btn-primary" onClick={rescheduleTask} disabled={pending || !when}>
                 Guardar hora
@@ -197,15 +193,10 @@ export function EventEditor({
                 placeholder="Título del evento"
               />
             </label>
-            <label className="cal-field-label">
+            <div className="cal-field-label">
               Inicio
-              <input
-                type="datetime-local"
-                className="field"
-                value={when}
-                onChange={(e) => setWhen(e.target.value)}
-              />
-            </label>
+              <DateTimeField value={when} onChange={setWhen} ariaLabel="Inicio" />
+            </div>
             <label className="cal-field-label">
               Duración
               <select

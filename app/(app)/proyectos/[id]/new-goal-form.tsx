@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from 'react';
 import { createGoalAction } from '@/app/actions/goals';
+import { DateField } from '../../date-picker';
 
 export function NewGoalForm({ projectId }: { projectId: string }) {
   const [title, setTitle] = useState('');
@@ -55,26 +56,14 @@ export function NewGoalForm({ projectId }: { projectId: string }) {
         aria-label="Cantidad objetivo"
       />
       <div className="new-task-row">
-        <label className="cal-field-label" style={{ flex: 1 }}>
+        <div className="cal-field-label" style={{ flex: 1 }}>
           Inicio
-          <input
-            type="date"
-            value={inicio}
-            onChange={(e) => setInicio(e.target.value)}
-            className="field"
-            aria-label="Fecha de inicio"
-          />
-        </label>
-        <label className="cal-field-label" style={{ flex: 1 }}>
+          <DateField value={inicio} onChange={setInicio} ariaLabel="Fecha de inicio" />
+        </div>
+        <div className="cal-field-label" style={{ flex: 1 }}>
           Cumplimiento
-          <input
-            type="date"
-            value={fin}
-            onChange={(e) => setFin(e.target.value)}
-            className="field"
-            aria-label="Fecha de cumplimiento esperado"
-          />
-        </label>
+          <DateField value={fin} min={inicio} onChange={setFin} ariaLabel="Fecha de cumplimiento esperado" />
+        </div>
       </div>
       <button type="submit" className="btn-primary" disabled={pending}>
         {pending ? '…' : 'Crear meta'}

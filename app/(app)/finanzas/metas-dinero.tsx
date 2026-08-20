@@ -6,6 +6,7 @@ import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
 import { Modal } from '../modal';
 import { SegSelect } from '../seg-select';
+import { DateField } from '../date-picker';
 
 type Project = { id: string; title: string };
 export type MetaProgreso = {
@@ -178,14 +179,14 @@ function MetaForm({
           ))}
         </select>
         <div className="new-task-row">
-          <label className="cal-field-label" style={{ flex: 1 }}>
+          <div className="cal-field-label" style={{ flex: 1 }}>
             Desde
-            <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="field" />
-          </label>
-          <label className="cal-field-label" style={{ flex: 1 }}>
+            <DateField value={desde} onChange={setDesde} ariaLabel="Desde" />
+          </div>
+          <div className="cal-field-label" style={{ flex: 1 }}>
             Hasta
-            <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="field" />
-          </label>
+            <DateField value={hasta} onChange={setHasta} min={desde} ariaLabel="Hasta" />
+          </div>
         </div>
         {error && <p className="error-text">{error}</p>}
         <button type="submit" className="btn-primary" disabled={pending}>

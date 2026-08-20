@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from 'react';
 import { createTaskAction } from '@/app/actions/tasks';
+import { DateTimeField } from '../date-picker';
 
 export function NewTaskForm({
   projects,
@@ -58,13 +59,7 @@ export function NewTaskForm({
         aria-label="Título de la tarea"
       />
       <div className="new-task-row">
-        <input
-          type="datetime-local"
-          value={due}
-          onChange={(e) => setDue(e.target.value)}
-          className="field"
-          aria-label="Fecha y hora"
-        />
+        <DateTimeField value={due} onChange={setDue} ariaLabel="Fecha y hora" />
         <button type="submit" className="btn-primary" disabled={pending}>
           {pending ? '…' : 'Agregar'}
         </button>

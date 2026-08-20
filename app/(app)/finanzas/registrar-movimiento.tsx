@@ -6,6 +6,7 @@ import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
 import { SegSelect } from '../seg-select';
 import { TagPicker, type TagOption } from './tags-ui';
+import { DateField } from '../date-picker';
 
 type Receipt = { data: string; preview: string };
 
@@ -261,15 +262,10 @@ export function RegistrarMovimiento({
         <TagPicker catalog={tags} projectId={projectId} selected={tagIds} onChange={setTagIds} />
       </div>
 
-      <label className="cal-field-label">
+      <div className="cal-field-label">
         Fecha
-        <input
-          type="date"
-          value={occurredOn}
-          onChange={(e) => setOccurredOn(e.target.value)}
-          className="field"
-        />
-      </label>
+        <DateField value={occurredOn} onChange={setOccurredOn} ariaLabel="Fecha del movimiento" />
+      </div>
 
       {error && <p className="error-text">{error}</p>}
       {okMsg && <p className="ok-text">{okMsg}</p>}

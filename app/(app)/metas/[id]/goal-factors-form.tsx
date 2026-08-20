@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { updateGoalAction } from '@/app/actions/goals';
+import { DateField } from '../../date-picker';
 
 export function GoalFactorsForm({
   goalId,
@@ -56,30 +57,29 @@ export function GoalFactorsForm({
         />
       </label>
       <div className="new-task-row">
-        <label className="cal-field-label" style={{ flex: 1 }}>
+        <div className="cal-field-label" style={{ flex: 1 }}>
           Fecha de inicio
-          <input
-            type="date"
-            className="field"
+          <DateField
             value={inicio}
-            onChange={(e) => {
-              setInicio(e.target.value);
+            onChange={(v) => {
+              setInicio(v);
               touched();
             }}
+            ariaLabel="Fecha de inicio"
           />
-        </label>
-        <label className="cal-field-label" style={{ flex: 1 }}>
+        </div>
+        <div className="cal-field-label" style={{ flex: 1 }}>
           Cumplimiento esperado
-          <input
-            type="date"
-            className="field"
+          <DateField
             value={fin}
-            onChange={(e) => {
-              setFin(e.target.value);
+            min={inicio}
+            onChange={(v) => {
+              setFin(v);
               touched();
             }}
+            ariaLabel="Cumplimiento esperado"
           />
-        </label>
+        </div>
       </div>
       <div className="desc-editor-actions">
         <button type="button" className="btn-primary" onClick={save} disabled={pending}>

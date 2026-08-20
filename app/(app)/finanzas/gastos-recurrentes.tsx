@@ -10,6 +10,7 @@ import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
 import type { RecurringFrequency } from '@/core/finance/ports';
 import { Modal } from '../modal';
+import { DateField } from '../date-picker';
 import { TagChips, TagPicker, type TagOption } from './tags-ui';
 
 type Project = { id: string; title: string; areaId: string };
@@ -240,15 +241,10 @@ function RecurForm({
         aria-label="Categoría"
         autoComplete="off"
       />
-      <label className="cal-field-label">
+      <div className="cal-field-label">
         Próxima fecha
-        <input
-          type="date"
-          value={nextDueOn}
-          onChange={(e) => setNextDueOn(e.target.value)}
-          className="field"
-        />
-      </label>
+        <DateField value={nextDueOn} onChange={setNextDueOn} ariaLabel="Próxima fecha" />
+      </div>
       <div className="cal-field-label">
         Etiquetas
         <TagPicker catalog={tags} projectId={projectId} selected={tagIds} onChange={setTagIds} />
@@ -315,13 +311,7 @@ function EditRow({ row, tags, onDone }: { row: RecurRow; tags: TagOption[]; onDo
               </option>
             ))}
           </select>
-          <input
-            type="date"
-            value={nextDueOn}
-            onChange={(e) => setNextDueOn(e.target.value)}
-            className="field"
-            aria-label="Próxima fecha"
-          />
+          <DateField value={nextDueOn} onChange={setNextDueOn} ariaLabel="Próxima fecha" />
         </div>
         <div className="cal-field-label">
           Etiquetas

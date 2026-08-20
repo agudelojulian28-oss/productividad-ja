@@ -9,6 +9,7 @@ import {
 } from '@/app/actions/tasks';
 import { timeInTz, dayLabelInTz } from '@/lib/format';
 import type { TaskRow } from '@/core/work/ports';
+import { DateTimeField } from '../date-picker';
 
 export function TaskItem({
   task,
@@ -59,13 +60,7 @@ export function TaskItem({
         <span className="task-meta">{meta}</span>
         {editing && (
           <div className="new-task-row" style={{ marginTop: 8 }}>
-            <input
-              type="datetime-local"
-              className="field"
-              value={due}
-              onChange={(e) => setDue(e.target.value)}
-              aria-label="Nueva fecha"
-            />
+            <DateTimeField value={due} onChange={setDue} ariaLabel="Nueva fecha" />
             <button
               type="button"
               className="btn-primary"

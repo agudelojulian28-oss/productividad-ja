@@ -6,6 +6,7 @@ import { listMovimientosAction } from '@/app/actions/finance';
 import { Modal } from '../modal';
 import { EditMovimiento } from './edit-movimiento';
 import { TagChips, type TagOption } from './tags-ui';
+import { DateField } from '../date-picker';
 
 export type MovRow = {
   id: string;
@@ -128,14 +129,14 @@ export function MovimientosRecientes({
 
         {preset === 'custom' && (
           <div className="mov-range">
-            <label className="mov-range-field">
+            <div className="mov-range-field">
               Desde
-              <input type="date" className="field" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
-            </label>
-            <label className="mov-range-field">
+              <DateField value={from} onChange={setFrom} max={to} today={today} ariaLabel="Desde" />
+            </div>
+            <div className="mov-range-field">
               Hasta
-              <input type="date" className="field" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} />
-            </label>
+              <DateField value={to} onChange={setTo} min={from} max={today} today={today} ariaLabel="Hasta" />
+            </div>
             <button type="button" className="btn-ghost mov-apply" disabled={pending} onClick={() => fetchRange({ from, to })}>
               {pending ? '…' : 'Aplicar'}
             </button>

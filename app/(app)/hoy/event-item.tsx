@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { editEventAction, deleteEventAction } from '@/app/actions/events';
+import { DateTimeField } from '../date-picker';
 import { timeInTz } from '@/lib/format';
 import {
   COLOR_NAMES,
@@ -55,13 +56,7 @@ export function EventItem({ event, tz }: { event: CalEvent; tz: string }) {
 
         {mode === 'time' && (
           <div className="new-task-row" style={{ marginTop: 8 }}>
-            <input
-              type="datetime-local"
-              className="field"
-              value={when}
-              onChange={(e) => setWhen(e.target.value)}
-              aria-label="Nueva hora"
-            />
+            <DateTimeField value={when} onChange={setWhen} ariaLabel="Nueva hora" />
             <button
               type="button"
               className="btn-primary"
