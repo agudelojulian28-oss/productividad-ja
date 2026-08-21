@@ -12,8 +12,15 @@ import {
   setTaskDescription,
   editTask,
 } from '@/core/work/tasks';
+import {
+  createRecurringTask,
+  updateRecurringTask,
+  deleteRecurringTask,
+  generateDueRecurringTasks,
+} from '@/core/work/recurring-tasks';
+import { todayInTz } from '@/lib/format';
 import type { Result } from '@/core/types';
-import type { TaskRow } from '@/core/work/ports';
+import type { TaskRow, RecurringTaskRow } from '@/core/work/ports';
 
 // Las TAREAS viven solo en la app: no se sincronizan a Google Calendar (los
 // EVENTOS son los que van al calendario). Ver ADR-022.
@@ -88,4 +95,53 @@ export async function updateTaskAction(input: {
   revalidatePath('/hoy');
   revalidatePath(`/tareas/${input.id}`);
   return result;
+}
+
+// ── Tareas recurrentes ─────────────────────────────────────────────────────────
+export async function createRecurringTaskAction(input: {
+  title: string;
+  notes?: string | null;
+  projectId?: string | null;
+  goalId?: string | null;
+  frequency: string;
+  dueTime?: string | null;
+  nextDueOn: string;
+}): Promise<Result<RecurringTaskRow>> {
+  const { ctx, repo } = await deps();
+  const result = await createRecurringTask(ctx, repo, input);
+  revalidatePath('/tareas/recurrentes');
+  revalidatePath('/hoy');
+  return result;
+}
+
+export async function updateRecurringTaskAction(input: {
+  id: string;
+  title?: string;
+  notes?: string | null;
+  projectId?: string | null;
+  goalId?: string | null;
+  frequency?: string;
+  dueTime?: string | null;
+  nextDueOn?: string;
+  active?: boolean;
+}): Promise<Result<RecurringTaskRow>> {
+  const { ctx, repo } = await deps();
+  const result = await updateRecurringTask(ctx, repo, input);
+  revalidatePath('/tareas/recurrentes');
+  return result;
+}
+
+export async function deleteRecurringTaskAction(id: string): Promise<Result<{ id: string }>> {
+  const { ctx, repo } = await deps();
+  const result = await deleteRecurringTask(ctx, repo, id);
+  revalidatePath('/tareas/recurrentes');
+  return result;
+}
+
+/** Materializa las recurrentes vencidas (aparecen solas en Hoy). Devuelve cuántas creó. */
+export async function generateDueRecurringTasksAction(): Promise<number> {
+  const { ctx, repo } = await deps();
+  const result = await generateDueRecurringTasks(ctx, repo, todayInTz(ctx.tz));
+  if (result.ok && result.value.created > 0) revalidatePath('/hoy');
+  return result.ok ? result.value.created : 0;
 }

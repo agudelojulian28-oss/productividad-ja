@@ -47,6 +47,33 @@ export const TaskReschedule = z.object({
 export type TaskRescheduleInput = z.infer<typeof TaskReschedule>;
 
 // Edición completa de una tarea. Cada campo es opcional; `null` limpia (fecha/proyecto/meta).
+const FREQUENCIES = ['semanal', 'quincenal', 'mensual', 'bimestral', 'trimestral', 'anual'] as const;
+const HmTime = z.string().regex(/^\d{2}:\d{2}$/, 'Hora HH:MM');
+
+export const RecurringTaskCreate = z.object({
+  title: z.string().trim().min(1, 'El título es obligatorio').max(200),
+  notes: z.string().max(5000).nullable().optional(),
+  projectId: z.uuid().nullable().optional(),
+  goalId: z.uuid().nullable().optional(),
+  frequency: z.enum(FREQUENCIES),
+  dueTime: HmTime.nullable().optional(),
+  nextDueOn: Ymd,
+});
+export type RecurringTaskCreateInput = z.infer<typeof RecurringTaskCreate>;
+
+export const RecurringTaskUpdate = z.object({
+  id: z.uuid(),
+  title: z.string().trim().min(1).max(200).optional(),
+  notes: z.string().max(5000).nullable().optional(),
+  projectId: z.uuid().nullable().optional(),
+  goalId: z.uuid().nullable().optional(),
+  frequency: z.enum(FREQUENCIES).optional(),
+  dueTime: HmTime.nullable().optional(),
+  nextDueOn: Ymd.optional(),
+  active: z.boolean().optional(),
+});
+export type RecurringTaskUpdateInput = z.infer<typeof RecurringTaskUpdate>;
+
 export const TaskEdit = z.object({
   id: z.uuid(),
   title: z.string().trim().min(1, 'El título es obligatorio').max(200).optional(),

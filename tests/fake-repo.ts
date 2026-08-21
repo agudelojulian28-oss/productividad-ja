@@ -11,6 +11,7 @@ import type {
   GoalRow,
   GoalInsert,
   GoalPatch,
+  RecurringTaskRow,
 } from '@/core/work/ports';
 import type { ActorContext } from '@/core/types';
 
@@ -18,10 +19,12 @@ export function makeFakeRepo(): WorkRepo & {
   _tasks: Map<string, TaskRow>;
   _projects: Map<string, ProjectRow>;
   _goals: Map<string, GoalRow>;
+  _recTasks: Map<string, RecurringTaskRow>;
 } {
   const tasks = new Map<string, TaskRow>();
   const projects = new Map<string, ProjectRow>();
   const goals = new Map<string, GoalRow>();
+  const recTasks = new Map<string, RecurringTaskRow>();
   let seq = 0;
   const uuid = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`;
 
@@ -29,6 +32,48 @@ export function makeFakeRepo(): WorkRepo & {
     _tasks: tasks,
     _projects: projects,
     _goals: goals,
+    _recTasks: recTasks,
+    async insertRecurringTask(input) {
+      const row: RecurringTaskRow = {
+        id: uuid(),
+        title: input.title,
+        notes: input.notes ?? null,
+        projectId: input.projectId ?? null,
+        goalId: input.goalId ?? null,
+        frequency: input.frequency,
+        dueTime: input.dueTime ?? null,
+        nextDueOn: input.nextDueOn,
+        active: true,
+      };
+      recTasks.set(row.id, row);
+      return row;
+    },
+    async listRecurringTasks() {
+      return [...recTasks.values()].filter((r) => r.active);
+    },
+    async getRecurringTask(id) {
+      return recTasks.get(id) ?? null;
+    },
+    async updateRecurringTask(id, patch) {
+      const cur = recTasks.get(id);
+      if (!cur) throw new Error('updateRecurringTask: no existe ' + id);
+      const next: RecurringTaskRow = {
+        ...cur,
+        title: patch.title ?? cur.title,
+        notes: patch.notes === undefined ? cur.notes : patch.notes,
+        projectId: patch.projectId === undefined ? cur.projectId : patch.projectId,
+        goalId: patch.goalId === undefined ? cur.goalId : patch.goalId,
+        frequency: patch.frequency ?? cur.frequency,
+        dueTime: patch.dueTime === undefined ? cur.dueTime : patch.dueTime,
+        nextDueOn: patch.nextDueOn ?? cur.nextDueOn,
+        active: patch.active ?? cur.active,
+      };
+      recTasks.set(id, next);
+      return next;
+    },
+    async deleteRecurringTask(id) {
+      recTasks.delete(id);
+    },
     async insertTask(input: TaskInsert): Promise<TaskRow> {
       const row: TaskRow = {
         id: uuid(),

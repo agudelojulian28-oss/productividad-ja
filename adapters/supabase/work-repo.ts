@@ -1,5 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { WorkRepo, TaskRow, TaskStatus, ProjectRow, GoalRow } from '@/core/work/ports';
+import type {
+  WorkRepo,
+  TaskRow,
+  TaskStatus,
+  ProjectRow,
+  GoalRow,
+  RecurringTaskRow,
+  TaskFrequency,
+} from '@/core/work/ports';
 
 interface DbTask {
   id: string;
@@ -17,6 +25,32 @@ interface DbTask {
 
 const COLS =
   'id,title,notes,status,due_at,completed_at,project_id,goal_id,origin,google_calendar_id,google_event_id';
+
+interface DbRecTask {
+  id: string;
+  title: string;
+  notes: string | null;
+  project_id: string | null;
+  goal_id: string | null;
+  frequency: TaskFrequency;
+  due_time: string | null;
+  next_due_on: string;
+  active: boolean;
+}
+const REC_TASK_COLS = 'id,title,notes,project_id,goal_id,frequency,due_time,next_due_on,active';
+function toRecTask(r: DbRecTask): RecurringTaskRow {
+  return {
+    id: r.id,
+    title: r.title,
+    notes: r.notes,
+    projectId: r.project_id,
+    goalId: r.goal_id,
+    frequency: r.frequency,
+    dueTime: r.due_time,
+    nextDueOn: r.next_due_on,
+    active: r.active,
+  };
+}
 
 function toRow(r: DbTask): TaskRow {
   return {
@@ -268,6 +302,70 @@ export function workRepo(supabase: SupabaseClient, userId: string): WorkRepo {
         .single();
       if (error) throw new Error(error.message);
       return toGoal(data as DbGoal);
+    },
+
+    async insertRecurringTask(input) {
+      const { data, error } = await supabase
+        .from('recurring_tasks')
+        .insert({
+          user_id: userId,
+          title: input.title,
+          notes: input.notes ?? null,
+          project_id: input.projectId ?? null,
+          goal_id: input.goalId ?? null,
+          frequency: input.frequency,
+          due_time: input.dueTime ?? null,
+          next_due_on: input.nextDueOn,
+        })
+        .select(REC_TASK_COLS)
+        .single();
+      if (error) throw new Error(error.message);
+      return toRecTask(data as DbRecTask);
+    },
+
+    async listRecurringTasks() {
+      const { data, error } = await supabase
+        .from('recurring_tasks')
+        .select(REC_TASK_COLS)
+        .eq('active', true)
+        .order('next_due_on', { ascending: true });
+      if (error) throw new Error(error.message);
+      return ((data as DbRecTask[] | null) ?? []).map(toRecTask);
+    },
+
+    async getRecurringTask(id) {
+      const { data, error } = await supabase
+        .from('recurring_tasks')
+        .select(REC_TASK_COLS)
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? toRecTask(data as DbRecTask) : null;
+    },
+
+    async updateRecurringTask(id, patch) {
+      const upd: Record<string, unknown> = {};
+      if (patch.title !== undefined) upd.title = patch.title;
+      if (patch.notes !== undefined) upd.notes = patch.notes;
+      if (patch.projectId !== undefined) upd.project_id = patch.projectId;
+      if (patch.goalId !== undefined) upd.goal_id = patch.goalId;
+      if (patch.frequency !== undefined) upd.frequency = patch.frequency;
+      if (patch.dueTime !== undefined) upd.due_time = patch.dueTime;
+      if (patch.nextDueOn !== undefined) upd.next_due_on = patch.nextDueOn;
+      if (patch.active !== undefined) upd.active = patch.active;
+      const { data, error } = await supabase
+        .from('recurring_tasks')
+        .update(upd)
+        .eq('id', id)
+        .select(REC_TASK_COLS)
+        .single();
+      if (error) throw new Error(error.message);
+      return toRecTask(data as DbRecTask);
+    },
+
+    async deleteRecurringTask(id) {
+      const { error } = await supabase.from('recurring_tasks').delete().eq('id', id);
+      if (error) throw new Error(error.message);
     },
   };
 }

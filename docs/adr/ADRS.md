@@ -760,3 +760,22 @@ formulario; el gestor agrupa por proyecto y crea bajo un proyecto.
 
 **Consecuencias.** Se borraron las etiquetas de prueba de ADR-028 (no tenían proyecto). Borrar un
 proyecto borra sus etiquetas (cascada). Los vínculos `transaction_tags`/`recurring_tags` no cambian.
+
+---
+
+## ADR-030 · Tareas recurrentes (auto-materialización al vencer)
+
+**Estado:** aceptado · **Fecha:** 2026-08-21
+
+**Contexto.** Faltaba repetir tareas (ej. "revisar TV los lunes"). Los gastos recurrentes
+(ADR-027) piden confirmación manual; para tareas Julián prefiere que **aparezcan solas**.
+
+**Decisión.** Tabla `recurring_tasks` (plantilla: título, notas, proyecto/meta opcionales,
+frecuencia, `next_due_on`, `due_time` opcional, `active`). Al abrir la app, `generateDueRecurringTasks`
+materializa **una** tarea por plantilla vencida (`next_due_on <= hoy`), avanza `next_due_on` saltando
+periodos perdidos (no crea una pila) — el avance es la guarda de idempotencia. La escritura ocurre por
+server action disparada al montar un componente en Hoy, nunca en el GET. Se gestiona en una página
+aparte (`/tareas/recurrentes`). El agente puede crear/editar/archivar plantillas.
+
+**Consecuencias.** Cubre "aparece al abrir la app"; la generación 100% en segundo plano (sin abrirla)
+queda para un `pg_cron` futuro (ADR-015). `project_id`/`goal_id` con `on delete set null` (opcionales).

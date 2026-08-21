@@ -87,6 +87,47 @@ export interface GoalPatch {
   periodEnd?: string;
 }
 
+export type TaskFrequency =
+  | 'semanal'
+  | 'quincenal'
+  | 'mensual'
+  | 'bimestral'
+  | 'trimestral'
+  | 'anual';
+
+export interface RecurringTaskRow {
+  id: string;
+  title: string;
+  notes: string | null;
+  projectId: string | null;
+  goalId: string | null;
+  frequency: TaskFrequency;
+  dueTime: string | null; // 'HH:MM'
+  nextDueOn: string; // YYYY-MM-DD
+  active: boolean;
+}
+
+export interface RecurringTaskInsert {
+  title: string;
+  notes?: string | null;
+  projectId?: string | null;
+  goalId?: string | null;
+  frequency: TaskFrequency;
+  dueTime?: string | null;
+  nextDueOn: string;
+}
+
+export interface RecurringTaskPatch {
+  title?: string;
+  notes?: string | null;
+  projectId?: string | null;
+  goalId?: string | null;
+  frequency?: TaskFrequency;
+  dueTime?: string | null;
+  nextDueOn?: string;
+  active?: boolean;
+}
+
 export interface WorkRepo {
   insertTask(input: TaskInsert): Promise<TaskRow>;
   listTasks(filter: TaskFilter): Promise<TaskRow[]>;
@@ -104,4 +145,10 @@ export interface WorkRepo {
   getGoal(id: string): Promise<GoalRow | null>;
   insertGoal(input: GoalInsert): Promise<GoalRow>;
   updateGoal(id: string, patch: GoalPatch): Promise<GoalRow>;
+
+  insertRecurringTask(input: RecurringTaskInsert): Promise<RecurringTaskRow>;
+  listRecurringTasks(): Promise<RecurringTaskRow[]>;
+  getRecurringTask(id: string): Promise<RecurringTaskRow | null>;
+  updateRecurringTask(id: string, patch: RecurringTaskPatch): Promise<RecurringTaskRow>;
+  deleteRecurringTask(id: string): Promise<void>;
 }
