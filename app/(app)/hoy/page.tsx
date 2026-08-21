@@ -30,17 +30,17 @@ export default async function HoyPage() {
   const finance = financeRepo(supabase, ctx.userId);
   const today = todayInTz(ctx.tz);
 
-  const from14 = addDaysYmd(today, -13); // 14 días: hoy y los 13 anteriores
+  const from7 = addDaysYmd(today, -6); // 7 días: hoy y los 6 anteriores
   const [tasks, projects, events, txWin] = await Promise.all([
     repo.listTasks({ status: 'pending' }),
     repo.listProjects(),
     getDayEvents(supabase, ctx, today),
-    finance.listTransactions({ from: from14, to: today, limit: 1000 }),
+    finance.listTransactions({ from: from7, to: today, limit: 1000 }),
   ]);
   const projectName = new Map(projects.map((p) => [p.id, p.title] as const));
 
-  // Serie de 14 días: ingresos vs gastos por día, con desglose de ingresos por proyecto.
-  const dayKeys = Array.from({ length: 14 }, (_, i) => addDaysYmd(from14, i));
+  // Serie de 7 días: ingresos vs gastos por día, con desglose de ingresos por proyecto.
+  const dayKeys = Array.from({ length: 7 }, (_, i) => addDaysYmd(from7, i));
   const byDay = new Map<string, { inflow: number; outflow: number; projIn: Map<string, number> }>();
   for (const k of dayKeys) byDay.set(k, { inflow: 0, outflow: 0, projIn: new Map() });
   for (const t of txWin) {
