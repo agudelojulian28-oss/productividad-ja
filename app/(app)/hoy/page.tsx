@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { requireContext } from '@/lib/auth';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { financeRepo } from '@/adapters/supabase/finance-repo';
@@ -8,6 +9,7 @@ import { detectarChoques } from '@/lib/agenda';
 import { TareaLauncher } from './tarea-launcher';
 import { ResumenDia } from './resumen-dia';
 import { TareasList } from './tareas-list';
+import { RecurringTasksGate } from './recurring-tasks-gate';
 import { EventItem } from './event-item';
 import { RealtimeRefresh } from '../realtime-refresh';
 import { ChoquesBanner } from '../choques-banner';
@@ -126,6 +128,7 @@ export default async function HoyPage() {
   return (
     <div className="page">
       <RealtimeRefresh tables={['tasks', 'projects']} />
+      <RecurringTasksGate />
       <PageHero
         eyebrow={fecha}
         title="Hoy"
@@ -177,6 +180,11 @@ export default async function HoyPage() {
         {/* Main: las tareas, el foco del trabajo. En escritorio, columna izquierda. */}
         <div className="hoy-main">
           <ResumenDia inToday={inToday} outToday={outToday} days={days} />
+          <div className="hoy-tasks-bar">
+            <Link href="/tareas/recurrentes" className="rt-link">
+              ↻ Tareas recurrentes
+            </Link>
+          </div>
           {totalPend === 0 ? (
             <EmptyState
               icon={emptyIcons.tasks}

@@ -4084,3 +4084,86 @@ button.mov-row:hover {
   gap: 6px;
   margin-bottom: 14px;
 }
+
+/* Tareas recurrentes (página + enlace en Hoy) */
+.hoy-tasks-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+.rt-link {
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.rt-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rt-new {
+  align-self: flex-start;
+}
+.rt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rt-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.rt-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.rt-row-title {
+  font-weight: 600;
+  color: var(--text);
+}
+.rt-row-meta {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.rt-row-actions {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.rt-del {
+  color: var(--danger, #ef4444);
+}
+.rt-card {
+  padding: 14px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+}
+.rt-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rt-form-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.rt-form-actions {
+  display: flex;
+  gap: 10px;
+}
+.rt-form-actions .btn-primary {
+  flex: 1;
+}
