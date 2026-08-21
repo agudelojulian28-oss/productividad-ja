@@ -32,6 +32,7 @@ export const Consultar = z.object({
       'agenda_hoy',
       'agenda',
       'pendientes',
+      'tareas_recurrentes',
       'estructura',
       'documentacion',
       'resumen_financiero',
@@ -47,7 +48,7 @@ export const Consultar = z.object({
     ])
     .describe(
       'Qué consultar. Trabajo: agenda_hoy (tareas+eventos de hoy), agenda (eventos de un día, usa fecha), ' +
-        'pendientes (tareas), estructura (áreas, proyectos y metas con sus IDs), documentacion (el método). ' +
+        'pendientes (tareas), tareas_recurrentes (plantillas de tareas que se repiten, con sus IDs), estructura (áreas, proyectos y metas con sus IDs), documentacion (el método). ' +
         'Dinero: resumen_financiero, por_proyecto (ingresos/gastos por proyecto), movimientos (lista de ' +
         'ingresos/gastos filtrable por rango de fechas: usa desde/hasta/direccion), gastos, recurrentes ' +
         '(gastos e ingresos recurrentes), etiquetas (lista de etiquetas con sus IDs para poder asignarlas), por_cobrar, pipeline. ' +
@@ -88,6 +89,7 @@ export const Crear = z
         'documento',
         'movimiento',
         'recurrente',
+        'tarea_recurrente',
         'etiqueta',
       ])
       .describe('Qué crear'),
@@ -97,7 +99,7 @@ export const Crear = z
       .min(1)
       .max(200)
       .optional()
-      .describe('Título/nombre. Requerido para: tarea, evento, proyecto, meta, area, documento, etiqueta'),
+      .describe('Título/nombre. Requerido para: tarea, evento, proyecto, meta, area, documento, etiqueta, tarea_recurrente'),
     area_id: z.uuid().optional().describe('Área. Requerido: proyecto. Opcional: documento'),
     proyecto_id: z
       .uuid()
@@ -105,9 +107,9 @@ export const Crear = z
       .describe(
         'Proyecto. El dinero (movimiento y meta_dinero) SIEMPRE se atribuye a un proyecto. Requerido: meta, meta_dinero, movimiento, recurrente, etiqueta (las etiquetas son por proyecto). Opcional: tarea, evento, documento',
       ),
-    meta_id: z.uuid().optional().describe('Meta. Opcional: tarea, evento'),
+    meta_id: z.uuid().optional().describe('Meta. Opcional: tarea, evento, tarea_recurrente'),
     fecha: Instant.optional().describe('Inicio con offset. tarea (vence, opcional), evento (inicio, requerido)'),
-    desde: Ymd.optional().describe('Inicio YYYY-MM-DD. meta / meta_dinero'),
+    desde: Ymd.optional().describe('Inicio YYYY-MM-DD. meta / meta_dinero · recurrente / tarea_recurrente: próxima fecha'),
     hasta: Ymd.optional().describe('Fin/cumplimiento YYYY-MM-DD. meta / meta_dinero'),
     objetivo: z.number().positive().optional().describe('Cantidad objetivo. meta (nº) / meta_dinero (pesos)'),
     metrica: z.enum(['money_in', 'money_net']).optional().describe('Solo meta_dinero: ingresos o neto'),
@@ -120,7 +122,7 @@ export const Crear = z
     moneda: z.enum(['COP', 'USD']).optional().describe('Solo movimiento (por defecto COP)'),
     tasa: z.number().positive().optional().describe('Solo movimiento en USD: COP por 1 USD'),
     categoria: z.string().trim().max(80).optional().describe('movimiento gasto / recurrente (ej. almuerzo, arriendo)'),
-    frecuencia: z.enum(RECUR_FREQ).optional().describe('Solo recurrente: cada cuánto se repite'),
+    frecuencia: z.enum(RECUR_FREQ).optional().describe('recurrente / tarea_recurrente: cada cuánto se repite'),
     color_hex: z
       .string()
       .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
@@ -165,6 +167,8 @@ export const Crear = z
           return !!d.direccion && d.monto != null && !!d.proyecto_id;
         case 'recurrente':
           return !!d.proyecto_id && d.monto != null && !!d.frecuencia && !!d.desde;
+        case 'tarea_recurrente':
+          return !!d.titulo && !!d.frecuencia && !!d.desde;
         case 'etiqueta':
           return !!d.titulo && !!d.proyecto_id;
         default:
@@ -178,7 +182,7 @@ export const Crear = z
 export const Actualizar = z
   .object({
     tipo: z
-      .enum(['tarea', 'evento', 'meta', 'proyecto', 'area', 'documento', 'recurrente', 'movimiento', 'etiqueta'])
+      .enum(['tarea', 'evento', 'meta', 'proyecto', 'area', 'documento', 'recurrente', 'tarea_recurrente', 'movimiento', 'etiqueta'])
       .describe('Qué actualizar'),
     id: z.string().min(1).describe('ID de la entidad (uuid; para evento es el id de Google de consultar agenda)'),
     accion: z
@@ -206,7 +210,7 @@ export const Actualizar = z
       .positive()
       .optional()
       .describe('recurrente: monto nuevo (editar) o monto real al confirmar si cambió'),
-    frecuencia: z.enum(RECUR_FREQ).optional().describe('recurrente: nueva frecuencia'),
+    frecuencia: z.enum(RECUR_FREQ).optional().describe('recurrente / tarea_recurrente: nueva frecuencia'),
     titulo: z.string().trim().min(1).max(200).optional().describe('Nuevo título/nombre (documento editar / evento / etiqueta renombrar)'),
     descripcion: z
       .string()
@@ -231,7 +235,7 @@ export const Actualizar = z
       .optional()
       .describe('movimiento / recurrente: REEMPLAZA sus etiquetas por estos IDs (obtén IDs con consultar etiquetas). Lista vacía = quitar todas'),
     objetivo: z.number().positive().optional().describe('meta factores: cantidad objetivo'),
-    desde: Ymd.optional().describe('meta factores: inicio'),
+    desde: Ymd.optional().describe('meta factores: inicio · tarea_recurrente: nueva próxima fecha'),
     hasta: Ymd.optional().describe('meta factores: cumplimiento'),
     fijado: z.boolean().optional().describe('documento: fijar/desfijar'),
     color: z.enum(COLOR_NAMES).optional().describe('evento'),
@@ -250,8 +254,8 @@ export const Actualizar = z
 // ── archivar / borrar (unión por tipo) ──────────────────────────────────────
 export const Archivar = z.object({
   tipo: z
-    .enum(['tarea', 'evento', 'documento', 'area', 'recurrente', 'movimiento', 'etiqueta'])
-    .describe('Qué eliminar/archivar. tarea/evento/documento/recurrente/movimiento/etiqueta se borran; area se archiva'),
+    .enum(['tarea', 'evento', 'documento', 'area', 'recurrente', 'tarea_recurrente', 'movimiento', 'etiqueta'])
+    .describe('Qué eliminar/archivar. tarea/evento/documento/recurrente/tarea_recurrente/movimiento/etiqueta se borran; area se archiva'),
   id: z.string().min(1).describe('ID (uuid; para evento el id de Google)'),
   alcance: Alcance.optional().describe('Solo evento: serie o instancia (por defecto serie)'),
 });

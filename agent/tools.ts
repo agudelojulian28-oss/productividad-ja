@@ -10,6 +10,11 @@ import {
 } from '@/core/work/tasks';
 import { createProject, setProjectDescription } from '@/core/work/projects';
 import { createGoal, updateGoal, setGoalDescription } from '@/core/work/goals';
+import {
+  createRecurringTask,
+  updateRecurringTask,
+  deleteRecurringTask,
+} from '@/core/work/recurring-tasks';
 import { consultar, buscar } from '@/core/work/queries';
 import type { FinanceRepo } from '@/core/finance/ports';
 import { registrarMovimiento, updateTransaction, deleteTransaction } from '@/core/finance/transactions';
@@ -128,6 +133,19 @@ export async function runTool(
       if (vista === 'agenda_hoy' || vista === 'pendientes') {
         const r = await consultar(ctx, repo, vista);
         return r.ok ? ok(r.value.map(summarize)) : r;
+      }
+      if (vista === 'tareas_recurrentes') {
+        const [recs, projects] = await Promise.all([repo.listRecurringTasks(), repo.listProjects()]);
+        const nombre = new Map(projects.map((pr) => [pr.id, pr.title] as const));
+        return ok(
+          recs.map((r) => ({
+            id: r.id,
+            titulo: r.title,
+            frecuencia: r.frequency,
+            proxima: r.nextDueOn,
+            proyecto: r.projectId ? (nombre.get(r.projectId) ?? '—') : '—',
+          })),
+        );
       }
       if (vista === 'agenda') {
         if (!deps.listCalendar || !(await calendarReady(deps))) return err('EXTERNAL_ERROR', CAL_OFF);
@@ -351,6 +369,19 @@ export async function runTool(
           });
           return r.ok ? ok(summarize(r.value)) : r;
         }
+        case 'tarea_recurrente': {
+          const r = await createRecurringTask(ctx, repo, {
+            title: v.titulo!,
+            notes: v.descripcion ?? null,
+            projectId: v.proyecto_id ?? null,
+            goalId: v.meta_id ?? null,
+            frequency: v.frecuencia!,
+            nextDueOn: v.desde!,
+          });
+          return r.ok
+            ? ok({ tarea_recurrente_id: r.value.id, titulo: r.value.title, frecuencia: r.value.frequency, proxima: r.value.nextDueOn })
+            : r;
+        }
         case 'evento': {
           if (!deps.createEvent || !(await calendarReady(deps))) return err('EXTERNAL_ERROR', CAL_OFF);
           const id = await deps.createEvent({
@@ -484,6 +515,20 @@ export async function runTool(
       if (!p.ok) return p;
       const v = p.value;
       switch (v.tipo) {
+        case 'tarea_recurrente': {
+          const r = await updateRecurringTask(ctx, repo, {
+            id: v.id,
+            title: v.titulo,
+            notes: v.descripcion,
+            projectId: v.proyecto_id,
+            goalId: v.meta_id,
+            frequency: v.frecuencia,
+            nextDueOn: v.desde,
+          });
+          return r.ok
+            ? ok({ tarea_recurrente_id: r.value.id, titulo: r.value.title, frecuencia: r.value.frequency, proxima: r.value.nextDueOn })
+            : r;
+        }
         case 'tarea': {
           if (v.accion === 'completar') {
             const r = await completeTask(ctx, repo, v.id);
@@ -644,6 +689,10 @@ export async function runTool(
       switch (v.tipo) {
         case 'tarea': {
           const r = await deleteTask(ctx, repo, v.id);
+          return r.ok ? ok({ borrada: v.id }) : r;
+        }
+        case 'tarea_recurrente': {
+          const r = await deleteRecurringTask(ctx, repo, v.id);
           return r.ok ? ok({ borrada: v.id }) : r;
         }
         case 'documento': {
