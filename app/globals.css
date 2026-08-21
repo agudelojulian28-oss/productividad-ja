@@ -4076,3 +4076,11 @@ button.mov-row:hover {
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+
+/* Filtro de tareas por proyecto (Hoy) */
+.tareas-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}

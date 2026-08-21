@@ -7,7 +7,7 @@ import type { TaskRow } from '@/core/work/ports';
 import { detectarChoques } from '@/lib/agenda';
 import { TareaLauncher } from './tarea-launcher';
 import { ResumenDia } from './resumen-dia';
-import { TaskItem } from './task-item';
+import { TareasList } from './tareas-list';
 import { EventItem } from './event-item';
 import { RealtimeRefresh } from '../realtime-refresh';
 import { ChoquesBanner } from '../choques-banner';
@@ -184,30 +184,11 @@ export default async function HoyPage() {
               hint="No tienes pendientes. Crea uno con “Nueva tarea” o pídeselo al asistente."
             />
           ) : (
-            sections
-              .filter((s) => s.items.length > 0)
-              .map((s) => (
-                <section key={s.label} className="task-section">
-                  <h2
-                    className={`section-title${s.tone === 'danger' ? ' section-danger' : ''}`}
-                  >
-                    <span>{s.label}</span>
-                    <span className="section-count">{s.items.length}</span>
-                  </h2>
-                  <ul>
-                    {s.items.map((t) => (
-                      <TaskItem
-                        key={t.id}
-                        task={t}
-                        tz={ctx.tz}
-                        projectName={
-                          t.projectId ? projectName.get(t.projectId) : undefined
-                        }
-                      />
-                    ))}
-                  </ul>
-                </section>
-              ))
+            <TareasList
+              sections={sections}
+              projects={projects.map((p) => ({ id: p.id, title: p.title }))}
+              tz={ctx.tz}
+            />
           )}
         </div>
       </div>
