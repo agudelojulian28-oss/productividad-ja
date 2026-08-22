@@ -68,8 +68,9 @@ const BARGE_SUSTAIN_MS = 260;
 const BARGE_GRACE_MS = 350; // ignora el arranque del audio
 const VOICE_ON_KEY = 'voz:activada'; // recuerda si prefieres voz o texto
 const WAKE_ON_KEY = 'voz:despertar'; // recuerda si "escuchar 'Aura'" está activo
-// Frase para despertar: exige "oye/hey" antes de "aura" (evita falsos con Laura/aurora).
-const WAKE_WORD = /\b(oye|hey|ey)\s*,?\s+aura\b/i;
+// Palabra clave para despertar: basta "Aura" (también acepta "oye/hey aura"). El límite
+// de palabra evita falsos con "Laura". Fácil de disparar; el comando se captura en la misma frase.
+const WAKE_WORD = /\baura\b/i;
 
 export function VoiceOrb() {
   const [open, setOpen] = useState(false);
@@ -86,6 +87,8 @@ export function VoiceOrb() {
   const openRef = useRef(false);
   const wakeRecRef = useRef<SpeechRec | null>(null);
   const startWakeRef = useRef<() => void>(() => {});
+  const wakeArmedRef = useRef(false); // ya oyó "Aura" y está capturando el comando
+  const wakeEndTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recognitionRef = useRef<SpeechRec | null>(null);
   const recEndTimerRef = useRef<ReturnType<typeof setInterval> | null>(null); // endpointing propio
   const listenAbortRef = useRef(false); // cerrar sin enviar lo escuchado
@@ -689,6 +692,11 @@ export function VoiceOrb() {
 
   // ── Despertar con "Aura" (solo con la app abierta y en primer plano) ────────
   const stopWake = useCallback(() => {
+    if (wakeEndTimerRef.current) {
+      clearInterval(wakeEndTimerRef.current);
+      wakeEndTimerRef.current = null;
+    }
+    wakeArmedRef.current = false;
     const r = wakeRecRef.current;
     wakeRecRef.current = null;
     try {
@@ -698,9 +706,16 @@ export function VoiceOrb() {
     }
   }, []);
 
+  // Un SOLO reconocimiento: escucha "Aura" y sigue capturando el comando de la misma
+  // frase (sin cortar ni repetir). Al terminar de hablar: manda el comando; si solo
+  // dijiste "Aura", abre y escucha. Se reinicia al instante para no perder palabras.
   const startWake = useCallback(() => {
     const Ctor = getSpeechRecCtor();
     if (!Ctor || wakeRecRef.current || !wakeOnRef.current || openRef.current) return;
+    const clearTimer = () => {
+      if (wakeEndTimerRef.current) clearInterval(wakeEndTimerRef.current);
+      wakeEndTimerRef.current = null;
+    };
     try {
       const rec = new Ctor();
       rec.lang = 'es-ES';
@@ -708,42 +723,90 @@ export function VoiceOrb() {
       rec.interimResults = true;
       rec.maxAlternatives = 1;
       wakeRecRef.current = rec;
+      let command = '';
+      let lastAt = Date.now();
+
+      const finalize = () => {
+        clearTimer();
+        wakeArmedRef.current = false;
+        try {
+          rec.abort();
+        } catch {
+          /* no-op */
+        }
+        wakeRecRef.current = null;
+        const cmd = command.trim();
+        if (isMeaningful(cmd)) {
+          emptyCountRef.current = 0;
+          void enviarTexto(cmd); // ya dijo el comando junto con "Aura"
+        } else {
+          setTimeout(() => startListeningRef.current(), 80); // solo dijo "Aura" → escucha
+        }
+      };
+
       rec.onresult = (e) => {
-        let txt = '';
-        for (let i = e.resultIndex; i < e.results.length; i++) {
+        let full = '';
+        for (let i = 0; i < e.results.length; i++) {
           const alt = e.results[i]?.[0];
-          if (alt) txt += ` ${alt.transcript}`;
+          if (alt) full += ` ${alt.transcript}`;
         }
-        if (WAKE_WORD.test(txt)) {
-          stopWake();
-          abrir(true); // abre la conversación y empieza a escuchar
+        full = full.trim();
+        const m = WAKE_WORD.exec(full);
+        if (!m) return;
+        if (!wakeArmedRef.current) {
+          wakeArmedRef.current = true;
+          setOpen(true);
+          setConversando(true);
+          convRef.current = true;
+          setEstado('listening');
+          lastAt = Date.now();
+          // Endpointing propio: cuando dejes de hablar, cierra la captura y manda.
+          wakeEndTimerRef.current = setInterval(() => {
+            if (Date.now() - lastAt > END_SILENCE_MS) finalize();
+          }, 150);
         }
+        command = full.slice(m.index + m[0].length).replace(/^[\s,.:;¿?]+/, '');
+        setHeard(command);
+        lastAt = Date.now();
       };
       rec.onerror = () => {
-        /* onend se encarga del reinicio */
+        /* onend reinicia si toca */
       };
       rec.onend = () => {
+        clearTimer();
         wakeRecRef.current = null;
-        // El navegador corta el reconocimiento cada tanto: si sigue activo, reinícialo.
-        if (wakeOnRef.current && !openRef.current) {
-          setTimeout(() => startWakeRef.current(), 500);
+        if (wakeArmedRef.current) {
+          // El navegador cortó a mitad del comando: procesa lo capturado.
+          wakeArmedRef.current = false;
+          const cmd = command.trim();
+          if (isMeaningful(cmd)) {
+            emptyCountRef.current = 0;
+            void enviarTexto(cmd);
+          } else {
+            setTimeout(() => startListeningRef.current(), 80);
+          }
+          return;
         }
+        if (wakeOnRef.current && !openRef.current) startWakeRef.current(); // reinicia YA
       };
       rec.start();
     } catch {
       wakeRecRef.current = null;
     }
-  }, [stopWake, abrir]);
+  }, [enviarTexto]);
 
   useEffect(() => {
     startWakeRef.current = startWake;
   }, [startWake]);
 
-  // Ciclo de vida del "despertar": corre solo cuando está activo y el panel está cerrado.
+  // Ciclo de vida del "despertar": corre con el panel cerrado. NO lo cortes mientras
+  // está capturando un comando (armado), aunque el panel se abra por el propio wake.
   useEffect(() => {
     if (wakeOn && !open) startWake();
-    else stopWake();
-    return () => stopWake();
+    else if (!wakeArmedRef.current) stopWake();
+    return () => {
+      if (!wakeArmedRef.current) stopWake();
+    };
   }, [wakeOn, open, startWake, stopWake]);
 
   const toggleWake = () => {
@@ -890,7 +953,7 @@ export function VoiceOrb() {
               </label>
               <label className="voice-conv-toggle">
                 <input type="checkbox" checked={wakeOn} onChange={toggleWake} />
-                Despertar diciendo “Oye Aura”
+                Despertar diciendo “Aura”
               </label>
             </div>
           </div>
