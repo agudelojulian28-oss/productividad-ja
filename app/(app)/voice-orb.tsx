@@ -809,6 +809,30 @@ export function VoiceOrb() {
     };
   }, [wakeOn, open, startWake, stopWake]);
 
+  // Que "Aura" quede escuchando apenas abras/vuelvas a la app: el navegador suele exigir
+  // un gesto para arrancar el micrófono, así que reintentamos al volver a la pestaña
+  // (visibilidad/foco) y en el primer toque. `startWake` se auto-protege (no duplica).
+  useEffect(() => {
+    if (!wakeOn) return;
+    const ensure = () => {
+      if (!wakeRecRef.current && !openRef.current && !wakeArmedRef.current) startWakeRef.current();
+    };
+    const onVis = () => {
+      if (document.visibilityState === 'visible') ensure();
+    };
+    ensure();
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onVis);
+    window.addEventListener('pointerdown', ensure, { capture: true });
+    window.addEventListener('keydown', ensure);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', onVis);
+      window.removeEventListener('pointerdown', ensure, { capture: true });
+      window.removeEventListener('keydown', ensure);
+    };
+  }, [wakeOn]);
+
   const toggleWake = () => {
     const next = !wakeOn;
     setWakeOn(next);
