@@ -33,15 +33,18 @@ const PALETTE = ['#ff7a45', '#3bc9db', '#4dabf7', '#9775fa', '#51cf66', '#ffd43b
 export function CashflowChart({
   serie,
   porProyecto,
+  gastosPorProyecto = [],
   balanceMinor,
 }: {
   serie: SerieMes[];
   porProyecto: Proj[];
+  gastosPorProyecto?: Proj[];
   balanceMinor: number;
 }) {
   const [view, setView] = useState<View>('circular');
   const [hover, setHover] = useState<number | null>(null);
   const [show, setShow] = useState({ balance: true, ingresos: false, gastos: false });
+  const [donutMode, setDonutMode] = useState<'in' | 'out'>('in');
   const gradId = useId();
 
   if (serie.length === 0) {
@@ -81,7 +84,18 @@ export function CashflowChart({
       {view === 'tabla' && <CashTable serie={serie} />}
 
       {view === 'circular' && (
-        <Donut porProyecto={porProyecto} balanceMinor={balanceMinor} hover={hover} setHover={setHover} />
+        <Donut
+          ingresos={porProyecto}
+          gastos={gastosPorProyecto}
+          mode={donutMode}
+          setMode={(m) => {
+            setHover(null);
+            setDonutMode(m);
+          }}
+          balanceMinor={balanceMinor}
+          hover={hover}
+          setHover={setHover}
+        />
       )}
 
       {view === 'montana' && (
@@ -293,27 +307,52 @@ function arcPath(cx: number, cy: number, R: number, r: number, a0: number, a1: n
   return `M${x0.toFixed(1)},${y0.toFixed(1)} A${R},${R} 0 ${large} 1 ${x1.toFixed(1)},${y1.toFixed(1)} L${x2.toFixed(1)},${y2.toFixed(1)} A${r},${r} 0 ${large} 0 ${x3.toFixed(1)},${y3.toFixed(1)} Z`;
 }
 
-/** Dona: ingreso por proyecto (color por proyecto) con el balance al centro. */
+/** Dona: ingresos o gastos por proyecto (color por proyecto) con el balance al centro.
+ *  Toggle Ingresos/Gastos para ver la composición sin perder el balance. */
 function Donut({
-  porProyecto,
+  ingresos,
+  gastos,
+  mode,
+  setMode,
   balanceMinor,
   hover,
   setHover,
 }: {
-  porProyecto: Proj[];
+  ingresos: Proj[];
+  gastos: Proj[];
+  mode: 'in' | 'out';
+  setMode: (m: 'in' | 'out') => void;
   balanceMinor: number;
   hover: number | null;
   setHover: (n: number | null) => void;
 }) {
-  const items = porProyecto.filter((p) => p.value > 0);
   const size = 200;
   const cx = size / 2;
   const cy = size / 2;
   const R = 92;
   const r = 58;
 
+  const toggle = (
+    <div className="cash-series donut-toggle" role="group" aria-label="Ingresos o gastos">
+      <button type="button" className={`cash-serie${mode === 'in' ? ' cash-serie-on' : ''}`} aria-pressed={mode === 'in'} onClick={() => setMode('in')}>
+        <i className="chart-dot" style={{ background: 'var(--positive)' }} /> Ingresos
+      </button>
+      <button type="button" className={`cash-serie${mode === 'out' ? ' cash-serie-on' : ''}`} aria-pressed={mode === 'out'} onClick={() => setMode('out')}>
+        <i className="chart-dot" style={{ background: 'var(--negative)' }} /> Gastos
+      </button>
+    </div>
+  );
+
+  const items = (mode === 'in' ? ingresos : gastos).filter((p) => p.value > 0);
   if (items.length === 0) {
-    return <p className="muted donut-empty">Sin ingresos por proyecto este mes.</p>;
+    return (
+      <div className="donut-block">
+        {toggle}
+        <p className="muted donut-empty">
+          Sin {mode === 'in' ? 'ingresos' : 'gastos'} por proyecto este mes.
+        </p>
+      </div>
+    );
   }
 
   const total = items.reduce((a, p) => a + p.value, 0);
@@ -328,8 +367,10 @@ function Donut({
   });
 
   return (
-    <div className="donut-wrap">
-      <svg viewBox={`0 0 ${size} ${size}`} className="donut-svg" role="img" aria-label="Ingreso por proyecto y balance">
+    <div className="donut-block">
+      {toggle}
+      <div className="donut-wrap">
+      <svg viewBox={`0 0 ${size} ${size}`} className="donut-svg" role="img" aria-label={`${mode === 'in' ? 'Ingresos' : 'Gastos'} por proyecto y balance`}>
         {segs.map((s, i) =>
           s.single ? (
             <circle
@@ -385,6 +426,7 @@ function Donut({
           </li>
         ))}
       </ul>
+      </div>
     </div>
   );
 }

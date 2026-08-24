@@ -78,6 +78,11 @@ export default async function FinanzasPage() {
       value: r.inflowMinor,
       valueLabel: money(r.inflowMinor),
     }));
+  // Gastos por proyecto del mes (para la dona en modo "Gastos").
+  const gastosProy = thisMonth
+    .filter((r) => r.outflowMinor > 0)
+    .sort((a, b) => b.outflowMinor - a.outflowMinor)
+    .map((r) => ({ label: projName.get(r.projectId) ?? '—', value: r.outflowMinor }));
   // Filas por proyecto y mes (todas) para el bloque de Ingresos/Gastos/Balance filtrable.
   const statRows = byProj.map((r) => ({
     projectId: r.projectId,
@@ -201,6 +206,7 @@ export default async function FinanzasPage() {
             <CashflowChart
               serie={serie}
               porProyecto={fuentes.map((f) => ({ label: f.label, value: f.value }))}
+              gastosPorProyecto={gastosProy}
               balanceMinor={resumen.netMinor}
             />
           </section>

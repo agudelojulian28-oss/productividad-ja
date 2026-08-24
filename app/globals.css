@@ -4317,3 +4317,7 @@ button.mov-row:hover {
   opacity: 0.6;
 }
 .cash-serie-on { color: var(--text); border-color: var(--border-strong); opacity: 1; }
+
+/* Dona con toggle Ingresos/Gastos */
+.donut-block { display: flex; flex-direction: column; gap: 6px; }
+.donut-toggle { justify-content: center; }
