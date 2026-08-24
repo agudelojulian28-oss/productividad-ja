@@ -7,6 +7,7 @@ import { Modal } from '../modal';
 import { EditMovimiento } from './edit-movimiento';
 import { TagChips, type TagOption } from './tags-ui';
 import { DateField } from '../date-picker';
+import { Dropdown } from '../dropdown';
 
 export type MovRow = {
   id: string;
@@ -112,19 +113,14 @@ export function MovimientosRecientes({
   return (
     <div className="mov-wrap">
       <div className="mov-filters">
-        <div className="seg mov-presets" role="tablist" aria-label="Rango de fechas">
-          {PRESETS.map((p) => (
-            <button
-              key={p.v}
-              type="button"
-              role="tab"
-              aria-selected={preset === p.v}
-              className={`seg-btn${preset === p.v ? ' seg-on' : ''}`}
-              onClick={() => applyPreset(p.v)}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="mov-filters-top">
+          <span className="mov-filters-k">Rango</span>
+          <Dropdown
+            value={preset}
+            options={PRESETS.map((p) => ({ v: p.v, label: p.label }))}
+            onChange={(v) => applyPreset(v as Preset)}
+            ariaLabel="Rango de fechas"
+          />
         </div>
 
         {preset === 'custom' && (

@@ -3,29 +3,45 @@
 import { useMemo, useState } from 'react';
 import { money } from '@/lib/format';
 import { MiniMountain } from './mini-mountain';
+import { Dropdown } from '../dropdown';
+import { Modal } from '../modal';
 
-// Ingresos/Gastos/Balance con filtro de periodo. Por cada proyecto, una montañita con
-// sus últimas 6 cubetas SEGÚN el filtro: mensual → 6 semanas; anual/todo → 6 meses.
-export type StatRow = { label: string; month: string; inflow: number; outflow: number };
-export type TrendTx = { label: string; dir: 'in' | 'out'; amount: number; date: string };
+// General (ingresos/gastos/balance) con filtro de periodo (desplegable) y, por proyecto,
+// su BALANCE con una montañita; al tocar un proyecto se abre su detalle.
+export type StatRow = {
+  projectId: string;
+  label: string;
+  month: string;
+  inflow: number;
+  outflow: number;
+  movements: number;
+};
+export type TrendTx = { projectId: string; dir: 'in' | 'out'; amount: number; date: string };
+export type RecentMov = {
+  id: string;
+  projectId: string | null;
+  direction: 'in' | 'out';
+  title: string;
+  baseAmountMinor: number;
+  occurredOn: string; // etiqueta legible del día
+};
+
 type Period = 'mes' | 'mesPasado' | 'anio' | 'todo';
-
-const PERIODS: { v: Period; label: string }[] = [
+const PERIODS: { v: string; label: string }[] = [
   { v: 'mes', label: 'Este mes' },
   { v: 'mesPasado', label: 'Mes pasado' },
   { v: 'anio', label: 'Este año' },
   { v: 'todo', label: 'Todo' },
 ];
+const periodLabelOf = (v: Period) => PERIODS.find((p) => p.v === v)!.label.toLowerCase();
+
 const BUCKETS = 6;
 const DAY = 86_400_000;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-
 const ymdMs = (s: string) => {
   const [y, m, d] = s.split('-').map(Number);
   return Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1);
 };
-
-/** 'YYYY-MM' del mes anterior a `monthKey`. */
 function prevMonthKey(monthKey: string): string {
   const [y, m] = monthKey.split('-').map(Number);
   const d = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, 1));
@@ -33,36 +49,46 @@ function prevMonthKey(monthKey: string): string {
   return d.toISOString().slice(0, 7);
 }
 
-type ProjTrend = { label: string; valueLabel: string; series: number[] };
+type Proj = {
+  projectId: string;
+  label: string;
+  inflow: number;
+  outflow: number;
+  net: number;
+  movements: number;
+  netSeries: number[];
+};
 
 export function FinStats({
   rows,
   monthKey,
   trendTx = [],
+  recent = [],
   today,
 }: {
   rows: StatRow[];
   monthKey: string;
   trendTx?: TrendTx[];
+  recent?: RecentMov[];
   today: string;
 }) {
   const [period, setPeriod] = useState<Period>('mes');
-  const [tab, setTab] = useState<'in' | 'out'>('in');
+  const [detailId, setDetailId] = useState<string | null>(null);
 
-  const { inflow, outflow, labels, inAgg, outAgg, netAgg, fuentes, gastos } = useMemo(() => {
+  const { inflow, outflow, labels, inAgg, outAgg, netAgg, projects } = useMemo(() => {
     const prev = prevMonthKey(monthKey);
     const year = monthKey.slice(0, 4);
     const inPeriod = (m: string) => {
       if (period === 'mes') return m.startsWith(monthKey);
       if (period === 'mesPasado') return m.startsWith(prev);
       if (period === 'anio') return m.startsWith(year);
-      return true; // 'todo'
+      return true;
     };
 
-    // ── Cubetas de la montañita, según el filtro ──────────────────────────────
+    // Cubetas de las montañitas según el filtro (mensual → semanas; anual/todo → meses).
     const weekly = period === 'mes' || period === 'mesPasado';
     let labels: string[];
-    let assign: (date: string) => number; // índice de cubeta 0..5, o -1 si queda fuera
+    let assign: (date: string) => number;
     if (weekly) {
       const todayMs = ymdMs(today);
       labels = Array.from({ length: BUCKETS }, (_, i) => {
@@ -84,137 +110,164 @@ export function FinStats({
       assign = (date) => ms.indexOf(date.slice(0, 7));
     }
 
-    const inSeries = new Map<string, number[]>();
-    const outSeries = new Map<string, number[]>();
-    const inAgg = new Array<number>(BUCKETS).fill(0); // total general (no por proyecto)
+    // Series NET por proyecto + agregados generales.
+    const netSeries = new Map<string, number[]>();
+    const inAgg = new Array<number>(BUCKETS).fill(0);
     const outAgg = new Array<number>(BUCKETS).fill(0);
     for (const t of trendTx) {
       const idx = assign(t.date);
       if (idx < 0) continue;
-      const map = t.dir === 'in' ? inSeries : outSeries;
-      let arr = map.get(t.label);
+      let arr = netSeries.get(t.projectId);
       if (!arr) {
         arr = new Array(BUCKETS).fill(0);
-        map.set(t.label, arr);
+        netSeries.set(t.projectId, arr);
       }
-      arr[idx] = (arr[idx] ?? 0) + t.amount;
-      const agg = t.dir === 'in' ? inAgg : outAgg;
-      agg[idx] = (agg[idx] ?? 0) + t.amount;
+      arr[idx] = (arr[idx] ?? 0) + (t.dir === 'in' ? t.amount : -t.amount);
+      if (t.dir === 'in') inAgg[idx] = (inAgg[idx] ?? 0) + t.amount;
+      else outAgg[idx] = (outAgg[idx] ?? 0) + t.amount;
     }
     const netAgg = inAgg.map((v, i) => v - (outAgg[i] ?? 0));
 
-    // ── Totales del periodo (la cifra a la derecha) ───────────────────────────
-    const inTotal = new Map<string, number>();
-    const outTotal = new Map<string, number>();
+    // Totales del periodo por proyecto.
+    const acc = new Map<string, { label: string; inflow: number; outflow: number; movements: number }>();
     let inflow = 0;
     let outflow = 0;
     for (const r of rows) {
       if (!inPeriod(r.month)) continue;
       inflow += r.inflow;
       outflow += r.outflow;
-      if (r.inflow > 0) inTotal.set(r.label, (inTotal.get(r.label) ?? 0) + r.inflow);
-      if (r.outflow > 0) outTotal.set(r.label, (outTotal.get(r.label) ?? 0) + r.outflow);
+      const cur = acc.get(r.projectId) ?? { label: r.label, inflow: 0, outflow: 0, movements: 0 };
+      cur.inflow += r.inflow;
+      cur.outflow += r.outflow;
+      cur.movements += r.movements;
+      acc.set(r.projectId, cur);
     }
+    const projects: Proj[] = [...acc.entries()]
+      .map(([projectId, v]) => ({
+        projectId,
+        label: v.label,
+        inflow: v.inflow,
+        outflow: v.outflow,
+        net: v.inflow - v.outflow,
+        movements: v.movements,
+        netSeries: netSeries.get(projectId) ?? new Array(BUCKETS).fill(0),
+      }))
+      .sort((a, b) => b.net - a.net);
 
-    const build = (totals: Map<string, number>, series: Map<string, number[]>): ProjTrend[] =>
-      [...totals.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .map(([label, total]) => ({
-          label,
-          valueLabel: money(total),
-          series: series.get(label) ?? new Array(BUCKETS).fill(0),
-        }));
-
-    return {
-      inflow,
-      outflow,
-      labels,
-      inAgg,
-      outAgg,
-      netAgg,
-      fuentes: build(inTotal, inSeries),
-      gastos: build(outTotal, outSeries),
-    };
+    return { inflow, outflow, labels, inAgg, outAgg, netAgg, projects };
   }, [rows, monthKey, period, trendTx, today]);
 
   const balance = inflow - outflow;
-  const periodLabel = PERIODS.find((p) => p.v === period)!.label.toLowerCase();
-
-  const pane = (items: ProjTrend[], tone: 'accent' | 'muted', vacio: string) =>
-    items.length === 0 ? (
-      <p className="muted">{vacio}</p>
-    ) : (
-      <div className="ptrend">
-        {items.map((it) => (
-          <div key={it.label} className="ptrend-row">
-            <div className="ptrend-head">
-              <span className="ptrend-label">{it.label}</span>
-              <span className="ptrend-val">{it.valueLabel}</span>
-            </div>
-            <MiniMountain labels={labels} values={it.series} tone={tone} />
-          </div>
-        ))}
-      </div>
-    );
+  const pLabel = periodLabelOf(period);
+  const detail = detailId ? projects.find((p) => p.projectId === detailId) ?? null : null;
 
   return (
     <section className="fin-block fin-stats">
-      <div className="seg fin-period-seg" role="tablist" aria-label="Periodo">
-        {PERIODS.map((p) => (
-          <button
-            key={p.v}
-            type="button"
-            role="tab"
-            aria-selected={period === p.v}
-            className={`seg-btn${period === p.v ? ' seg-on' : ''}`}
-            onClick={() => setPeriod(p.v)}
-          >
-            {p.label}
-          </button>
-        ))}
+      <div className="fin-stats-topbar">
+        <span className="fin-gen-cap">General</span>
+        <Dropdown
+          value={period}
+          options={PERIODS}
+          onChange={(v) => setPeriod(v as Period)}
+          ariaLabel="Periodo"
+          align="right"
+        />
       </div>
 
-      <p className="fin-gen-cap">General · {periodLabel}</p>
       <div className="fin-general">
-        <GenTile
-          label="Balance"
-          value={balance}
-          series={netAgg}
-          labels={labels}
-          tone="accent"
-          numClass={balance >= 0 ? 'fin-pos' : 'fin-neg'}
-          hero
-        />
+        <GenTile label="Balance" value={balance} series={netAgg} labels={labels} tone="accent" numClass={balance >= 0 ? 'fin-pos' : 'fin-neg'} hero />
         <GenTile label="Ingresos" value={inflow} series={inAgg} labels={labels} tone="accent" numClass="fin-pos" />
         <GenTile label="Gastos" value={outflow} series={outAgg} labels={labels} tone="muted" numClass="fin-neg" />
       </div>
 
-      <p className="fin-stats-sub">Por proyecto</p>
-      <div className="seg fin-stats-seg">
-        <button
-          type="button"
-          className={`seg-btn${tab === 'in' ? ' seg-on' : ''}`}
-          onClick={() => setTab('in')}
-        >
-          Ingresos
-        </button>
-        <button
-          type="button"
-          className={`seg-btn${tab === 'out' ? ' seg-on' : ''}`}
-          onClick={() => setTab('out')}
-        >
-          Gastos
-        </button>
-      </div>
+      <p className="fin-stats-sub">Balance por proyecto</p>
+      {projects.length === 0 ? (
+        <p className="muted">Sin movimientos por proyecto en {pLabel}.</p>
+      ) : (
+        <div className="ptrend">
+          {projects.map((p) => (
+            <button key={p.projectId} type="button" className="ptrend-row ptrend-click" onClick={() => setDetailId(p.projectId)}>
+              <div className="ptrend-head">
+                <span className="ptrend-label">{p.label}</span>
+                <span className={`ptrend-val ${p.net >= 0 ? 'fin-pos' : 'fin-neg'}`}>
+                  {money(p.net, { compact: true })}
+                </span>
+              </div>
+              <MiniMountain labels={labels} values={p.netSeries} tone={p.net >= 0 ? 'accent' : 'muted'} />
+            </button>
+          ))}
+        </div>
+      )}
 
-      <div className={`fin-stats-pane${tab === 'in' ? ' on' : ''}`}>
-        {pane(fuentes, 'accent', `Sin ingresos por proyecto en ${periodLabel}.`)}
-      </div>
-
-      <div className={`fin-stats-pane${tab === 'out' ? ' on' : ''}`}>
-        {pane(gastos, 'muted', `Sin gastos en ${periodLabel}.`)}
-      </div>
+      <Modal open={detail !== null} onClose={() => setDetailId(null)} eyebrow="Proyecto" title={detail?.label ?? ''}>
+        {detail && (
+          <ProjectDetail
+            proj={detail}
+            labels={labels}
+            periodLabel={pLabel}
+            recent={recent.filter((m) => m.projectId === detail.projectId)}
+          />
+        )}
+      </Modal>
     </section>
+  );
+}
+
+function ProjectDetail({
+  proj,
+  labels,
+  periodLabel,
+  recent,
+}: {
+  proj: Proj;
+  labels: string[];
+  periodLabel: string;
+  recent: RecentMov[];
+}) {
+  const margen = proj.inflow > 0 ? Math.round((proj.net / proj.inflow) * 100) : null;
+  return (
+    <div className="pd">
+      <p className="pd-period">{periodLabel}</p>
+      <div className="pd-cells">
+        <div className="pd-cell">
+          <span className="pd-k">Ingresos</span>
+          <span className="pd-v fin-pos">{money(proj.inflow, { compact: true })}</span>
+        </div>
+        <div className="pd-cell">
+          <span className="pd-k">Gastos</span>
+          <span className="pd-v fin-neg">{money(proj.outflow, { compact: true })}</span>
+        </div>
+        <div className="pd-cell">
+          <span className="pd-k">Balance</span>
+          <span className={`pd-v ${proj.net >= 0 ? 'fin-pos' : 'fin-neg'}`}>{money(proj.net, { compact: true })}</span>
+        </div>
+      </div>
+      <p className="pd-meta">
+        {proj.movements} {proj.movements === 1 ? 'movimiento' : 'movimientos'}
+        {margen !== null ? ` · margen ${margen}%` : ''}
+      </p>
+
+      <p className="pd-sub">Tendencia</p>
+      <MiniMountain labels={labels} values={proj.netSeries} tone={proj.net >= 0 ? 'accent' : 'muted'} />
+
+      <p className="pd-sub">Últimos movimientos</p>
+      {recent.length === 0 ? (
+        <p className="muted">Sin movimientos recientes de este proyecto.</p>
+      ) : (
+        <ul className="pd-movs">
+          {recent.slice(0, 8).map((m) => (
+            <li key={m.id} className="pd-mov">
+              <span className="pd-mov-title">{m.title}</span>
+              <span className="pd-mov-day">{m.occurredOn}</span>
+              <span className={`pd-mov-amt ${m.direction === 'in' ? 'fin-pos' : 'fin-neg'}`}>
+                {m.direction === 'in' ? '+' : '−'}
+                {money(m.baseAmountMinor, { compact: true })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

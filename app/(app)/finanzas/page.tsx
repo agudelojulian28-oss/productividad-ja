@@ -80,10 +80,12 @@ export default async function FinanzasPage() {
     }));
   // Filas por proyecto y mes (todas) para el bloque de Ingresos/Gastos/Balance filtrable.
   const statRows = byProj.map((r) => ({
+    projectId: r.projectId,
     label: projName.get(r.projectId) ?? '—',
     month: r.month, // 'YYYY-MM-01'
     inflow: r.inflowMinor,
     outflow: r.outflowMinor,
+    movements: r.movements,
   }));
 
   // Movimientos de los últimos ~6 meses para las montañitas por proyecto (semanas o meses).
@@ -96,7 +98,7 @@ export default async function FinanzasPage() {
   const trendData = trendTxs
     .filter((t) => t.projectId)
     .map((t) => ({
-      label: projName.get(t.projectId as string) ?? '—',
+      projectId: t.projectId as string,
       dir: t.direction,
       amount: t.baseAmountMinor,
       date: t.occurredOn,
@@ -207,6 +209,7 @@ export default async function FinanzasPage() {
             rows={statRows}
             monthKey={resumen.monthKey}
             trendTx={trendData}
+            recent={movRows}
             today={todayInTz(ctx.tz)}
           />
 
