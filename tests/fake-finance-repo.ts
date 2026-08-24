@@ -131,6 +131,7 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
         metric: input.metric,
         targetValue: input.targetValue,
         currentValue: 0,
+        projectId: input.projectId ?? null,
         periodStart: input.periodStart,
         periodEnd: input.periodEnd,
         status: 'active',

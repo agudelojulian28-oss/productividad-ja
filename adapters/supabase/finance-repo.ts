@@ -268,7 +268,7 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
     async moneyGoalsProgress() {
       const { data, error } = await supabase
         .from('goal_progress')
-        .select('goal_id,title,metric,target_value,current_value,period_start,period_end,status')
+        .select('goal_id,title,metric,target_value,current_value,project_id,period_start,period_end,status')
         .in('metric', ['money_in', 'money_net'])
         .eq('status', 'active');
       if (error) throw new Error(error.message);
@@ -278,6 +278,7 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
         metric: r.metric as 'money_in' | 'money_net',
         targetValue: n(r.target_value),
         currentValue: n(r.current_value),
+        projectId: (r.project_id as string | null) ?? null,
         periodStart: r.period_start as string,
         periodEnd: r.period_end as string,
         status: r.status as string,

@@ -363,6 +363,30 @@ function ProjectDetail({
             </>
           )}
 
+          {extras && extras.metas.length > 0 && (
+            <>
+              <p className="pd-sub">Metas de dinero</p>
+              <div className="pd-goals">
+                {extras.metas.map((g) => {
+                  const pct = g.targetValue > 0 ? Math.round((g.currentValue / g.targetValue) * 100) : 0;
+                  return (
+                    <div key={g.goalId} className="pd-goal">
+                      <div className="pd-goal-head">
+                        <span className="pd-goal-title">{g.title}</span>
+                        <span className="pd-goal-val">
+                          {money(g.currentValue * 100, { compact: true })} / {money(g.targetValue * 100, { compact: true })}
+                        </span>
+                      </div>
+                      <div className="pd-goal-track">
+                        <div className="pd-goal-fill" style={{ width: `${Math.min(100, Math.max(2, pct))}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
           {extras && extras.recurrentes.length > 0 && (
             <>
               <p className="pd-sub">Recurrentes</p>

@@ -197,6 +197,7 @@ export interface MoneyGoalProgressRow {
   metric: 'money_in' | 'money_net';
   targetValue: number; // pesos
   currentValue: number; // pesos
+  projectId: string | null;
   periodStart: string;
   periodEnd: string;
   status: string;

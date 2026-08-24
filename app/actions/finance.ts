@@ -362,6 +362,13 @@ export async function getProjectExtrasAction(input: {
     nextDueOn: string;
     vencido: boolean;
   }[];
+  metas: {
+    goalId: string;
+    title: string;
+    metric: 'money_in' | 'money_net';
+    targetValue: number;
+    currentValue: number;
+  }[];
 }> {
   const { ctx, repo } = await deps();
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz }).format(new Date());
@@ -409,5 +416,16 @@ export async function getProjectExtrasAction(input: {
       vencido: r.nextDueOn <= today,
     }));
 
-  return { topCategorias, topEtiquetas, recurrentes };
+  // Metas de dinero del proyecto (progreso).
+  const metas = (await repo.moneyGoalsProgress())
+    .filter((g) => g.projectId === input.projectId)
+    .map((g) => ({
+      goalId: g.goalId,
+      title: g.title,
+      metric: g.metric,
+      targetValue: g.targetValue,
+      currentValue: g.currentValue,
+    }));
+
+  return { topCategorias, topEtiquetas, recurrentes, metas };
 }
