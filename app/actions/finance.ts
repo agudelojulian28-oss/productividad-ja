@@ -345,3 +345,69 @@ export async function attachReceiptAction(input: {
     return err('EXTERNAL_ERROR', e instanceof Error ? e.message : 'No se pudo subir el comprobante');
   }
 }
+
+// ── Detalle de proyecto (se carga al abrir el modal) ────────────────────────────
+export async function getProjectExtrasAction(input: {
+  projectId: string;
+  from: string;
+  to: string;
+}): Promise<{
+  topCategorias: { category: string; amount: number }[];
+  topEtiquetas: { name: string; amount: number }[];
+  recurrentes: {
+    id: string;
+    title: string;
+    amount: number;
+    direction: 'in' | 'out';
+    nextDueOn: string;
+    vencido: boolean;
+  }[];
+}> {
+  const { ctx, repo } = await deps();
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz }).format(new Date());
+  const txs = (await repo.listTransactions({ from: input.from, to: input.to, limit: 1000 })).filter(
+    (t) => t.projectId === input.projectId,
+  );
+
+  // Top categorías de gasto.
+  const catMap = new Map<string, number>();
+  for (const t of txs) {
+    if (t.direction !== 'out') continue;
+    const c = (t.category ?? '').trim() || 'Sin categoría';
+    catMap.set(c, (catMap.get(c) ?? 0) + t.baseAmountMinor);
+  }
+  const topCategorias = [...catMap.entries()]
+    .map(([category, amount]) => ({ category, amount }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5);
+
+  // Top etiquetas (por monto de sus movimientos).
+  const amountById = new Map(txs.map((t) => [t.id, t.baseAmountMinor] as const));
+  const links = await repo.listTransactionTags(txs.map((t) => t.id));
+  const tagNames = new Map((await repo.listTags(input.projectId)).map((t) => [t.id, t.name] as const));
+  const tagMap = new Map<string, number>();
+  for (const l of links) {
+    const name = tagNames.get(l.tagId);
+    if (!name) continue;
+    tagMap.set(name, (tagMap.get(name) ?? 0) + (amountById.get(l.transactionId) ?? 0));
+  }
+  const topEtiquetas = [...tagMap.entries()]
+    .map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5);
+
+  // Recurrentes ligados al proyecto (marca los vencidos).
+  const recurrentes = (await repo.listRecurringExpenses())
+    .filter((r) => r.projectId === input.projectId)
+    .map((r) => ({
+      id: r.id,
+      title:
+        r.description || r.category || (r.direction === 'in' ? 'Ingreso recurrente' : 'Gasto recurrente'),
+      amount: r.amountMinor,
+      direction: r.direction,
+      nextDueOn: r.nextDueOn,
+      vencido: r.nextDueOn <= today,
+    }));
+
+  return { topCategorias, topEtiquetas, recurrentes };
+}

@@ -4264,3 +4264,29 @@ button.mov-row:hover {
 /* Movimientos: fila del desplegable de rango */
 .mov-filters-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .mov-filters-k { font-size: 12px; color: var(--text-muted); }
+
+/* Detalle de proyecto: extras */
+.pd-loading { margin: 4px 0; font-size: 13px; }
+.pd-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pd-bar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 14px; }
+.pd-bar-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pd-bar-val { font-variant-numeric: tabular-nums; font-weight: 600; flex: 0 0 auto; }
+.pd-due {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--negative, #ef4444);
+  background: color-mix(in srgb, var(--negative, #ef4444) 15%, transparent);
+}
+.pd-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}

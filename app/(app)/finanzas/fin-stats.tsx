@@ -1,7 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { money } from '@/lib/format';
+import { getProjectExtrasAction } from '@/app/actions/finance';
 import { MiniMountain } from './mini-mountain';
 import { Dropdown } from '../dropdown';
 import { Modal } from '../modal';
@@ -48,6 +50,10 @@ function prevMonthKey(monthKey: string): string {
   d.setUTCMonth(d.getUTCMonth() - 1);
   return d.toISOString().slice(0, 7);
 }
+function lastDayOfMonth(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number);
+  return new Date(Date.UTC(y ?? 1970, m ?? 1, 0)).toISOString().slice(0, 10);
+}
 
 type Proj = {
   projectId: string;
@@ -75,7 +81,7 @@ export function FinStats({
   const [period, setPeriod] = useState<Period>('mes');
   const [detailId, setDetailId] = useState<string | null>(null);
 
-  const { inflow, outflow, labels, inAgg, outAgg, netAgg, projects } = useMemo(() => {
+  const { inflow, outflow, labels, inAgg, outAgg, netAgg, projects, range, prevNet } = useMemo(() => {
     const prev = prevMonthKey(monthKey);
     const year = monthKey.slice(0, 4);
     const inPeriod = (m: string) => {
@@ -154,7 +160,32 @@ export function FinStats({
       }))
       .sort((a, b) => b.net - a.net);
 
-    return { inflow, outflow, labels, inAgg, outAgg, netAgg, projects };
+    // Rango de fechas del periodo (para cargar el detalle del proyecto).
+    const firstOfMonth = `${monthKey}-01`;
+    const range =
+      period === 'mes'
+        ? { from: firstOfMonth, to: today }
+        : period === 'mesPasado'
+          ? { from: `${prev}-01`, to: lastDayOfMonth(prev) }
+          : period === 'anio'
+            ? { from: `${year}-01-01`, to: today }
+            : { from: '2000-01-01', to: today };
+
+    // Balance del periodo ANTERIOR por proyecto (para la comparación ▲/▼).
+    const prevPredicate =
+      period === 'mes'
+        ? (mm: string) => mm.startsWith(prev)
+        : period === 'mesPasado'
+          ? (mm: string) => mm.startsWith(prevMonthKey(prev))
+          : period === 'anio'
+            ? (mm: string) => mm.startsWith(String(Number(year) - 1))
+            : () => false; // 'todo' → sin comparación
+    const prevNet = new Map<string, number>();
+    for (const r of rows) {
+      if (prevPredicate(r.month)) prevNet.set(r.projectId, (prevNet.get(r.projectId) ?? 0) + (r.inflow - r.outflow));
+    }
+
+    return { inflow, outflow, labels, inAgg, outAgg, netAgg, projects, range, prevNet };
   }, [rows, monthKey, period, trendTx, today]);
 
   const balance = inflow - outflow;
@@ -205,6 +236,9 @@ export function FinStats({
             proj={detail}
             labels={labels}
             periodLabel={pLabel}
+            from={range.from}
+            to={range.to}
+            prevNet={period === 'todo' ? null : (prevNet.get(detail.projectId) ?? 0)}
             recent={recent.filter((m) => m.projectId === detail.projectId)}
           />
         )}
@@ -213,18 +247,59 @@ export function FinStats({
   );
 }
 
+type Extras = Awaited<ReturnType<typeof getProjectExtrasAction>>;
+
 function ProjectDetail({
   proj,
   labels,
   periodLabel,
+  from,
+  to,
+  prevNet,
   recent,
 }: {
   proj: Proj;
   labels: string[];
   periodLabel: string;
+  from: string;
+  to: string;
+  prevNet: number | null;
   recent: RecentMov[];
 }) {
+  const [extras, setExtras] = useState<Extras | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setExtras(null);
+    getProjectExtrasAction({ projectId: proj.projectId, from, to })
+      .then((x) => {
+        if (alive) {
+          setExtras(x);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [proj.projectId, from, to]);
+
   const margen = proj.inflow > 0 ? Math.round((proj.net / proj.inflow) * 100) : null;
+  // Comparación vs periodo anterior.
+  let delta: { up: boolean; text: string } | null = null;
+  if (prevNet !== null) {
+    if (prevNet === 0) {
+      if (proj.net !== 0) delta = { up: proj.net > 0, text: 'nuevo' };
+    } else {
+      const pct = Math.round(((proj.net - prevNet) / Math.abs(prevNet)) * 100);
+      delta = { up: pct >= 0, text: `${pct >= 0 ? '+' : ''}${pct}% vs. periodo anterior` };
+    }
+  }
+
   return (
     <div className="pd">
       <p className="pd-period">{periodLabel}</p>
@@ -245,10 +320,71 @@ function ProjectDetail({
       <p className="pd-meta">
         {proj.movements} {proj.movements === 1 ? 'movimiento' : 'movimientos'}
         {margen !== null ? ` · margen ${margen}%` : ''}
+        {delta && (
+          <em className={delta.up ? 'fin-pos' : 'fin-neg'}>
+            {' · '}
+            {delta.up ? '▲' : '▼'} {delta.text}
+          </em>
+        )}
       </p>
 
       <p className="pd-sub">Tendencia</p>
       <MiniMountain labels={labels} values={proj.netSeries} tone={proj.net >= 0 ? 'accent' : 'muted'} />
+
+      {loading ? (
+        <p className="muted pd-loading">Cargando detalle…</p>
+      ) : (
+        <>
+          {extras && extras.topCategorias.length > 0 && (
+            <>
+              <p className="pd-sub">Top categorías de gasto</p>
+              <ul className="pd-bars">
+                {extras.topCategorias.map((c) => (
+                  <li key={c.category} className="pd-bar">
+                    <span className="pd-bar-name">{c.category}</span>
+                    <span className="pd-bar-val fin-neg">{money(c.amount, { compact: true })}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {extras && extras.topEtiquetas.length > 0 && (
+            <>
+              <p className="pd-sub">Etiquetas</p>
+              <ul className="pd-bars">
+                {extras.topEtiquetas.map((t) => (
+                  <li key={t.name} className="pd-bar">
+                    <span className="pd-bar-name">{t.name}</span>
+                    <span className="pd-bar-val">{money(t.amount, { compact: true })}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {extras && extras.recurrentes.length > 0 && (
+            <>
+              <p className="pd-sub">Recurrentes</p>
+              <ul className="pd-movs">
+                {extras.recurrentes.map((r) => (
+                  <li key={r.id} className="pd-mov">
+                    <span className="pd-mov-title">
+                      {r.title}
+                      {r.vencido && <span className="pd-due">vencido</span>}
+                    </span>
+                    <span className="pd-mov-day">{r.nextDueOn}</span>
+                    <span className={`pd-mov-amt ${r.direction === 'in' ? 'fin-pos' : 'fin-neg'}`}>
+                      {r.direction === 'in' ? '+' : '−'}
+                      {money(r.amount, { compact: true })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
+      )}
 
       <p className="pd-sub">Últimos movimientos</p>
       {recent.length === 0 ? (
@@ -267,6 +403,10 @@ function ProjectDetail({
           ))}
         </ul>
       )}
+
+      <Link href={`/proyectos/${proj.projectId}`} className="pd-link">
+        Ver el proyecto completo →
+      </Link>
     </div>
   );
 }
