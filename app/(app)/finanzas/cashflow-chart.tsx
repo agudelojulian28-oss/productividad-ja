@@ -41,6 +41,7 @@ export function CashflowChart({
 }) {
   const [view, setView] = useState<View>('circular');
   const [hover, setHover] = useState<number | null>(null);
+  const [show, setShow] = useState({ balance: true, ingresos: false, gastos: false });
   const gradId = useId();
 
   if (serie.length === 0) {
@@ -85,15 +86,33 @@ export function CashflowChart({
 
       {view === 'montana' && (
         <figure className="fin-chart" style={{ position: 'relative' }}>
+          <div className="cash-series" role="group" aria-label="Series del gráfico">
+            {([
+              { k: 'balance', label: 'Balance', color: 'var(--accent)' },
+              { k: 'ingresos', label: 'Ingresos', color: 'var(--positive)' },
+              { k: 'gastos', label: 'Gastos', color: 'var(--negative)' },
+            ] as const).map((s) => (
+              <button
+                key={s.k}
+                type="button"
+                className={`cash-serie${show[s.k] ? ' cash-serie-on' : ''}`}
+                aria-pressed={show[s.k]}
+                onClick={() => setShow((prev) => ({ ...prev, [s.k]: !prev[s.k] }))}
+              >
+                <i className="chart-dot" style={{ background: s.color }} />
+                {s.label}
+              </button>
+            ))}
+          </div>
           <svg
             viewBox={`0 0 ${W} ${H}`}
             width="100%"
             role="img"
-            aria-label="Balance por mes"
+            aria-label="Ingresos, gastos y balance por mes"
             style={{ display: 'block' }}
             onMouseLeave={() => setHover(null)}
           >
-            <BalanceArea serie={serie} slot={slot} area gradId={gradId} hover={hover} />
+            <MultiSeries serie={serie} slot={slot} gradId={gradId} hover={hover} show={show} />
 
             {serie.map((s, i) => (
               <rect
@@ -168,72 +187,96 @@ function smoothPath(pts: [number, number][]): string {
   return d;
 }
 
-/** Área/línea del balance mensual, con degradado en modo montaña. */
-function BalanceArea({
+/** Líneas de balance/ingresos/gastos por mes (según `show`), con escala compartida.
+ *  El balance lleva área con degradado; ingresos/gastos son líneas. */
+function MultiSeries({
   serie,
   slot,
-  area,
   gradId,
   hover,
+  show,
 }: {
   serie: SerieMes[];
   slot: number;
-  area: boolean;
   gradId: string;
   hover: number | null;
+  show: { balance: boolean; ingresos: boolean; gastos: boolean };
 }) {
-  const nets = serie.map((s) => s.netMinor);
-  const min = Math.min(0, ...nets);
-  const max = Math.max(0, ...nets);
+  // Escala sobre las series visibles (siempre incluye 0; balance puede ser negativo).
+  const vals: number[] = [0];
+  for (const s of serie) {
+    if (show.balance) vals.push(s.netMinor);
+    if (show.ingresos) vals.push(s.inflowMinor);
+    if (show.gastos) vals.push(s.outflowMinor);
+  }
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
   const range = max - min || 1;
   const y = (v: number) => padTop + plotH * (1 - (v - min) / range);
   const x = (i: number) => slot * i + slot / 2;
   const bottom = padTop + plotH;
   const zeroY = y(0);
 
-  const pts: [number, number][] = serie.map((s, i) => [x(i), y(s.netMinor)]);
-  const line = smoothPath(pts);
-  const areaD = `${line} L${x(serie.length - 1)},${bottom} L${x(0)},${bottom} Z`;
+  const linePts = (pick: (s: SerieMes) => number): [number, number][] =>
+    serie.map((s, i) => [x(i), y(pick(s))]);
+  const balanceLine = smoothPath(linePts((s) => s.netMinor));
+  const balanceArea = `${balanceLine} L${x(serie.length - 1)},${bottom} L${x(0)},${bottom} Z`;
+
+  const only = [show.balance, show.ingresos, show.gastos].filter(Boolean).length === 1;
 
   return (
     <>
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.45" />
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.42" />
           <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.03" />
         </linearGradient>
       </defs>
 
-      {/* línea cero de referencia */}
-      <line x1={0} y1={zeroY} x2={W} y2={zeroY} stroke="var(--border-strong)" strokeWidth={1} strokeDasharray="3 3" />
+      {min < 0 && (
+        <line x1={0} y1={zeroY} x2={W} y2={zeroY} stroke="var(--border-strong)" strokeWidth={1} strokeDasharray="3 3" />
+      )}
 
-      {area && <path d={areaD} fill={`url(#${gradId})`} />}
-      <path d={line} fill="none" stroke="var(--accent)" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+      {show.gastos && (
+        <path d={smoothPath(linePts((s) => s.outflowMinor))} fill="none" stroke="var(--negative)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
+      )}
+      {show.ingresos && (
+        <path d={smoothPath(linePts((s) => s.inflowMinor))} fill="none" stroke="var(--positive)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
+      )}
+      {show.balance && (
+        <>
+          <path d={balanceArea} fill={`url(#${gradId})`} />
+          <path d={balanceLine} fill="none" stroke="var(--accent)" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      )}
 
-      {serie.map((s, i) => (
-        <g key={s.month}>
-          <circle
-            cx={x(i)}
-            cy={y(s.netMinor)}
-            r={hover === i ? 5 : 3.5}
-            fill="var(--accent)"
-            stroke="var(--surface)"
-            strokeWidth={2}
-          />
-          {(hover === i || hover === null) && (
-            <text
-              x={x(i)}
-              y={y(s.netMinor) - 9}
-              textAnchor="middle"
-              fontSize={9}
-              fill="var(--text-muted)"
-              style={{ fontVariantNumeric: 'tabular-nums' }}
-            >
-              {money(s.netMinor, { compact: true })}
-            </text>
-          )}
-        </g>
-      ))}
+      {/* Puntos + etiqueta solo cuando hay UNA serie (para no saturar). */}
+      {only &&
+        serie.map((s, i) => {
+          const v = show.balance ? s.netMinor : show.ingresos ? s.inflowMinor : s.outflowMinor;
+          const color = show.balance ? 'var(--accent)' : show.ingresos ? 'var(--positive)' : 'var(--negative)';
+          return (
+            <g key={s.month}>
+              <circle cx={x(i)} cy={y(v)} r={hover === i ? 5 : 3.5} fill={color} stroke="var(--surface)" strokeWidth={2} />
+              {(hover === i || hover === null) && (
+                <text x={x(i)} y={y(v) - 9} textAnchor="middle" fontSize={9} fill="var(--text-muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {money(v, { compact: true })}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+      {/* Con varias series, solo un punto en el mes con hover. */}
+      {!only &&
+        hover !== null &&
+        serie[hover] && (
+          <>
+            {show.balance && <circle cx={x(hover)} cy={y(serie[hover]!.netMinor)} r={4} fill="var(--accent)" stroke="var(--surface)" strokeWidth={2} />}
+            {show.ingresos && <circle cx={x(hover)} cy={y(serie[hover]!.inflowMinor)} r={4} fill="var(--positive)" stroke="var(--surface)" strokeWidth={2} />}
+            {show.gastos && <circle cx={x(hover)} cy={y(serie[hover]!.outflowMinor)} r={4} fill="var(--negative)" stroke="var(--surface)" strokeWidth={2} />}
+          </>
+        )}
     </>
   );
 }
