@@ -41,6 +41,7 @@ export const Consultar = z.object({
       'gastos',
       'recurrentes',
       'etiquetas',
+      'sostenimiento',
       'por_cobrar',
       'pipeline',
       'conflictos',
@@ -51,7 +52,7 @@ export const Consultar = z.object({
         'pendientes (tareas), tareas_recurrentes (plantillas de tareas que se repiten, con sus IDs), estructura (áreas, proyectos y metas con sus IDs), documentacion (el método). ' +
         'Dinero: resumen_financiero, por_proyecto (ingresos/gastos por proyecto), movimientos (lista de ' +
         'ingresos/gastos filtrable por rango de fechas: usa desde/hasta/direccion), gastos, recurrentes ' +
-        '(gastos e ingresos recurrentes), etiquetas (lista de etiquetas con sus IDs para poder asignarlas), por_cobrar, pipeline. ' +
+        '(gastos e ingresos recurrentes), etiquetas (lista de etiquetas con sus IDs para poder asignarlas), sostenimiento (costos de operar la app: total mensual y alertas de recarga/renovación), por_cobrar, pipeline. ' +
         'Agenda: conflictos (solapes próximos 7 días), huecos (ratos libres; usa duracion_min).',
     ),
   fecha: Ymd.optional().describe('Solo vista=agenda: día YYYY-MM-DD (por defecto hoy)'),

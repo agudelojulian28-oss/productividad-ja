@@ -34,6 +34,7 @@ import {
   setRecurringTags,
 } from '@/core/finance/tags';
 import { resumenFinanciero, resumenPorPeriodo, enPeriodo, topGastos } from '@/core/finance/queries';
+import { sustainingSummary } from '@/core/finance/sustaining';
 import { detectarChoques, huecosLibres } from '@/lib/agenda';
 import type { StructureRepo } from '@/core/structure/ports';
 import { createArea, archiveArea, setAreaDescription } from '@/core/structure/areas';
@@ -313,6 +314,28 @@ export async function runTool(
             vencido: r.nextDueOn <= hoy,
           })),
         );
+      }
+      if (vista === 'sostenimiento') {
+        const services = await fin.listSustaining();
+        const resumen = sustainingSummary(services, todayInTz(ctx.tz));
+        return ok({
+          total_mensual: money(resumen.monthlyTotalMinor),
+          posible_futuro: money(resumen.futurosMinor),
+          servicios: services.map((s) => ({
+            id: s.id,
+            nombre: s.name,
+            estado: s.status,
+            cadencia: s.cadence,
+            monto: money(s.amountMinor),
+            saldo: s.balanceMinor == null ? undefined : money(s.balanceMinor),
+            renueva: s.renewsOn ?? undefined,
+          })),
+          alertas: resumen.alerts.map((a) =>
+            a.kind === 'recargar'
+              ? { tipo: 'recargar', servicio: a.name, saldo: money(a.balanceMinor ?? 0) }
+              : { tipo: 'renovacion', servicio: a.name, fecha: a.renewsOn },
+          ),
+        });
       }
       if (vista === 'etiquetas') {
         const tags = await fin.listTags(p.value.proyecto_id);
