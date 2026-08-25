@@ -5,6 +5,7 @@ import { financeRepo } from '@/adapters/supabase/finance-repo';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { resumenFinanciero, serieMensual } from '@/core/finance/queries';
 import { money, todayInTz, dayLabelInTz } from '@/lib/format';
+import { getTrm } from '@/lib/trm';
 import { signedUrl } from '@/adapters/supabase/storage';
 import { RealtimeRefresh } from '../realtime-refresh';
 import { MovimientoLauncher } from './movimiento-launcher';
@@ -25,13 +26,14 @@ export default async function FinanzasPage() {
   const finance = financeRepo(supabase, ctx.userId);
   const work = workRepo(supabase, ctx.userId);
 
-  const [projects, cashflow, byProj, metas, recurrentes, tags] = await Promise.all([
+  const [projects, cashflow, byProj, metas, recurrentes, tags, trm] = await Promise.all([
     work.listProjects(),
     finance.cashflowMonthly(),
     finance.byProject(),
     finance.moneyGoalsProgress(),
     finance.listRecurringExpenses(),
     finance.listTags(),
+    getTrm(),
   ]);
   // Etiquetas de cada recurrente (una consulta para todas).
   const recTags = await finance.listRecurringTags(recurrentes.map((r) => r.id));
@@ -194,7 +196,7 @@ export default async function FinanzasPage() {
           escritorio este se oculta (se usa el del rail). */}
       {projectOpts.length > 0 && (
         <div className="fin-capture-top">
-          <MovimientoLauncher projects={projectOpts} today={todayInTz(ctx.tz)} tags={tags} />
+          <MovimientoLauncher projects={projectOpts} today={todayInTz(ctx.tz)} tags={tags} trm={trm.value} />
         </div>
       )}
 
@@ -291,7 +293,7 @@ export default async function FinanzasPage() {
           ) : (
             <>
               <section className="fin-block fin-capture">
-                <MovimientoLauncher projects={projectOpts} today={todayInTz(ctx.tz)} tags={tags} />
+                <MovimientoLauncher projects={projectOpts} today={todayInTz(ctx.tz)} tags={tags} trm={trm.value} />
               </section>
 
               <section className="fin-block">

@@ -34,7 +34,8 @@ import {
   setRecurringTags,
 } from '@/core/finance/tags';
 import { resumenFinanciero, resumenPorPeriodo, enPeriodo, topGastos } from '@/core/finance/queries';
-import { sustainingSummary } from '@/core/finance/sustaining';
+import { sustainingSummary, monthlyEquivalent, toCopMinor } from '@/core/finance/sustaining';
+import { getTrm } from '@/lib/trm';
 import { detectarChoques, huecosLibres } from '@/lib/agenda';
 import type { StructureRepo } from '@/core/structure/ports';
 import { createArea, archiveArea, setAreaDescription } from '@/core/structure/areas';
@@ -316,9 +317,12 @@ export async function runTool(
         );
       }
       if (vista === 'sostenimiento') {
-        const services = await fin.listSustaining();
-        const resumen = sustainingSummary(services, todayInTz(ctx.tz));
+        const [services, trm] = await Promise.all([fin.listSustaining(), getTrm()]);
+        const resumen = sustainingSummary(services, todayInTz(ctx.tz), trm.value);
+        const usdFmt = (minor: number) => 'US$' + (minor / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
+        const enMoneda = (minor: number, cur: 'COP' | 'USD') => (cur === 'USD' ? usdFmt(minor) : money(minor));
         return ok({
+          trm: { valor: trm.value, fecha: trm.date || undefined, aproximada: trm.fallback },
           total_mensual: money(resumen.monthlyTotalMinor),
           posible_futuro: money(resumen.futurosMinor),
           servicios: services.map((s) => ({
@@ -326,13 +330,18 @@ export async function runTool(
             nombre: s.name,
             estado: s.status,
             cadencia: s.cadence,
-            monto: money(s.amountMinor),
-            saldo: s.balanceMinor == null ? undefined : money(s.balanceMinor),
+            moneda: s.currency,
+            monto: enMoneda(s.amountMinor, s.currency),
+            monto_mensual_cop:
+              s.currency === 'USD'
+                ? money(toCopMinor(monthlyEquivalent(s.amountMinor, s.cadence), 'USD', trm.value))
+                : undefined,
+            saldo: s.balanceMinor == null ? undefined : enMoneda(s.balanceMinor, s.currency),
             renueva: s.renewsOn ?? undefined,
           })),
           alertas: resumen.alerts.map((a) =>
             a.kind === 'recargar'
-              ? { tipo: 'recargar', servicio: a.name, saldo: money(a.balanceMinor ?? 0) }
+              ? { tipo: 'recargar', servicio: a.name, saldo: enMoneda(a.balanceMinor ?? 0, a.currency) }
               : { tipo: 'renovacion', servicio: a.name, fecha: a.renewsOn },
           ),
         });

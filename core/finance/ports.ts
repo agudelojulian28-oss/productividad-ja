@@ -120,7 +120,8 @@ export interface SustainingServiceRow {
   category: SustainingCategory;
   status: SustainingStatus;
   cadence: SustainingCadence;
-  amountMinor: number; // COP
+  currency: 'COP' | 'USD';
+  amountMinor: number; // en la moneda del servicio
   balanceMinor: number | null; // créditos restantes (prepago)
   alertThresholdMinor: number | null;
   renewsOn: string | null; // YYYY-MM-DD
@@ -133,6 +134,7 @@ export interface SustainingServiceInsert {
   category: SustainingCategory;
   status: SustainingStatus;
   cadence: SustainingCadence;
+  currency?: 'COP' | 'USD';
   amountMinor: number;
   balanceMinor?: number | null;
   alertThresholdMinor?: number | null;
@@ -145,6 +147,7 @@ export interface SustainingServicePatch {
   category?: SustainingCategory;
   status?: SustainingStatus;
   cadence?: SustainingCadence;
+  currency?: 'COP' | 'USD';
   amountMinor?: number;
   balanceMinor?: number | null;
   alertThresholdMinor?: number | null;

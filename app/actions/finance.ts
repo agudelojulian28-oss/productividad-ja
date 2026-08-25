@@ -450,6 +450,7 @@ export async function createSustainingAction(input: {
   category: string;
   status: string;
   cadence: string;
+  currency?: string;
   amountMinor: number;
   balanceMinor?: number | null;
   alertThresholdMinor?: number | null;
@@ -469,6 +470,7 @@ export async function updateSustainingAction(input: {
   category?: string;
   status?: string;
   cadence?: string;
+  currency?: string;
   amountMinor?: number;
   balanceMinor?: number | null;
   alertThresholdMinor?: number | null;
@@ -509,14 +511,14 @@ export async function seedSustainingSugeridosAction(): Promise<Result<{ added: n
   const { ctx, repo } = await deps();
   const existing = new Set((await repo.listSustaining()).map((s) => s.name.toLowerCase()));
   const sugeridos = [
-    { name: 'Anthropic — Aura (agente)', provider: 'Anthropic', category: 'ia', status: 'paga', cadence: 'uso', notes: 'Créditos de API; el consumo real del mes se ve arriba en "Consumo de Aura".' },
-    { name: 'OpenAI — voz de Aura (TTS)', provider: 'OpenAI', category: 'ia', status: 'paga', cadence: 'uso', notes: 'Voz de nube (text-to-speech).' },
-    { name: 'Groq — transcripción (Whisper)', provider: 'Groq', category: 'ia', status: 'gratis', cadence: 'uso', notes: 'Voz→texto; hoy en capa gratis / uso mínimo.' },
-    { name: 'Supabase — base de datos', provider: 'Supabase', category: 'infra', status: 'gratis', cadence: 'mensual', notes: 'Free hoy; Pro (~US$25/mes) si el uso crece.' },
-    { name: 'Vercel — hosting', provider: 'Vercel', category: 'infra', status: 'gratis', cadence: 'mensual', notes: 'Hobby hoy; Pro (~US$20/mes) si lo necesitas.' },
-    { name: 'WhatsApp Cloud API', provider: 'Meta', category: 'canal', status: 'gratis', cadence: 'uso', notes: 'Capa gratis de conversaciones; futuro si suben.' },
-    { name: 'Google Calendar API', provider: 'Google', category: 'canal', status: 'gratis', cadence: 'mensual', notes: 'Gratis.' },
-    { name: 'Dominio propio', provider: null, category: 'dominio', status: 'futuro', cadence: 'anual', notes: 'Si compras un dominio en vez del .vercel.app gratis.' },
+    { name: 'Anthropic — Aura (agente)', provider: 'Anthropic', category: 'ia', status: 'paga', cadence: 'uso', currency: 'USD', notes: 'Créditos de API; el consumo real del mes se ve arriba en "Consumo de Aura".' },
+    { name: 'OpenAI — voz de Aura (TTS)', provider: 'OpenAI', category: 'ia', status: 'paga', cadence: 'uso', currency: 'USD', notes: 'Voz de nube (text-to-speech).' },
+    { name: 'Groq — transcripción (Whisper)', provider: 'Groq', category: 'ia', status: 'gratis', cadence: 'uso', currency: 'USD', notes: 'Voz→texto; hoy en capa gratis / uso mínimo.' },
+    { name: 'Supabase — base de datos', provider: 'Supabase', category: 'infra', status: 'gratis', cadence: 'mensual', currency: 'USD', notes: 'Free hoy; Pro (~US$25/mes) si el uso crece.' },
+    { name: 'Vercel — hosting', provider: 'Vercel', category: 'infra', status: 'gratis', cadence: 'mensual', currency: 'USD', notes: 'Hobby hoy; Pro (~US$20/mes) si lo necesitas.' },
+    { name: 'WhatsApp Cloud API', provider: 'Meta', category: 'canal', status: 'gratis', cadence: 'uso', currency: 'USD', notes: 'Capa gratis de conversaciones; futuro si suben.' },
+    { name: 'Google Calendar API', provider: 'Google', category: 'canal', status: 'gratis', cadence: 'mensual', currency: 'USD', notes: 'Gratis.' },
+    { name: 'Dominio propio', provider: null, category: 'dominio', status: 'futuro', cadence: 'anual', currency: 'USD', notes: 'Si compras un dominio en vez del .vercel.app gratis.' },
   ] as const;
   let added = 0;
   for (const s of sugeridos) {

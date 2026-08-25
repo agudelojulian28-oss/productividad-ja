@@ -19,6 +19,7 @@ function svc(over: Partial<SustainingServiceRow>): SustainingServiceRow {
     category: over.category ?? 'otro',
     status: over.status ?? 'paga',
     cadence: over.cadence ?? 'mensual',
+    currency: over.currency ?? 'COP',
     amountMinor: over.amountMinor ?? 0,
     balanceMinor: over.balanceMinor ?? null,
     alertThresholdMinor: over.alertThresholdMinor ?? null,
@@ -39,6 +40,7 @@ describe('monthlyEquivalent', () => {
 
 describe('sustainingSummary', () => {
   const today = '2026-08-24';
+  const TRM = 4000; // COP por 1 USD
   const services = [
     svc({ id: 'a', status: 'paga', cadence: 'mensual', amountMinor: 40000 }),
     svc({ id: 'b', status: 'paga', cadence: 'anual', amountMinor: 120000 }), // 10000/mes
@@ -48,36 +50,72 @@ describe('sustainingSummary', () => {
   ];
 
   it('suma solo las pagas activas (mensual-equivalente)', () => {
-    const s = sustainingSummary(services, today);
+    const s = sustainingSummary(services, today, TRM);
     expect(s.monthlyTotalMinor).toBe(50000); // 40000 + 10000
     expect(s.futurosMinor).toBe(100000);
     expect(s.count).toBe(4); // excluye la inactiva
+  });
+
+  it('convierte los servicios en USD a COP con la TRM', () => {
+    // US$20/mes → 2000 (centavos USD) × 4000 = 8.000.000 (centavos COP) = $80.000
+    const s = sustainingSummary(
+      [svc({ id: 'u', status: 'paga', cadence: 'mensual', currency: 'USD', amountMinor: 2000 })],
+      today,
+      TRM,
+    );
+    expect(s.monthlyTotalMinor).toBe(8_000_000);
+  });
+
+  it('mezcla COP y USD en el total mensual', () => {
+    const s = sustainingSummary(
+      [
+        svc({ id: 'cop', status: 'paga', cadence: 'mensual', currency: 'COP', amountMinor: 50000 }),
+        svc({ id: 'usd', status: 'paga', cadence: 'anual', currency: 'USD', amountMinor: 24000 }), // US$20/mes → $80.000
+      ],
+      today,
+      TRM,
+    );
+    expect(s.monthlyTotalMinor).toBe(50000 + 8_000_000);
   });
 
   it('alerta de recarga cuando el saldo <= umbral', () => {
     const s = sustainingSummary(
       [svc({ id: 'g', name: 'OpenAI', balanceMinor: 3000, alertThresholdMinor: 5000 })],
       today,
+      TRM,
     );
     const a = s.alerts.find((x) => x.kind === 'recargar');
     expect(a?.name).toBe('OpenAI');
+  });
+
+  it('la alerta de saldo se compara en la moneda del servicio (sin convertir)', () => {
+    // US$3 de saldo, umbral US$5 → alerta; el saldo reportado sigue en centavos USD.
+    const s = sustainingSummary(
+      [svc({ id: 'g', name: 'OpenAI', currency: 'USD', balanceMinor: 300, alertThresholdMinor: 500 })],
+      today,
+      TRM,
+    );
+    const a = s.alerts.find((x) => x.kind === 'recargar');
+    expect(a?.currency).toBe('USD');
+    expect(a?.balanceMinor).toBe(300);
   });
 
   it('no alerta de recarga cuando el saldo está por encima del umbral', () => {
     const s = sustainingSummary(
       [svc({ balanceMinor: 9000, alertThresholdMinor: 5000 })],
       today,
+      TRM,
     );
     expect(s.alerts.some((x) => x.kind === 'recargar')).toBe(false);
   });
 
   it('alerta de renovación si renews_on está dentro de la ventana', () => {
-    const s = sustainingSummary([svc({ id: 'r', name: 'Vercel', renewsOn: '2026-08-26' })], today);
+    const s = sustainingSummary([svc({ id: 'r', name: 'Vercel', renewsOn: '2026-08-26' })], today, TRM);
     expect(s.alerts.some((x) => x.kind === 'renovacion')).toBe(true);
   });
 
   it('no alerta de renovación si falta mucho', () => {
-    const s = sustainingSummary([svc({ renewsOn: '2026-12-01' })], today);
+    const s = sustainingSummary([svc({ renewsOn: '2026-12-01' })], today, TRM);
     expect(s.alerts.some((x) => x.kind === 'renovacion')).toBe(false);
   });
 });

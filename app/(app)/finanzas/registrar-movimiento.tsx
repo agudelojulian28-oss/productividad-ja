@@ -34,11 +34,14 @@ export function RegistrarMovimiento({
   projects,
   today,
   tags = [],
+  trm,
   onDone,
 }: {
   projects: Project[];
   today: string;
   tags?: TagOption[];
+  /** TRM del día (COP por 1 USD) para prefilar la tasa al elegir USD. */
+  trm?: number;
   /** Si se pasa, se invoca tras registrar con éxito (p. ej. cerrar el modal). */
   onDone?: (summary: string) => void;
 }) {
@@ -46,6 +49,15 @@ export function RegistrarMovimiento({
   const [monto, setMonto] = useState('');
   const [currency, setCurrency] = useState<'COP' | 'USD'>('COP');
   const [fx, setFx] = useState('');
+  // Al elegir USD, si la tasa está vacía se prefilla con la TRM del día (editable).
+  const [fxFromTrm, setFxFromTrm] = useState(false);
+  function onCurrencyChange(next: 'COP' | 'USD') {
+    setCurrency(next);
+    if (next === 'USD' && fx.trim() === '' && trm && trm > 0) {
+      setFx(String(Math.round(trm)));
+      setFxFromTrm(true);
+    }
+  }
   const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
   const [category, setCategory] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -146,7 +158,7 @@ export function RegistrarMovimiento({
       <SegSelect
         ariaLabel="Moneda"
         value={currency}
-        onChange={setCurrency}
+        onChange={onCurrencyChange}
         options={[
           { value: 'COP', label: 'COP' },
           { value: 'USD', label: 'USD' },
@@ -161,11 +173,19 @@ export function RegistrarMovimiento({
             inputMode="decimal"
             placeholder="ej. 4000"
             value={fx}
-            onChange={(e) => setFx(e.target.value)}
+            onChange={(e) => {
+              setFx(e.target.value);
+              setFxFromTrm(false);
+            }}
             className="field"
             aria-label="Tasa de cambio"
             autoComplete="off"
           />
+          {fxFromTrm ? (
+            <span className="muted" style={{ fontSize: 12 }}>
+              TRM de hoy (editable)
+            </span>
+          ) : null}
           {baseCop && currency === 'USD' && fxRate > 0 ? (
             <span className="muted" style={{ fontSize: 13 }}>
               ≈ {money(baseCop)} COP

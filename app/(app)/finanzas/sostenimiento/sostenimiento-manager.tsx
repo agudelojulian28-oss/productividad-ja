@@ -4,8 +4,9 @@ import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { money } from '@/lib/format';
 import { parseAmountToMinor } from '@/lib/parse-amount';
-import { sustainingSummary, monthlyEquivalent } from '@/core/finance/sustaining';
+import { sustainingSummary, monthlyEquivalent, toCopMinor } from '@/core/finance/sustaining';
 import type { SustainingServiceRow } from '@/core/finance/ports';
+import type { Trm } from '@/lib/trm';
 import {
   createSustainingAction,
   updateSustainingAction,
@@ -34,26 +35,36 @@ const CADENCE = [
   { v: 'uso', label: 'Por uso' },
   { v: 'unico', label: 'Único' },
 ];
+const CURRENCY = [
+  { v: 'COP', label: 'COP ($)' },
+  { v: 'USD', label: 'USD (US$)' },
+];
 const labelOf = (arr: { v: string; label: string }[], v: string) => arr.find((x) => x.v === v)?.label ?? v;
 const STATUS_ORDER = ['paga', 'gratis', 'futuro'];
 const toMinor = (s: string) => (s.trim() === '' ? 0 : (parseAmountToMinor(s) ?? 0));
 const fromMinor = (m: number | null) => (m == null ? '' : String(Math.round(m / 100)));
+/** Formatea un monto en su propia moneda: COP con `money()`, USD como "US$X". */
+const usd = (minor: number) => 'US$' + (minor / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
+const inCurrency = (minor: number, currency: 'COP' | 'USD') =>
+  currency === 'USD' ? usd(minor) : money(minor, { compact: true });
 
 export function SostenimientoManager({
   services,
   budget,
   today,
+  trm,
 }: {
   services: Row[];
   budget: { usdSpent: number; limitUsd: number };
   today: string;
+  trm: Trm;
 }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const summary = useMemo(() => sustainingSummary(services, today), [services, today]);
+  const summary = useMemo(() => sustainingSummary(services, today, trm.value), [services, today, trm.value]);
   const grouped = useMemo(() => {
     const m = new Map<string, Row[]>();
     for (const s of services) (m.get(s.status) ?? m.set(s.status, []).get(s.status)!).push(s);
@@ -70,6 +81,7 @@ export function SostenimientoManager({
         category: v.category,
         status: v.status,
         cadence: v.cadence,
+        currency: v.currency,
         amountMinor: toMinor(v.amount),
         balanceMinor: v.balance.trim() === '' ? null : toMinor(v.balance),
         alertThresholdMinor: v.threshold.trim() === '' ? null : toMinor(v.threshold),
@@ -100,6 +112,13 @@ export function SostenimientoManager({
 
   return (
     <div className="sos">
+      {/* TRM del día (convierte los servicios en dólares) */}
+      <div className="sos-trm" title={trm.fallback ? 'No se pudo consultar la TRM oficial; se usa un valor de respaldo.' : `TRM oficial${trm.date ? ' vigente ' + trm.date : ''}`}>
+        <span className="sos-trm-k">TRM</span>
+        <span className="sos-trm-v">${trm.value.toLocaleString('es-CO', { maximumFractionDigits: 2 })}/US$</span>
+        <span className="sos-trm-note">{trm.fallback ? 'aprox.' : trm.date || 'hoy'}</span>
+      </div>
+
       {/* Contador */}
       <div className="sos-counters">
         <div className="fin-gen-tile hero">
@@ -125,7 +144,7 @@ export function SostenimientoManager({
           {summary.alerts.map((a) => (
             <p key={`${a.id}-${a.kind}`} className="sos-alert">
               {a.kind === 'recargar'
-                ? `⚠ Recarga ${a.name}: quedan ${money(a.balanceMinor ?? 0, { compact: true })}`
+                ? `⚠ Recarga ${a.name}: quedan ${inCurrency(a.balanceMinor ?? 0, a.currency)}`
                 : `📅 ${a.name} se renueva el ${a.renewsOn}`}
             </p>
           ))}
@@ -172,8 +191,14 @@ export function SostenimientoManager({
                     <span className="rt-row-title">{s.name}</span>
                     <span className="rt-row-meta">
                       {labelOf(CATEGORY, s.category)} · {labelOf(CADENCE, s.cadence)}
-                      {s.amountMinor > 0 ? ` · ${money(monthlyEquivalent(s.amountMinor, s.cadence), { compact: true })}/mes` : ''}
-                      {s.balanceMinor != null ? ` · saldo ${money(s.balanceMinor, { compact: true })}` : ''}
+                      {s.amountMinor > 0
+                        ? ` · ${inCurrency(monthlyEquivalent(s.amountMinor, s.cadence), s.currency)}/mes${
+                            s.currency === 'USD'
+                              ? ` ≈ ${money(toCopMinor(monthlyEquivalent(s.amountMinor, s.cadence), 'USD', trm.value), { compact: true })}`
+                              : ''
+                          }`
+                        : ''}
+                      {s.balanceMinor != null ? ` · saldo ${inCurrency(s.balanceMinor, s.currency)}` : ''}
                       {s.renewsOn ? ` · renueva ${s.renewsOn}` : ''}
                     </span>
                   </div>
@@ -201,6 +226,7 @@ type FormValues = {
   category: string;
   status: string;
   cadence: string;
+  currency: string;
   amount: string;
   balance: string;
   threshold: string;
@@ -227,6 +253,7 @@ function ServiceForm({
     category: init?.category ?? 'ia',
     status: init?.status ?? 'paga',
     cadence: init?.cadence ?? 'mensual',
+    currency: init?.currency ?? 'COP',
     amount: fromMinor(init?.amountMinor ?? 0),
     balance: fromMinor(init?.balanceMinor ?? null),
     threshold: fromMinor(init?.alertThresholdMinor ?? null),
@@ -280,10 +307,20 @@ function ServiceForm({
           </select>
         </label>
       </div>
-      <label className="cal-field-label">
-        Monto (COP) {v.cadence === 'anual' ? '· al año' : v.cadence === 'uso' ? '· estimado al mes' : ''}
-        <input className="field" inputMode="decimal" value={v.amount} onChange={(e) => set('amount', e.target.value)} placeholder="0" />
-      </label>
+      <div className="rt-form-row">
+        <label className="cal-field-label" style={{ width: 130 }}>
+          Moneda
+          <select className="field" value={v.currency} onChange={(e) => set('currency', e.target.value)}>
+            {CURRENCY.map((c) => (
+              <option key={c.v} value={c.v}>{c.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="cal-field-label" style={{ flex: 1 }}>
+          Monto ({v.currency}) {v.cadence === 'anual' ? '· al año' : v.cadence === 'uso' ? '· estimado al mes' : ''}
+          <input className="field" inputMode="decimal" value={v.amount} onChange={(e) => set('amount', e.target.value)} placeholder="0" />
+        </label>
+      </div>
       <div className="rt-form-row">
         <label className="cal-field-label" style={{ flex: 1 }}>
           Saldo/créditos (opcional)

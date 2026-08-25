@@ -17,6 +17,7 @@ const SustainingCreate = z.object({
   category: z.enum(CATEGORY).default('otro'),
   status: z.enum(STATUS).default('paga'),
   cadence: z.enum(CADENCE).default('mensual'),
+  currency: z.enum(['COP', 'USD']).default('COP'),
   amountMinor: Amount.default(0),
   balanceMinor: Amount.nullable().optional(),
   alertThresholdMinor: Amount.nullable().optional(),
@@ -31,6 +32,7 @@ const SustainingUpdate = z.object({
   category: z.enum(CATEGORY).optional(),
   status: z.enum(STATUS).optional(),
   cadence: z.enum(CADENCE).optional(),
+  currency: z.enum(['COP', 'USD']).optional(),
   amountMinor: Amount.optional(),
   balanceMinor: Amount.nullable().optional(),
   alertThresholdMinor: Amount.nullable().optional(),
@@ -53,6 +55,7 @@ export async function createSustaining(
       category: parsed.data.category,
       status: parsed.data.status,
       cadence: parsed.data.cadence,
+      currency: parsed.data.currency,
       amountMinor: parsed.data.amountMinor,
       balanceMinor: parsed.data.balanceMinor ?? null,
       alertThresholdMinor: parsed.data.alertThresholdMinor ?? null,
@@ -118,20 +121,28 @@ export interface SustainingAlert {
   id: string;
   name: string;
   kind: 'recargar' | 'renovacion';
-  balanceMinor: number | null;
+  balanceMinor: number | null; // en la moneda del servicio
+  currency: 'COP' | 'USD';
   renewsOn: string | null;
 }
 export interface SustainingSummary {
-  monthlyTotalMinor: number; // suma de las pagas (mensual-equivalente)
-  futurosMinor: number; // posible a futuro (mensual-equivalente de los 'futuro')
+  monthlyTotalMinor: number; // suma de las pagas (mensual-equivalente), YA en COP
+  futurosMinor: number; // posible a futuro (mensual-equivalente de los 'futuro'), en COP
   count: number; // servicios activos
   alerts: SustainingAlert[];
 }
 
-/** Resumen del sostenimiento: total mensual, posible futuro y alertas (recarga/renovación). */
+/** Convierte un monto (minor) de la moneda del servicio a COP-minor con la TRM. */
+export function toCopMinor(amountMinor: number, currency: 'COP' | 'USD', trm: number): number {
+  return currency === 'USD' ? Math.round(amountMinor * trm) : amountMinor;
+}
+
+/** Resumen del sostenimiento: total mensual (COP, convertido con TRM), posible futuro y
+ *  alertas (recarga/renovación). `trm` = COP por 1 USD. */
 export function sustainingSummary(
   services: SustainingServiceRow[],
   today: string,
+  trm: number,
   renewWindowDays = 5,
 ): SustainingSummary {
   let monthlyTotalMinor = 0;
@@ -143,15 +154,15 @@ export function sustainingSummary(
   for (const s of services) {
     if (!s.active) continue;
     count++;
-    const eq = monthlyEquivalent(s.amountMinor, s.cadence);
-    if (s.status === 'paga') monthlyTotalMinor += eq;
-    else if (s.status === 'futuro') futurosMinor += eq;
+    const eqCop = toCopMinor(monthlyEquivalent(s.amountMinor, s.cadence), s.currency, trm);
+    if (s.status === 'paga') monthlyTotalMinor += eqCop;
+    else if (s.status === 'futuro') futurosMinor += eqCop;
 
     if (s.balanceMinor !== null && s.alertThresholdMinor !== null && s.balanceMinor <= s.alertThresholdMinor) {
-      alerts.push({ id: s.id, name: s.name, kind: 'recargar', balanceMinor: s.balanceMinor, renewsOn: null });
+      alerts.push({ id: s.id, name: s.name, kind: 'recargar', balanceMinor: s.balanceMinor, currency: s.currency, renewsOn: null });
     }
     if (s.renewsOn !== null && s.renewsOn <= soon) {
-      alerts.push({ id: s.id, name: s.name, kind: 'renovacion', balanceMinor: null, renewsOn: s.renewsOn });
+      alerts.push({ id: s.id, name: s.name, kind: 'renovacion', balanceMinor: null, currency: s.currency, renewsOn: s.renewsOn });
     }
   }
   return { monthlyTotalMinor, futurosMinor, count, alerts };

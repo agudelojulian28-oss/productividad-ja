@@ -16,10 +16,12 @@ export function MovimientoLauncher({
   projects,
   today,
   tags = [],
+  trm,
 }: {
   projects: Project[];
   today: string;
   tags?: TagOption[];
+  trm?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -58,6 +60,7 @@ export function MovimientoLauncher({
           projects={projects}
           today={today}
           tags={tags}
+          trm={trm}
           onDone={(summary) => {
             setOpen(false);
             setToast(summary);

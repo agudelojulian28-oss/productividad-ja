@@ -151,6 +151,7 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
         category: input.category,
         status: input.status,
         cadence: input.cadence,
+        currency: input.currency ?? 'COP',
         amountMinor: input.amountMinor,
         balanceMinor: input.balanceMinor ?? null,
         alertThresholdMinor: input.alertThresholdMinor ?? null,
@@ -177,6 +178,7 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
         category: patch.category ?? cur.category,
         status: patch.status ?? cur.status,
         cadence: patch.cadence ?? cur.cadence,
+        currency: patch.currency ?? cur.currency,
         amountMinor: patch.amountMinor ?? cur.amountMinor,
         balanceMinor: patch.balanceMinor === undefined ? cur.balanceMinor : patch.balanceMinor,
         alertThresholdMinor:

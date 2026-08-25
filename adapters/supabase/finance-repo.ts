@@ -87,7 +87,7 @@ const REC_COLS =
   'id,direction,project_id,area_id,amount_minor,currency,category,description,frequency,next_due_on,active';
 
 const SUS_COLS =
-  'id,name,provider,category,status,cadence,amount_minor,balance_minor,alert_threshold_minor,renews_on,active,notes';
+  'id,name,provider,category,status,cadence,currency,amount_minor,balance_minor,alert_threshold_minor,renews_on,active,notes';
 function toSustaining(r: Record<string, unknown>): SustainingServiceRow {
   return {
     id: r.id as string,
@@ -96,6 +96,7 @@ function toSustaining(r: Record<string, unknown>): SustainingServiceRow {
     category: r.category as SustainingServiceRow['category'],
     status: r.status as SustainingServiceRow['status'],
     cadence: r.cadence as SustainingServiceRow['cadence'],
+    currency: (r.currency as 'COP' | 'USD') ?? 'COP',
     amountMinor: n(r.amount_minor),
     balanceMinor: r.balance_minor == null ? null : n(r.balance_minor),
     alertThresholdMinor: r.alert_threshold_minor == null ? null : n(r.alert_threshold_minor),
@@ -316,6 +317,7 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
           category: input.category,
           status: input.status,
           cadence: input.cadence,
+          currency: input.currency ?? 'COP',
           amount_minor: input.amountMinor,
           balance_minor: input.balanceMinor ?? null,
           alert_threshold_minor: input.alertThresholdMinor ?? null,
@@ -355,6 +357,7 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
       if (patch.category !== undefined) upd.category = patch.category;
       if (patch.status !== undefined) upd.status = patch.status;
       if (patch.cadence !== undefined) upd.cadence = patch.cadence;
+      if (patch.currency !== undefined) upd.currency = patch.currency;
       if (patch.amountMinor !== undefined) upd.amount_minor = patch.amountMinor;
       if (patch.balanceMinor !== undefined) upd.balance_minor = patch.balanceMinor;
       if (patch.alertThresholdMinor !== undefined) upd.alert_threshold_minor = patch.alertThresholdMinor;

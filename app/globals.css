@@ -4324,6 +4324,10 @@ button.mov-row:hover {
 
 /* Sostenimiento */
 .sos { display: flex; flex-direction: column; gap: 16px; }
+.sos-trm { display: inline-flex; align-items: baseline; gap: 8px; padding: 6px 12px; margin-bottom: 12px; border-radius: 999px; background: var(--surface-2, var(--card)); border: 1px solid var(--border); }
+.sos-trm-k { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.sos-trm-v { font-size: 14px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.sos-trm-note { font-size: 11px; color: var(--text-muted); }
 .sos-counters { display: grid; grid-template-columns: 1fr; gap: 10px; }
 @media (min-width: 560px) { .sos-counters { grid-template-columns: repeat(3, 1fr); } }
 .sos-budget-track { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; margin: 6px 0 2px; }
