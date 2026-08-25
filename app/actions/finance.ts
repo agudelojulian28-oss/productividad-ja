@@ -24,6 +24,13 @@ import {
   setTransactionTags,
   setRecurringTags,
 } from '@/core/finance/tags';
+import {
+  createSustaining,
+  updateSustaining,
+  deleteSustaining,
+  listSustaining,
+} from '@/core/finance/sustaining';
+import type { SustainingServiceRow } from '@/core/finance/ports';
 import type { RecurringExpenseRow, RecurringFrequency, TagRow } from '@/core/finance/ports';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { workRepo } from '@/adapters/supabase/work-repo';
@@ -428,4 +435,95 @@ export async function getProjectExtrasAction(input: {
     }));
 
   return { topCategorias, topEtiquetas, recurrentes, metas };
+}
+
+// ── Sostenimiento (costos de operar la app) ─────────────────────────────────────
+export async function listSustainingAction(): Promise<SustainingServiceRow[]> {
+  const { ctx, repo } = await deps();
+  const r = await listSustaining(ctx, repo);
+  return r.ok ? r.value : [];
+}
+
+export async function createSustainingAction(input: {
+  name: string;
+  provider?: string | null;
+  category: string;
+  status: string;
+  cadence: string;
+  amountMinor: number;
+  balanceMinor?: number | null;
+  alertThresholdMinor?: number | null;
+  renewsOn?: string | null;
+  notes?: string | null;
+}): Promise<Result<SustainingServiceRow>> {
+  const { ctx, repo } = await deps();
+  const result = await createSustaining(ctx, repo, input);
+  revalidatePath('/finanzas/sostenimiento');
+  return result;
+}
+
+export async function updateSustainingAction(input: {
+  id: string;
+  name?: string;
+  provider?: string | null;
+  category?: string;
+  status?: string;
+  cadence?: string;
+  amountMinor?: number;
+  balanceMinor?: number | null;
+  alertThresholdMinor?: number | null;
+  renewsOn?: string | null;
+  active?: boolean;
+  notes?: string | null;
+}): Promise<Result<SustainingServiceRow>> {
+  const { ctx, repo } = await deps();
+  const result = await updateSustaining(ctx, repo, input);
+  revalidatePath('/finanzas/sostenimiento');
+  return result;
+}
+
+export async function deleteSustainingAction(id: string): Promise<Result<{ id: string }>> {
+  const { ctx, repo } = await deps();
+  const result = await deleteSustaining(ctx, repo, id);
+  revalidatePath('/finanzas/sostenimiento');
+  return result;
+}
+
+/** Lee el consumo del agente del mes (usage_budget), solo lectura, para el tile. */
+export async function agentBudgetAction(): Promise<{ usdSpent: number; limitUsd: number }> {
+  const { supabase, ctx } = await requireContext();
+  const { data } = await supabase
+    .from('usage_budget')
+    .select('period,usd_spent,limit_usd')
+    .eq('user_id', ctx.userId)
+    .maybeSingle();
+  const row = data as { period: string; usd_spent: number; limit_usd: number } | null;
+  if (!row) return { usdSpent: 0, limitUsd: 25 };
+  const thisMonth = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz, year: 'numeric', month: '2-digit' }).format(new Date());
+  const same = String(row.period).startsWith(thisMonth);
+  return { usdSpent: same ? Number(row.usd_spent) : 0, limitUsd: Number(row.limit_usd) };
+}
+
+/** Siembra la lista sugerida de servicios (idempotente por nombre). */
+export async function seedSustainingSugeridosAction(): Promise<Result<{ added: number }>> {
+  const { ctx, repo } = await deps();
+  const existing = new Set((await repo.listSustaining()).map((s) => s.name.toLowerCase()));
+  const sugeridos = [
+    { name: 'Anthropic — Aura (agente)', provider: 'Anthropic', category: 'ia', status: 'paga', cadence: 'uso', notes: 'Créditos de API; el consumo real del mes se ve arriba en "Consumo de Aura".' },
+    { name: 'OpenAI — voz de Aura (TTS)', provider: 'OpenAI', category: 'ia', status: 'paga', cadence: 'uso', notes: 'Voz de nube (text-to-speech).' },
+    { name: 'Groq — transcripción (Whisper)', provider: 'Groq', category: 'ia', status: 'gratis', cadence: 'uso', notes: 'Voz→texto; hoy en capa gratis / uso mínimo.' },
+    { name: 'Supabase — base de datos', provider: 'Supabase', category: 'infra', status: 'gratis', cadence: 'mensual', notes: 'Free hoy; Pro (~US$25/mes) si el uso crece.' },
+    { name: 'Vercel — hosting', provider: 'Vercel', category: 'infra', status: 'gratis', cadence: 'mensual', notes: 'Hobby hoy; Pro (~US$20/mes) si lo necesitas.' },
+    { name: 'WhatsApp Cloud API', provider: 'Meta', category: 'canal', status: 'gratis', cadence: 'uso', notes: 'Capa gratis de conversaciones; futuro si suben.' },
+    { name: 'Google Calendar API', provider: 'Google', category: 'canal', status: 'gratis', cadence: 'mensual', notes: 'Gratis.' },
+    { name: 'Dominio propio', provider: null, category: 'dominio', status: 'futuro', cadence: 'anual', notes: 'Si compras un dominio en vez del .vercel.app gratis.' },
+  ] as const;
+  let added = 0;
+  for (const s of sugeridos) {
+    if (existing.has(s.name.toLowerCase())) continue;
+    const r = await createSustaining(ctx, repo, { ...s, amountMinor: 0 });
+    if (r.ok) added++;
+  }
+  revalidatePath('/finanzas/sostenimiento');
+  return ok({ added });
 }

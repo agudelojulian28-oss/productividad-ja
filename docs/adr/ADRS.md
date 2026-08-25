@@ -779,3 +779,24 @@ aparte (`/tareas/recurrentes`). El agente puede crear/editar/archivar plantillas
 
 **Consecuencias.** Cubre "aparece al abrir la app"; la generación 100% en segundo plano (sin abrirla)
 queda para un `pg_cron` futuro (ADR-015). `project_id`/`goal_id` con `on delete set null` (opcionales).
+
+---
+
+## ADR-031 · Sostenimiento (costos de operar la app)
+
+**Estado:** aceptado · **Fecha:** 2026-08-24
+
+**Contexto.** Faltaba administrar el costo de sostener la app: servicios que cuestan hoy
+(Anthropic, OpenAI, Groq) y que podrían costar a futuro (Supabase Pro, Vercel Pro, WhatsApp,
+dominio). Julián quiere un contador del gasto mensual, monitoreo y que Aura avise cuándo recargar.
+
+**Decisión.** Tabla `sustaining_services` (nombre, proveedor, categoría, estado paga|gratis|futuro,
+cadencia mensual|anual|uso|unico, `amount_minor` en COP, `balance_minor`/`alert_threshold_minor`
+para prepago, `renews_on` para suscripción). `sustainingSummary` (core, puro) calcula el total
+mensual-equivalente + alertas (recarga si saldo ≤ umbral; renovación próxima). El agente puede
+consultar sostenimiento y avisar; hay un "consumo de Aura" de solo lectura desde `usage_budget`.
+Todo en COP para un único contador. El agente NO recarga (solo recuerda).
+
+**Consecuencias.** Datos gestionados por el usuario (con un sembrado sugerido opt-in). Los saldos de
+créditos son manuales (no hay API de saldo de cada proveedor); el consumo del agente sí es real
+(`usage_budget`). Metas/recurrentes personales no se mezclan con esto.

@@ -108,6 +108,51 @@ export interface RecurringExpenseInsert {
   nextDueOn: string;
 }
 
+// ── Sostenimiento (costos de operar la app) ────────────────────────────────
+export type SustainingCategory = 'infra' | 'ia' | 'canal' | 'dominio' | 'otro';
+export type SustainingStatus = 'paga' | 'gratis' | 'futuro';
+export type SustainingCadence = 'mensual' | 'anual' | 'uso' | 'unico';
+
+export interface SustainingServiceRow {
+  id: string;
+  name: string;
+  provider: string | null;
+  category: SustainingCategory;
+  status: SustainingStatus;
+  cadence: SustainingCadence;
+  amountMinor: number; // COP
+  balanceMinor: number | null; // créditos restantes (prepago)
+  alertThresholdMinor: number | null;
+  renewsOn: string | null; // YYYY-MM-DD
+  active: boolean;
+  notes: string | null;
+}
+export interface SustainingServiceInsert {
+  name: string;
+  provider?: string | null;
+  category: SustainingCategory;
+  status: SustainingStatus;
+  cadence: SustainingCadence;
+  amountMinor: number;
+  balanceMinor?: number | null;
+  alertThresholdMinor?: number | null;
+  renewsOn?: string | null;
+  notes?: string | null;
+}
+export interface SustainingServicePatch {
+  name?: string;
+  provider?: string | null;
+  category?: SustainingCategory;
+  status?: SustainingStatus;
+  cadence?: SustainingCadence;
+  amountMinor?: number;
+  balanceMinor?: number | null;
+  alertThresholdMinor?: number | null;
+  renewsOn?: string | null;
+  active?: boolean;
+  notes?: string | null;
+}
+
 /** Etiqueta de un proyecto (clasifica movimientos y recurrentes de ese proyecto). */
 export interface TagRow {
   id: string;
@@ -239,6 +284,13 @@ export interface FinanceRepo {
 
   insertMoneyGoal(input: MoneyGoalInsert): Promise<{ id: string }>;
   moneyGoalsProgress(): Promise<MoneyGoalProgressRow[]>;
+
+  // Sostenimiento (costos de operar la app).
+  insertSustaining(input: SustainingServiceInsert): Promise<SustainingServiceRow>;
+  listSustaining(): Promise<SustainingServiceRow[]>;
+  getSustaining(id: string): Promise<SustainingServiceRow | null>;
+  updateSustaining(id: string, patch: SustainingServicePatch): Promise<SustainingServiceRow>;
+  deleteSustaining(id: string): Promise<void>;
 
   cashflowMonthly(): Promise<CashflowMonthRow[]>;
   bySource(): Promise<BySourceRow[]>;

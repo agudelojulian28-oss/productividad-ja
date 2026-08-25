@@ -259,6 +259,16 @@ export default async function FinanzasPage() {
             />
           </section>
 
+          <section className="fin-block">
+            <h2 className="fin-h2">Sostenimiento</h2>
+            <p className="muted" style={{ marginBottom: 10 }}>
+              Costos de operar la app (y los que podrían venir), con avisos de recarga.
+            </p>
+            <Link href="/finanzas/sostenimiento" className="btn-ghost meta-add">
+              Ver sostenimiento →
+            </Link>
+          </section>
+
           {/* Pipeline y discrepancias llegan con las ventas (Etapa 5). */}
           <p className="muted fin-soon">
             Pipeline abierto y discrepancias llegan en la Etapa 5, con las ventas.

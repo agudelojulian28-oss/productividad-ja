@@ -9,6 +9,7 @@ import type {
   MoneyGoalProgressRow,
   RecurringExpenseRow,
   TagRow,
+  SustainingServiceRow,
 } from '@/core/finance/ports';
 
 export function makeFakeFinanceRepo(): FinanceRepo & {
@@ -25,6 +26,7 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
   const goals: MoneyGoalProgressRow[] = [];
   const recurring = new Map<string, RecurringExpenseRow>();
   const tags = new Map<string, TagRow>();
+  const sustaining = new Map<string, SustainingServiceRow>();
   let txTags: { transactionId: string; tagId: string }[] = [];
   let recTags: { recurringId: string; tagId: string }[] = [];
   let seq = 0;
@@ -140,6 +142,54 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
     },
     async moneyGoalsProgress(): Promise<MoneyGoalProgressRow[]> {
       return goals.filter((g) => g.status === 'active');
+    },
+    async insertSustaining(input): Promise<SustainingServiceRow> {
+      const row: SustainingServiceRow = {
+        id: uuid(),
+        name: input.name,
+        provider: input.provider ?? null,
+        category: input.category,
+        status: input.status,
+        cadence: input.cadence,
+        amountMinor: input.amountMinor,
+        balanceMinor: input.balanceMinor ?? null,
+        alertThresholdMinor: input.alertThresholdMinor ?? null,
+        renewsOn: input.renewsOn ?? null,
+        active: true,
+        notes: input.notes ?? null,
+      };
+      sustaining.set(row.id, row);
+      return row;
+    },
+    async listSustaining(): Promise<SustainingServiceRow[]> {
+      return [...sustaining.values()];
+    },
+    async getSustaining(id: string): Promise<SustainingServiceRow | null> {
+      return sustaining.get(id) ?? null;
+    },
+    async updateSustaining(id, patch): Promise<SustainingServiceRow> {
+      const cur = sustaining.get(id);
+      if (!cur) throw new Error('updateSustaining: no existe');
+      const next: SustainingServiceRow = {
+        ...cur,
+        name: patch.name ?? cur.name,
+        provider: patch.provider === undefined ? cur.provider : patch.provider,
+        category: patch.category ?? cur.category,
+        status: patch.status ?? cur.status,
+        cadence: patch.cadence ?? cur.cadence,
+        amountMinor: patch.amountMinor ?? cur.amountMinor,
+        balanceMinor: patch.balanceMinor === undefined ? cur.balanceMinor : patch.balanceMinor,
+        alertThresholdMinor:
+          patch.alertThresholdMinor === undefined ? cur.alertThresholdMinor : patch.alertThresholdMinor,
+        renewsOn: patch.renewsOn === undefined ? cur.renewsOn : patch.renewsOn,
+        active: patch.active ?? cur.active,
+        notes: patch.notes === undefined ? cur.notes : patch.notes,
+      };
+      sustaining.set(id, next);
+      return next;
+    },
+    async deleteSustaining(id: string): Promise<void> {
+      sustaining.delete(id);
     },
     async insertIncomeSource(input: IncomeSourceInsert): Promise<IncomeSourceRow> {
       const row: IncomeSourceRow = {

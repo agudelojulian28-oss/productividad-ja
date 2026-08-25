@@ -10,6 +10,7 @@ import type {
   RecurringExpenseRow,
   RecurringFrequency,
   TagRow,
+  SustainingServiceRow,
   ExpenseCategoryRow,
   ReceivableRow,
   PipelineRow,
@@ -84,6 +85,25 @@ interface DbRecurring {
 
 const REC_COLS =
   'id,direction,project_id,area_id,amount_minor,currency,category,description,frequency,next_due_on,active';
+
+const SUS_COLS =
+  'id,name,provider,category,status,cadence,amount_minor,balance_minor,alert_threshold_minor,renews_on,active,notes';
+function toSustaining(r: Record<string, unknown>): SustainingServiceRow {
+  return {
+    id: r.id as string,
+    name: r.name as string,
+    provider: (r.provider as string | null) ?? null,
+    category: r.category as SustainingServiceRow['category'],
+    status: r.status as SustainingServiceRow['status'],
+    cadence: r.cadence as SustainingServiceRow['cadence'],
+    amountMinor: n(r.amount_minor),
+    balanceMinor: r.balance_minor == null ? null : n(r.balance_minor),
+    alertThresholdMinor: r.alert_threshold_minor == null ? null : n(r.alert_threshold_minor),
+    renewsOn: (r.renews_on as string | null) ?? null,
+    active: r.active as boolean,
+    notes: (r.notes as string | null) ?? null,
+  };
+}
 
 function toTag(r: Record<string, unknown>): TagRow {
   return {
@@ -283,6 +303,77 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
         periodEnd: r.period_end as string,
         status: r.status as string,
       }));
+    },
+
+    // ── Sostenimiento ────────────────────────────────────────────────────────
+    async insertSustaining(input) {
+      const { data, error } = await supabase
+        .from('sustaining_services')
+        .insert({
+          user_id: userId,
+          name: input.name,
+          provider: input.provider ?? null,
+          category: input.category,
+          status: input.status,
+          cadence: input.cadence,
+          amount_minor: input.amountMinor,
+          balance_minor: input.balanceMinor ?? null,
+          alert_threshold_minor: input.alertThresholdMinor ?? null,
+          renews_on: input.renewsOn ?? null,
+          notes: input.notes ?? null,
+        })
+        .select(SUS_COLS)
+        .single();
+      if (error) throw new Error(error.message);
+      return toSustaining(data as Record<string, unknown>);
+    },
+
+    async listSustaining() {
+      const { data, error } = await supabase
+        .from('sustaining_services')
+        .select(SUS_COLS)
+        .order('status', { ascending: true })
+        .order('amount_minor', { ascending: false });
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map(toSustaining);
+    },
+
+    async getSustaining(id) {
+      const { data, error } = await supabase
+        .from('sustaining_services')
+        .select(SUS_COLS)
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? toSustaining(data as Record<string, unknown>) : null;
+    },
+
+    async updateSustaining(id, patch) {
+      const upd: Record<string, unknown> = {};
+      if (patch.name !== undefined) upd.name = patch.name;
+      if (patch.provider !== undefined) upd.provider = patch.provider;
+      if (patch.category !== undefined) upd.category = patch.category;
+      if (patch.status !== undefined) upd.status = patch.status;
+      if (patch.cadence !== undefined) upd.cadence = patch.cadence;
+      if (patch.amountMinor !== undefined) upd.amount_minor = patch.amountMinor;
+      if (patch.balanceMinor !== undefined) upd.balance_minor = patch.balanceMinor;
+      if (patch.alertThresholdMinor !== undefined) upd.alert_threshold_minor = patch.alertThresholdMinor;
+      if (patch.renewsOn !== undefined) upd.renews_on = patch.renewsOn;
+      if (patch.active !== undefined) upd.active = patch.active;
+      if (patch.notes !== undefined) upd.notes = patch.notes;
+      const { data, error } = await supabase
+        .from('sustaining_services')
+        .update(upd)
+        .eq('id', id)
+        .select(SUS_COLS)
+        .single();
+      if (error) throw new Error(error.message);
+      return toSustaining(data as Record<string, unknown>);
+    },
+
+    async deleteSustaining(id) {
+      const { error } = await supabase.from('sustaining_services').delete().eq('id', id);
+      if (error) throw new Error(error.message);
     },
 
     async cashflowMonthly() {
