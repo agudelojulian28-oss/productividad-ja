@@ -10,6 +10,8 @@ import { getTrm } from '@/lib/trm';
 import { signedUrl } from '@/adapters/supabase/storage';
 import { RealtimeRefresh } from '../realtime-refresh';
 import { MovimientoLauncher } from './movimiento-launcher';
+import { ReservasTiles } from './reservas-tiles';
+import { getReservasAction } from '@/app/actions/finance';
 import { CashflowChart } from './cashflow-chart';
 import { MetasDinero } from './metas-dinero';
 import { FinStats } from './fin-stats';
@@ -62,6 +64,7 @@ export default async function FinanzasPage() {
   const serie = serieMensual(cashflow, 6);
   // Serie completa (todos los meses con datos) para el resumen anual del rail.
   const serieCompleta = serieMensual(cashflow, 600);
+  const reservas = await getReservasAction();
 
   // Variación % vs el mes anterior (badge en KPIs). Solo si el mes previo > 0.
   const cur = serie[serie.length - 1];
@@ -186,6 +189,7 @@ export default async function FinanzasPage() {
             delta: ingresosDelta,
           },
         ]}
+        actions={<ReservasTiles data={reservas} today={todayInTz(ctx.tz)} />}
       />
 
       {resumen.stale && (

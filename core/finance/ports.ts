@@ -156,6 +156,53 @@ export interface SustainingServicePatch {
   notes?: string | null;
 }
 
+// ── Reservas (flujo de caja + fondo de emergencia) ─────────────────────────
+export type ReserveKind = 'flujo' | 'emergencia';
+
+export interface ReserveFundRow {
+  id: string;
+  kind: ReserveKind;
+  targetMinor: number; // meta (COP menor)
+  description: string | null;
+  projectId: string | null; // solo emergencia: proyecto dedicado del gasto
+  areaId: string | null;
+}
+export interface ReserveFundPatch {
+  targetMinor?: number;
+  description?: string | null;
+  projectId?: string | null;
+  areaId?: string | null;
+}
+export interface ReserveMovementRow {
+  id: string;
+  fundId: string;
+  direction: 'in' | 'out';
+  amountMinor: number;
+  occurredOn: string; // YYYY-MM-DD
+  description: string | null;
+  linkedTransactionId: string | null;
+}
+export interface ReserveMovementInsert {
+  fundId: string;
+  direction: 'in' | 'out';
+  amountMinor: number;
+  occurredOn?: string;
+  description?: string | null;
+  linkedTransactionId?: string | null;
+}
+/** Fila de la vista fin_reserve_summary (saldo ya calculado, en COP menor). */
+export interface ReserveSummaryRow {
+  fundId: string;
+  kind: ReserveKind;
+  targetMinor: number;
+  description: string | null;
+  projectId: string | null;
+  inMinor: number;
+  outMinor: number;
+  balanceMinor: number;
+  movements: number;
+}
+
 /** Etiqueta de un proyecto (clasifica movimientos y recurrentes de ese proyecto). */
 export interface TagRow {
   id: string;
@@ -287,6 +334,15 @@ export interface FinanceRepo {
 
   insertMoneyGoal(input: MoneyGoalInsert): Promise<{ id: string }>;
   moneyGoalsProgress(): Promise<MoneyGoalProgressRow[]>;
+
+  // Reservas (flujo de caja + fondo de emergencia).
+  ensureReserves(): Promise<void>; // crea las filas flujo/emergencia si faltan
+  listReserveFunds(): Promise<ReserveFundRow[]>;
+  getReserveFund(kind: ReserveKind): Promise<ReserveFundRow | null>;
+  updateReserveFund(id: string, patch: ReserveFundPatch): Promise<ReserveFundRow>;
+  insertReserveMovement(input: ReserveMovementInsert): Promise<ReserveMovementRow>;
+  listReserveMovements(fundId: string): Promise<ReserveMovementRow[]>;
+  reserveSummary(): Promise<ReserveSummaryRow[]>;
 
   // Sostenimiento (costos de operar la app).
   insertSustaining(input: SustainingServiceInsert): Promise<SustainingServiceRow>;

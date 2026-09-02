@@ -346,6 +346,25 @@ export async function runTool(
           ),
         });
       }
+      if (vista === 'reservas') {
+        await fin.ensureReserves();
+        const summary = await fin.reserveSummary();
+        const one = (k: 'flujo' | 'emergencia') => {
+          const r = summary.find((s) => s.kind === k);
+          if (!r) return { saldo: money(0), meta: money(0), bajo_meta: false };
+          return {
+            saldo: money(r.balanceMinor),
+            meta: r.targetMinor > 0 ? money(r.targetMinor) : 'sin meta',
+            falta: money(Math.max(0, r.targetMinor - r.balanceMinor)),
+            bajo_meta: r.targetMinor > 0 && r.balanceMinor < r.targetMinor,
+            descripcion: r.description ?? undefined,
+          };
+        };
+        return ok({
+          flujo_de_caja: one('flujo'),
+          fondo_de_emergencia: one('emergencia'),
+        });
+      }
       if (vista === 'etiquetas') {
         const tags = await fin.listTags(p.value.proyecto_id);
         const projects = await repo.listProjects();

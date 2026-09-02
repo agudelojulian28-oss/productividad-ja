@@ -4373,4 +4373,67 @@ button.mov-row:hover {
 .ba-table tbody tr.ba-now th:first-child { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
 .ba-table tbody tr.ba-now td:last-child { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
 .ba-table tfoot th, .ba-table tfoot td { border-top: 1px solid var(--border); font-weight: 800; padding-top: 8px; }
+
+/* ── Reservas: tiles (flujo + fondo de emergencia) junto a los KPIs ───────── */
+.rsv-tile-wrap { position: relative; }
+.rsv-tile {
+  text-align: left; cursor: pointer; font: inherit; color: var(--text); display: block;
+  min-width: 150px; touch-action: manipulation; transition: border-color .15s, transform .05s;
+}
+.rsv-tile:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.rsv-tile:active { transform: translateY(1px); }
+.rsv-tile.rsv-danger { border-color: color-mix(in srgb, var(--negative) 55%, var(--border)); background: var(--negative-weak); }
+.rsv-meter { height: 5px; border-radius: 999px; background: var(--border); overflow: hidden; margin-top: 8px; }
+.rsv-meter-fill { height: 100%; border-radius: 999px; }
+.rsv-meter-fill.rsv-acc { background: linear-gradient(90deg, var(--accent-from), var(--accent-to)); }
+.rsv-meter-fill.rsv-neg { background: var(--negative); }
+
+/* Popover de specs del flujo */
+.rsv-pop {
+  position: absolute; z-index: 60; top: calc(100% + 8px); left: 0; width: 280px; max-width: 84vw;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.45);
+}
+.rsv-pop-title { margin: 0 0 4px; font-weight: 700; font-size: 13.5px; color: var(--text); }
+.rsv-pop-text { margin: 0 0 10px; font-size: 12.5px; color: var(--text-muted); line-height: 1.4; }
+.rsv-pop-dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 10px; }
+.rsv-pop-dl dt { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.rsv-pop-dl dd { margin: 2px 0 0; font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.rsv-meta-btn { width: 100%; }
+.rsv-meta-edit { display: flex; gap: 8px; align-items: stretch; }
+.rsv-meta-edit .field { flex: 1; }
+
+/* Pop-up mensual del flujo */
+.rsv-prompt-lead { margin: 0 0 14px; font-size: 14px; color: var(--text); line-height: 1.5; }
+.rsv-prompt-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+
+/* Modal del fondo de emergencia */
+.rsv-emerg-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.rsv-emerg-k { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.rsv-emerg-v { display: block; font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.rsv-emerg-v.pos { color: var(--positive); }
+.rsv-emerg-v.neg { color: var(--negative); }
+.rsv-emerg-cap { display: block; font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+.rsv-emerg-desc { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); }
+.rsv-ajustes { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 14px; background: var(--surface-2, var(--card)); }
+.rsv-suggest { align-self: flex-start; }
+.rsv-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 640px) { .rsv-grid { grid-template-columns: 1fr 1fr; } }
+.rsv-col { display: flex; flex-direction: column; gap: 10px; }
+.rsv-col-h { margin: 0 0 2px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.rsv-note { margin: 0; font-size: 12px; color: var(--text-muted); }
+.rsv-submit { margin-top: 2px; }
+.rsv-danger-box { border: 1px solid var(--negative); background: var(--negative-weak); border-radius: 12px; padding: 12px; }
+.rsv-danger-box p { margin: 0 0 10px; font-size: 13px; color: var(--text); line-height: 1.45; }
+.rsv-danger-actions { display: flex; gap: 10px; }
+.btn-danger { background: var(--negative); color: #fff; border: 0; border-radius: 10px; padding: 9px 16px; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+.btn-danger:disabled { opacity: .5; cursor: default; }
+.rsv-movs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+.rsv-mov { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+.rsv-mov-main { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.rsv-mov-amt { font-weight: 700; font-variant-numeric: tabular-nums; }
+.rsv-mov-amt.pos { color: var(--positive); }
+.rsv-mov-amt.neg { color: var(--negative); }
+.rsv-mov-desc { font-size: 12.5px; color: var(--text); text-align: right; }
+.rsv-mov-meta { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .sos-group { display: flex; flex-direction: column; gap: 6px; }

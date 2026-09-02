@@ -30,6 +30,15 @@ import {
   deleteSustaining,
   listSustaining,
 } from '@/core/finance/sustaining';
+import {
+  updateReserveFund,
+  addFlujoAllocation,
+  addEmergencyMovement,
+  reserveView,
+  mesesDeGastos,
+} from '@/core/finance/reserves';
+import { serieMensual, resumenPorPeriodo } from '@/core/finance/queries';
+import type { ReserveMovementRow, ReserveSummaryRow } from '@/core/finance/ports';
 import type { SustainingServiceRow } from '@/core/finance/ports';
 import type { RecurringExpenseRow, RecurringFrequency, TagRow } from '@/core/finance/ports';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
@@ -528,4 +537,138 @@ export async function seedSustainingSugeridosAction(): Promise<Result<{ added: n
   }
   revalidatePath('/finanzas/sostenimiento');
   return ok({ added });
+}
+
+// ── Reservas (flujo de caja + fondo de emergencia) ─────────────────────────
+
+export interface ReservaTile {
+  fundId: string;
+  targetMinor: number;
+  balanceMinor: number;
+  belowTarget: boolean;
+  remainingMinor: number;
+  description: string | null;
+}
+export interface ReservasData {
+  flujo: ReservaTile;
+  emergencia: ReservaTile & { movements: ReserveMovementRow[] };
+  suggestedTargetMinor: number; // 6 meses de gastos
+  lastMonthBalanceMinor: number;
+  lastMonthLabel: string; // 'YYYY-MM'
+  flujoAllocatedThisMonth: boolean; // ya se apartó al flujo en el mes en curso
+}
+
+/** Estado de las reservas para los tiles + modal (una sola lectura para la página). */
+export async function getReservasAction(): Promise<ReservasData> {
+  const { supabase, ctx } = await requireContext();
+  const repo = financeRepo(supabase, ctx.userId);
+  await repo.ensureReserves();
+  const [summary, cashflow] = await Promise.all([repo.reserveSummary(), repo.cashflowMonthly()]);
+  const byKind = (k: 'flujo' | 'emergencia'): ReserveSummaryRow =>
+    summary.find((s) => s.kind === k) ?? {
+      fundId: '',
+      kind: k,
+      targetMinor: 0,
+      description: null,
+      projectId: null,
+      inMinor: 0,
+      outMinor: 0,
+      balanceMinor: 0,
+      movements: 0,
+    };
+  const tile = (row: ReserveSummaryRow): ReservaTile => {
+    const v = reserveView(row);
+    return {
+      fundId: row.fundId,
+      targetMinor: v.targetMinor,
+      balanceMinor: v.balanceMinor,
+      belowTarget: v.belowTarget,
+      remainingMinor: v.remainingMinor,
+      description: row.description,
+    };
+  };
+  const flujoRow = byKind('flujo');
+  const emergRow = byKind('emergencia');
+  const [emergMovs, flujoMovs] = await Promise.all([
+    emergRow.fundId ? repo.listReserveMovements(emergRow.fundId) : Promise.resolve([]),
+    flujoRow.fundId ? repo.listReserveMovements(flujoRow.fundId) : Promise.resolve([]),
+  ]);
+  const mesPasado = resumenPorPeriodo(cashflow, ctx.tz, 'mes_pasado');
+  const thisMonth = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz, year: 'numeric', month: '2-digit' }).format(new Date());
+  const flujoAllocatedThisMonth = flujoMovs.some((m) => m.occurredOn.startsWith(thisMonth));
+
+  return {
+    flujo: tile(flujoRow),
+    emergencia: { ...tile(emergRow), movements: emergMovs },
+    suggestedTargetMinor: mesesDeGastos(serieMensual(cashflow, 6), 6),
+    lastMonthBalanceMinor: mesPasado.netMinor,
+    lastMonthLabel: (() => {
+      const now = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz, year: 'numeric', month: '2-digit' }).format(new Date());
+      const [y, m] = now.split('-').map(Number);
+      const d = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, 1));
+      d.setUTCMonth(d.getUTCMonth() - 1);
+      return d.toISOString().slice(0, 7);
+    })(),
+    flujoAllocatedThisMonth,
+  };
+}
+
+export async function updateReserveFundAction(input: {
+  id: string;
+  targetMinor?: number;
+  description?: string | null;
+}): Promise<Result<{ id: string }>> {
+  const { ctx, repo } = await deps();
+  const r = await updateReserveFund(ctx, repo, input);
+  revalidatePath('/finanzas');
+  return r;
+}
+
+export async function addFlujoAllocationAction(input: {
+  fundId: string;
+  amountMinor: number;
+  occurredOn?: string;
+  description?: string | null;
+}): Promise<Result<ReserveMovementRow>> {
+  const { ctx, repo } = await deps();
+  const r = await addFlujoAllocation(ctx, repo, input);
+  revalidatePath('/finanzas');
+  return r;
+}
+
+/** Asegura el proyecto/área dedicados del fondo de emergencia (una vez). */
+async function ensureEmergencyProject(): Promise<{ fundId: string } | null> {
+  const { supabase, ctx } = await requireContext();
+  const finance = financeRepo(supabase, ctx.userId);
+  await finance.ensureReserves();
+  const fund = await finance.getReserveFund('emergencia');
+  if (!fund) return null;
+  if (fund.projectId && fund.areaId) return { fundId: fund.id };
+
+  const structure = structureRepo(supabase, ctx.userId);
+  const work = workRepo(supabase, ctx.userId);
+  // Área "Reservas" (reusa si ya existe por nombre).
+  const areas = await structure.listAreas();
+  const area = areas.find((a) => a.name.toLowerCase() === 'reservas') ?? (await structure.insertArea({ name: 'Reservas', kind: 'personal' }));
+  // Proyecto "Fondo de emergencia" bajo esa área.
+  const projects = await work.listProjects(area.id);
+  const project =
+    projects.find((p) => p.title.toLowerCase() === 'fondo de emergencia') ??
+    (await work.insertProject({ title: 'Fondo de emergencia', areaId: area.id }));
+  await finance.updateReserveFund(fund.id, { projectId: project.id, areaId: area.id });
+  return { fundId: fund.id };
+}
+
+export async function addEmergencyMovementAction(input: {
+  direction: 'in' | 'out';
+  amountMinor: number;
+  occurredOn?: string;
+  description?: string | null;
+}): Promise<Result<ReserveMovementRow>> {
+  const { ctx, repo } = await deps();
+  const ensured = await ensureEmergencyProject();
+  if (!ensured) return err('NOT_FOUND', 'No se pudo preparar el fondo de emergencia');
+  const r = await addEmergencyMovement(ctx, repo, { ...input, fundId: ensured.fundId });
+  revalidatePath('/finanzas');
+  return r;
 }

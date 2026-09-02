@@ -10,6 +10,9 @@ import type {
   RecurringExpenseRow,
   TagRow,
   SustainingServiceRow,
+  ReserveFundRow,
+  ReserveMovementRow,
+  ReserveKind,
 } from '@/core/finance/ports';
 
 export function makeFakeFinanceRepo(): FinanceRepo & {
@@ -20,6 +23,8 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
   _tags: Map<string, TagRow>;
   _txTags: { transactionId: string; tagId: string }[];
   _recTags: { recurringId: string; tagId: string }[];
+  _reserveFunds: Map<string, ReserveFundRow>;
+  _reserveMovements: ReserveMovementRow[];
 } {
   const sources = new Map<string, IncomeSourceRow>();
   const txs: TransactionRow[] = [];
@@ -27,6 +32,8 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
   const recurring = new Map<string, RecurringExpenseRow>();
   const tags = new Map<string, TagRow>();
   const sustaining = new Map<string, SustainingServiceRow>();
+  const reserveFunds = new Map<string, ReserveFundRow>();
+  const reserveMovements: ReserveMovementRow[] = [];
   let txTags: { transactionId: string; tagId: string }[] = [];
   let recTags: { recurringId: string; tagId: string }[] = [];
   let seq = 0;
@@ -37,6 +44,8 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
     _txs: txs,
     _goals: goals,
     _recurring: recurring,
+    _reserveFunds: reserveFunds,
+    _reserveMovements: reserveMovements,
     _tags: tags,
     _txTags: txTags,
     _recTags: recTags,
@@ -192,6 +201,67 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
     },
     async deleteSustaining(id: string): Promise<void> {
       sustaining.delete(id);
+    },
+    async ensureReserves(): Promise<void> {
+      for (const kind of ['flujo', 'emergencia'] as ReserveKind[]) {
+        if (![...reserveFunds.values()].some((f) => f.kind === kind)) {
+          const row: ReserveFundRow = { id: uuid(), kind, targetMinor: 0, description: null, projectId: null, areaId: null };
+          reserveFunds.set(row.id, row);
+        }
+      }
+    },
+    async listReserveFunds(): Promise<ReserveFundRow[]> {
+      return [...reserveFunds.values()];
+    },
+    async getReserveFund(kind: ReserveKind): Promise<ReserveFundRow | null> {
+      return [...reserveFunds.values()].find((f) => f.kind === kind) ?? null;
+    },
+    async updateReserveFund(id, patch): Promise<ReserveFundRow> {
+      const cur = reserveFunds.get(id);
+      if (!cur) throw new Error('updateReserveFund: no existe');
+      const next: ReserveFundRow = {
+        ...cur,
+        targetMinor: patch.targetMinor ?? cur.targetMinor,
+        description: patch.description === undefined ? cur.description : patch.description,
+        projectId: patch.projectId === undefined ? cur.projectId : patch.projectId,
+        areaId: patch.areaId === undefined ? cur.areaId : patch.areaId,
+      };
+      reserveFunds.set(id, next);
+      return next;
+    },
+    async insertReserveMovement(input): Promise<ReserveMovementRow> {
+      const row: ReserveMovementRow = {
+        id: uuid(),
+        fundId: input.fundId,
+        direction: input.direction,
+        amountMinor: input.amountMinor,
+        occurredOn: input.occurredOn ?? '2026-09-02',
+        description: input.description ?? null,
+        linkedTransactionId: input.linkedTransactionId ?? null,
+      };
+      reserveMovements.push(row);
+      return row;
+    },
+    async listReserveMovements(fundId: string): Promise<ReserveMovementRow[]> {
+      return reserveMovements.filter((m) => m.fundId === fundId);
+    },
+    async reserveSummary() {
+      return [...reserveFunds.values()].map((f) => {
+        const ms = reserveMovements.filter((m) => m.fundId === f.id);
+        const inMinor = ms.filter((m) => m.direction === 'in').reduce((s, m) => s + m.amountMinor, 0);
+        const outMinor = ms.filter((m) => m.direction === 'out').reduce((s, m) => s + m.amountMinor, 0);
+        return {
+          fundId: f.id,
+          kind: f.kind,
+          targetMinor: f.targetMinor,
+          description: f.description,
+          projectId: f.projectId,
+          inMinor,
+          outMinor,
+          balanceMinor: inMinor - outMinor,
+          movements: ms.length,
+        };
+      });
     },
     async insertIncomeSource(input: IncomeSourceInsert): Promise<IncomeSourceRow> {
       const row: IncomeSourceRow = {

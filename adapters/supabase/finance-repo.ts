@@ -15,10 +15,36 @@ import type {
   ReceivableRow,
   PipelineRow,
   MoneyGoalProgressRow,
+  ReserveKind,
+  ReserveFundRow,
+  ReserveMovementRow,
+  ReserveSummaryRow,
 } from '@/core/finance/ports';
 
 // Los sum() de bigint pueden volver como string desde PostgREST → Number() siempre.
 const n = (v: unknown): number => Number(v ?? 0);
+
+function toReserveFund(r: Record<string, unknown>): ReserveFundRow {
+  return {
+    id: r.id as string,
+    kind: r.kind as ReserveKind,
+    targetMinor: n(r.target_minor),
+    description: (r.description as string | null) ?? null,
+    projectId: (r.project_id as string | null) ?? null,
+    areaId: (r.area_id as string | null) ?? null,
+  };
+}
+function toReserveMovement(r: Record<string, unknown>): ReserveMovementRow {
+  return {
+    id: r.id as string,
+    fundId: r.fund_id as string,
+    direction: r.direction as 'in' | 'out',
+    amountMinor: n(r.amount_minor),
+    occurredOn: r.occurred_on as string,
+    description: (r.description as string | null) ?? null,
+    linkedTransactionId: (r.linked_transaction_id as string | null) ?? null,
+  };
+}
 
 interface DbIncomeSource {
   id: string;
@@ -377,6 +403,96 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
     async deleteSustaining(id) {
       const { error } = await supabase.from('sustaining_services').delete().eq('id', id);
       if (error) throw new Error(error.message);
+    },
+
+    // ── Reservas ──────────────────────────────────────────────────────────
+    async ensureReserves() {
+      const { data, error } = await supabase.from('reserve_funds').select('kind');
+      if (error) throw new Error(error.message);
+      const have = new Set((data as { kind: string }[] | null)?.map((r) => r.kind) ?? []);
+      const missing = (['flujo', 'emergencia'] as const).filter((k) => !have.has(k));
+      if (missing.length === 0) return;
+      const { error: insErr } = await supabase
+        .from('reserve_funds')
+        .insert(missing.map((kind) => ({ user_id: userId, kind })));
+      if (insErr && !/duplicate key/i.test(insErr.message)) throw new Error(insErr.message);
+    },
+    async listReserveFunds() {
+      const { data, error } = await supabase
+        .from('reserve_funds')
+        .select('id,kind,target_minor,description,project_id,area_id');
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map(toReserveFund);
+    },
+    async getReserveFund(kind) {
+      const { data, error } = await supabase
+        .from('reserve_funds')
+        .select('id,kind,target_minor,description,project_id,area_id')
+        .eq('kind', kind)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? toReserveFund(data as Record<string, unknown>) : null;
+    },
+    async updateReserveFund(id, patch) {
+      const upd: Record<string, unknown> = {};
+      if (patch.targetMinor !== undefined) upd.target_minor = patch.targetMinor;
+      if (patch.description !== undefined) upd.description = patch.description;
+      if (patch.projectId !== undefined) upd.project_id = patch.projectId;
+      if (patch.areaId !== undefined) upd.area_id = patch.areaId;
+      const { data, error } = await supabase
+        .from('reserve_funds')
+        .update(upd)
+        .eq('id', id)
+        .select('id,kind,target_minor,description,project_id,area_id')
+        .single();
+      if (error) throw new Error(error.message);
+      return toReserveFund(data as Record<string, unknown>);
+    },
+    async insertReserveMovement(input) {
+      const { data, error } = await supabase
+        .from('reserve_movements')
+        .insert({
+          user_id: userId,
+          fund_id: input.fundId,
+          direction: input.direction,
+          amount_minor: input.amountMinor,
+          occurred_on: input.occurredOn ?? undefined,
+          description: input.description ?? null,
+          linked_transaction_id: input.linkedTransactionId ?? null,
+        })
+        .select('id,fund_id,direction,amount_minor,occurred_on,description,linked_transaction_id')
+        .single();
+      if (error) throw new Error(error.message);
+      return toReserveMovement(data as Record<string, unknown>);
+    },
+    async listReserveMovements(fundId) {
+      const { data, error } = await supabase
+        .from('reserve_movements')
+        .select('id,fund_id,direction,amount_minor,occurred_on,description,linked_transaction_id')
+        .eq('fund_id', fundId)
+        .order('occurred_on', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map(toReserveMovement);
+    },
+    async reserveSummary() {
+      const { data, error } = await supabase
+        .from('fin_reserve_summary')
+        .select('fund_id,kind,target_minor,description,project_id,in_minor,out_minor,balance_minor,movements');
+      if (error) throw new Error(error.message);
+      return ((data as Record<string, unknown>[] | null) ?? []).map(
+        (r): ReserveSummaryRow => ({
+          fundId: r.fund_id as string,
+          kind: r.kind as ReserveKind,
+          targetMinor: n(r.target_minor),
+          description: (r.description as string | null) ?? null,
+          projectId: (r.project_id as string | null) ?? null,
+          inMinor: n(r.in_minor),
+          outMinor: n(r.out_minor),
+          balanceMinor: n(r.balance_minor),
+          movements: n(r.movements),
+        }),
+      );
     },
 
     async cashflowMonthly() {
