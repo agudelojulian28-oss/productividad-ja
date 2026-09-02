@@ -33,7 +33,9 @@ import {
   setTransactionTags,
   setRecurringTags,
 } from '@/core/finance/tags';
-import { resumenFinanciero, resumenPorPeriodo, enPeriodo, topGastos } from '@/core/finance/queries';
+import { resumenFinanciero, resumenPorPeriodo, enPeriodo, topGastos, serieMensual } from '@/core/finance/queries';
+import { addFlujoAllocation, addEmergencyMovement, updateReserveFund } from '@/core/finance/reserves';
+import { reporteFinanciero } from '@/core/finance/analisis';
 import { sustainingSummary, monthlyEquivalent, toCopMinor } from '@/core/finance/sustaining';
 import { getTrm } from '@/lib/trm';
 import { detectarChoques, huecosLibres } from '@/lib/agenda';
@@ -114,6 +116,28 @@ const noEvento = err(
 async function calendarReady(deps: ToolDeps): Promise<boolean> {
   if (deps.googleConnected) return deps.googleConnected();
   return true;
+}
+
+/** Asegura el proyecto/área dedicados del fondo de emergencia (para atribuir el gasto
+ *  del aporte). Mismo comportamiento que la acción de la app, con los repos del agente. */
+async function ensureEmergencyFund(deps: ToolDeps): Promise<{ fundId: string } | null> {
+  const fin = deps.finance;
+  if (!fin) return null;
+  await fin.ensureReserves();
+  const fund = await fin.getReserveFund('emergencia');
+  if (!fund) return null;
+  if (fund.projectId && fund.areaId) return { fundId: fund.id };
+  if (!deps.structure) return null;
+  const areas = await deps.structure.listAreas();
+  const area =
+    areas.find((a) => a.name.toLowerCase() === 'reservas') ??
+    (await deps.structure.insertArea({ name: 'Reservas', kind: 'personal' }));
+  const projects = await deps.repo.listProjects(area.id);
+  const project =
+    projects.find((pr) => pr.title.toLowerCase() === 'fondo de emergencia') ??
+    (await deps.repo.insertProject({ title: 'Fondo de emergencia', areaId: area.id }));
+  await fin.updateReserveFund(fund.id, { projectId: project.id, areaId: area.id });
+  return { fundId: fund.id };
 }
 
 /** Ejecuta una herramienta: valida (Zod), llama al caso de uso de /core, y aplica
@@ -365,6 +389,42 @@ export async function runTool(
           fondo_de_emergencia: one('emergencia'),
         });
       }
+      if (vista === 'informe') {
+        await fin.ensureReserves();
+        const [cashflow, recurrentes, summary] = await Promise.all([
+          fin.cashflowMonthly(),
+          fin.listRecurringExpenses(),
+          fin.reserveSummary(),
+        ]);
+        const emerg = summary.find((s) => s.kind === 'emergencia');
+        const r = reporteFinanciero({
+          serie: serieMensual(cashflow, 600),
+          recurrentes: recurrentes.map((x) => ({
+            direction: x.direction,
+            projectId: x.projectId,
+            amountMinor: x.amountMinor,
+            frequency: x.frequency,
+          })),
+          emergencyBalanceMinor: emerg?.balanceMinor ?? 0,
+          today: todayInTz(ctx.tz),
+        });
+        return ok({
+          veredicto: r.verdict,
+          score: r.score,
+          tendencia: r.trend,
+          meses_analizados: r.monthsUsed,
+          neto_mensual_promedio: money(r.avgNetMinor),
+          tasa_ahorro_pct: r.savingsRatePct,
+          costos_fijos_sobre_ingresos_pct: r.fixedCostRatioPct,
+          cobertura_emergencia_meses: r.emergencyCoverageMonths,
+          recurrente_neto_mensual: money(r.recurringNetMinor),
+          proyeccion: r.projection.map((pj) => ({
+            mes: pj.month,
+            neto: money(pj.netMinor),
+            acumulado: money(pj.cumulativeMinor),
+          })),
+        });
+      }
       if (vista === 'etiquetas') {
         const tags = await fin.listTags(p.value.proyecto_id);
         const projects = await repo.listProjects();
@@ -556,6 +616,56 @@ export async function runTool(
           });
           return r.ok ? ok({ etiqueta_id: r.value.id, nombre: r.value.name, proyecto_id: r.value.projectId }) : r;
         }
+        case 'reserva': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          await deps.finance.ensureReserves();
+          const amountMinor = Math.round(v.monto! * 100);
+          if (v.fondo === 'flujo') {
+            if (v.direccion !== 'ingreso') {
+              return err('INVALID_INPUT', 'El flujo de caja solo recibe aportes (direccion=ingreso)');
+            }
+            const fund = await deps.finance.getReserveFund('flujo');
+            if (!fund) return err('NOT_FOUND', 'No se encontró el flujo de caja');
+            const r = await addFlujoAllocation(ctx, deps.finance, {
+              fundId: fund.id,
+              amountMinor,
+              occurredOn: v.desde,
+              description: v.descripcion,
+            });
+            return r.ok ? ok({ apartado: money(amountMinor), fondo: 'flujo de caja' }) : r;
+          }
+          // fondo === 'emergencia'
+          if (v.direccion === 'gasto') {
+            // Retiro: es dinero de emergencia → requiere confirmación explícita del usuario.
+            if (v.confirmar !== true) {
+              return ok({
+                confirmacion_requerida: true,
+                aviso: `⚠ Peligro: vas a retirar ${money(amountMinor)} del fondo de emergencia. Este dinero solo debe gastarse en una emergencia real. Confírmalo con el usuario y vuelve a llamar con confirmar=true.`,
+              });
+            }
+            const fund = await deps.finance.getReserveFund('emergencia');
+            if (!fund) return err('NOT_FOUND', 'No se encontró el fondo de emergencia');
+            const r = await addEmergencyMovement(ctx, deps.finance, {
+              fundId: fund.id,
+              direction: 'out',
+              amountMinor,
+              occurredOn: v.desde,
+              description: v.descripcion,
+            });
+            return r.ok ? ok({ retirado: money(amountMinor), fondo: 'emergencia' }) : r;
+          }
+          // Aporte al fondo: cuenta como GASTO real del balance (proyecto dedicado).
+          const ensured = await ensureEmergencyFund(deps);
+          if (!ensured) return err('EXTERNAL_ERROR', 'No se pudo preparar el fondo de emergencia');
+          const r = await addEmergencyMovement(ctx, deps.finance, {
+            fundId: ensured.fundId,
+            direction: 'in',
+            amountMinor,
+            occurredOn: v.desde,
+            description: v.descripcion,
+          });
+          return r.ok ? ok({ aportado: money(amountMinor), fondo: 'emergencia', nota: 'Cuenta como gasto de tu balance.' }) : r;
+        }
       }
       return err('INVALID_INPUT', 'Tipo desconocido');
     }
@@ -565,6 +675,23 @@ export async function runTool(
       const p = parse(Actualizar, rawInput);
       if (!p.ok) return p;
       const v = p.value;
+      // Reserva se identifica por `fondo`, no por id → se maneja antes del guard de id.
+      if (v.tipo === 'reserva') {
+        if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+        await deps.finance.ensureReserves();
+        const fund = await deps.finance.getReserveFund(v.fondo!);
+        if (!fund) return err('NOT_FOUND', 'No se encontró ese fondo');
+        const targetMinor = v.objetivo != null ? Math.round(v.objetivo * 100) : undefined;
+        const r = await updateReserveFund(ctx, deps.finance, {
+          id: fund.id,
+          targetMinor,
+          description: v.descripcion !== undefined ? v.descripcion || null : undefined,
+        });
+        return r.ok
+          ? ok({ actualizado: v.fondo, meta: targetMinor != null ? money(targetMinor) : undefined })
+          : r;
+      }
+      if (!v.id) return err('INVALID_INPUT', 'Indica el id de la entidad a actualizar');
       switch (v.tipo) {
         case 'tarea_recurrente': {
           const r = await updateRecurringTask(ctx, repo, {

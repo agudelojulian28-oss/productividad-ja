@@ -43,6 +43,7 @@ export const Consultar = z.object({
       'etiquetas',
       'sostenimiento',
       'reservas',
+      'informe',
       'por_cobrar',
       'pipeline',
       'conflictos',
@@ -53,7 +54,7 @@ export const Consultar = z.object({
         'pendientes (tareas), tareas_recurrentes (plantillas de tareas que se repiten, con sus IDs), estructura (áreas, proyectos y metas con sus IDs), documentacion (el método). ' +
         'Dinero: resumen_financiero, por_proyecto (ingresos/gastos por proyecto), movimientos (lista de ' +
         'ingresos/gastos filtrable por rango de fechas: usa desde/hasta/direccion), gastos, recurrentes ' +
-        '(gastos e ingresos recurrentes), etiquetas (lista de etiquetas con sus IDs para poder asignarlas), sostenimiento (costos de operar la app: total mensual y alertas de recarga/renovación), reservas (flujo de caja y fondo de emergencia: saldo, meta y si están bajo la meta), por_cobrar, pipeline. ' +
+        '(gastos e ingresos recurrentes), etiquetas (lista de etiquetas con sus IDs para poder asignarlas), sostenimiento (costos de operar la app: total mensual y alertas de recarga/renovación), reservas (flujo de caja y fondo de emergencia: saldo, meta y si están bajo la meta), informe (salud financiera: tasa de ahorro, costos fijos, cobertura del fondo, tendencia, score y proyección de los próximos meses), por_cobrar, pipeline. ' +
         'Agenda: conflictos (solapes próximos 7 días), huecos (ratos libres; usa duracion_min).',
     ),
   fecha: Ymd.optional().describe('Solo vista=agenda: día YYYY-MM-DD (por defecto hoy)'),
@@ -93,6 +94,7 @@ export const Crear = z
         'recurrente',
         'tarea_recurrente',
         'etiqueta',
+        'reserva',
       ])
       .describe('Qué crear'),
     titulo: z
@@ -119,7 +121,15 @@ export const Crear = z
     direccion: z
       .enum(['ingreso', 'gasto'])
       .optional()
-      .describe('movimiento: ingreso o gasto. recurrente: ingreso (recurrente de ingreso) o gasto (por defecto gasto)'),
+      .describe('movimiento: ingreso o gasto. recurrente: ingreso o gasto (def gasto). reserva: ingreso=aportar/apartar, gasto=retirar (solo fondo de emergencia)'),
+    fondo: z
+      .enum(['flujo', 'emergencia'])
+      .optional()
+      .describe('Solo reserva: flujo (uso diario, solo aportes) o emergencia (aportar/retirar)'),
+    confirmar: z
+      .boolean()
+      .optional()
+      .describe('Solo reserva gasto del fondo de emergencia (retiro): pon true SOLO después de que el usuario confirme; es dinero de emergencia'),
     monto: z.number().positive().optional().describe('movimiento / recurrente: en la moneda, NO centavos (ej. 50000, 12.5)'),
     moneda: z.enum(['COP', 'USD']).optional().describe('Solo movimiento (por defecto COP)'),
     tasa: z.number().positive().optional().describe('Solo movimiento en USD: COP por 1 USD'),
@@ -173,6 +183,8 @@ export const Crear = z
           return !!d.titulo && !!d.frecuencia && !!d.desde;
         case 'etiqueta':
           return !!d.titulo && !!d.proyecto_id;
+        case 'reserva':
+          return !!d.fondo && d.monto != null && !!d.direccion;
         default:
           return false;
       }
@@ -184,9 +196,10 @@ export const Crear = z
 export const Actualizar = z
   .object({
     tipo: z
-      .enum(['tarea', 'evento', 'meta', 'proyecto', 'area', 'documento', 'recurrente', 'tarea_recurrente', 'movimiento', 'etiqueta'])
+      .enum(['tarea', 'evento', 'meta', 'proyecto', 'area', 'documento', 'recurrente', 'tarea_recurrente', 'movimiento', 'etiqueta', 'reserva'])
       .describe('Qué actualizar'),
-    id: z.string().min(1).describe('ID de la entidad (uuid; para evento es el id de Google de consultar agenda)'),
+    id: z.string().min(1).optional().describe('ID de la entidad (uuid; para evento es el id de Google de consultar agenda). No aplica a reserva (usa fondo)'),
+    fondo: z.enum(['flujo', 'emergencia']).optional().describe('Solo reserva: cuál fondo cambiar (su meta con objetivo, y/o descripcion)'),
     accion: z
       .enum([
         'completar',
@@ -236,7 +249,7 @@ export const Actualizar = z
       .max(20)
       .optional()
       .describe('movimiento / recurrente: REEMPLAZA sus etiquetas por estos IDs (obtén IDs con consultar etiquetas). Lista vacía = quitar todas'),
-    objetivo: z.number().positive().optional().describe('meta factores: cantidad objetivo'),
+    objetivo: z.number().positive().optional().describe('meta factores: cantidad objetivo · reserva: nueva meta en pesos'),
     desde: Ymd.optional().describe('meta factores: inicio · tarea_recurrente: nueva próxima fecha'),
     hasta: Ymd.optional().describe('meta factores: cumplimiento'),
     fijado: z.boolean().optional().describe('documento: fijar/desfijar'),
@@ -251,6 +264,14 @@ export const Actualizar = z
   .refine((d) => d.tipo !== 'documento' || !!d.accion, {
     message: 'Para tipo=documento indica accion (editar/anexar/fijar)',
     path: ['accion'],
+  })
+  .refine((d) => d.tipo === 'reserva' || !!d.id, {
+    message: 'Indica el id de la entidad a actualizar',
+    path: ['id'],
+  })
+  .refine((d) => d.tipo !== 'reserva' || !!d.fondo, {
+    message: 'Para tipo=reserva indica el fondo (flujo o emergencia)',
+    path: ['fondo'],
   });
 
 // ── archivar / borrar (unión por tipo) ──────────────────────────────────────
