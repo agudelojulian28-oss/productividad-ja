@@ -135,7 +135,7 @@ export default async function FinanzasPage() {
     }));
 
   // Movimientos recientes con su comprobante (si tiene). Una consulta para todos.
-  const recientes = await finance.listRecentTransactions(20);
+  const recientes = await finance.listRecentTransactions(60);
   const receipts = await structure.listAttachmentsForTransactions(recientes.map((t) => t.id));
   const receiptPath = new Map<string, string>();
   for (const a of receipts) {

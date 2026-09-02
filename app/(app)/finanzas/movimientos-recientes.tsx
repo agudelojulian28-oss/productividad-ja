@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { money } from '@/lib/format';
 import { listMovimientosAction } from '@/app/actions/finance';
 import { Modal } from '../modal';
@@ -32,6 +32,8 @@ type Project = { id: string; title: string; areaId: string };
 export type { TagOption };
 type Dir = 'all' | 'in' | 'out';
 type Preset = 'recientes' | 'hoy' | '7d' | '30d' | 'mes' | 'custom';
+
+const PAGE = 15; // movimientos visibles antes de "Ver más"
 
 function addDays(ymd: string, n: number): string {
   const [y, m, d] = ymd.split('-').map(Number);
@@ -70,6 +72,7 @@ export function MovimientosRecientes({
   const [from, setFrom] = useState(addDays(today, -29));
   const [to, setTo] = useState(today);
   const [editing, setEditing] = useState<MovRow | null>(null);
+  const [limit, setLimit] = useState(PAGE);
   const [pending, startTransition] = useTransition();
 
   function rangeFor(p: Preset): { from?: string; to?: string } {
@@ -109,6 +112,11 @@ export function MovimientosRecientes({
   const shown = base
     .filter((r) => dir === 'all' || r.direction === dir)
     .filter((r) => !tagFilter || r.tagIds.includes(tagFilter));
+
+  // Al cambiar de filtro/rango, vuelve a mostrar solo la primera página.
+  useEffect(() => setLimit(PAGE), [dir, tagFilter, base]);
+  const visible = shown.slice(0, limit);
+  const restantes = shown.length - visible.length;
 
   // Opciones del filtro de etiquetas, agrupadas por proyecto (ADR-029). Solo se
   // listan las etiquetas que están en uso en los movimientos cargados.
@@ -193,7 +201,7 @@ export function MovimientosRecientes({
         </p>
       ) : (
         <div className="mov-list">
-          {shown.map((m) => (
+          {visible.map((m) => (
             <button key={m.id} type="button" className="mov-row" onClick={() => setEditing(m)}>
               <span className={`mov-thumb mov-thumb-${m.direction}`}>
                 {m.receiptUrl ? (
@@ -219,6 +227,11 @@ export function MovimientosRecientes({
               </span>
             </button>
           ))}
+          {restantes > 0 && (
+            <button type="button" className="btn-ghost mov-more" onClick={() => setLimit((l) => l + PAGE)}>
+              Ver más ({restantes} {restantes === 1 ? 'movimiento' : 'movimientos'})
+            </button>
+          )}
         </div>
       )}
 

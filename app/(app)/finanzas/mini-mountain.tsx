@@ -53,8 +53,13 @@ export function MiniMountain({
   const max = Math.max(0, ...values);
   const min = Math.min(0, ...values);
   const range = max - min || 1;
+  // Espacio extra arriba y abajo: la curva suavizada (Catmull-Rom) puede sobrepasar el
+  // punto más alto/bajo; sin este margen el pico (o el valle) se recorta contra el borde.
+  const HEAD = Math.max(6, Math.round(H * 0.16));
+  const top = PAD + HEAD;
+  const bot = H - PAD - Math.round(HEAD * 0.6);
   const x = (i: number) => (n <= 1 ? W / 2 : PAD + ((W - 2 * PAD) * i) / (n - 1));
-  const y = (v: number) => PAD + (H - 2 * PAD) * (1 - (v - min) / range);
+  const y = (v: number) => top + (bot - top) * (1 - (v - min) / range);
   const baseY = y(0);
   const pts = values.map((v, i): [number, number] => [x(i), y(v)]);
   const line = smoothPath(pts);

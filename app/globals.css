@@ -2339,6 +2339,7 @@ ol {
   flex-direction: column;
   gap: 2px;
 }
+.mov-more { align-self: center; margin-top: 10px; }
 .mov-row {
   display: flex;
   align-items: center;
