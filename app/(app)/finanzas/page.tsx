@@ -4,6 +4,7 @@ import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { financeRepo } from '@/adapters/supabase/finance-repo';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { resumenFinanciero, serieMensual } from '@/core/finance/queries';
+import { BalanceAnual } from './balance-anual';
 import { money, todayInTz, dayLabelInTz } from '@/lib/format';
 import { getTrm } from '@/lib/trm';
 import { signedUrl } from '@/adapters/supabase/storage';
@@ -59,6 +60,8 @@ export default async function FinanzasPage() {
 
   const resumen = resumenFinanciero(cashflow, ctx.tz);
   const serie = serieMensual(cashflow, 6);
+  // Serie completa (todos los meses con datos) para el resumen anual del rail.
+  const serieCompleta = serieMensual(cashflow, 600);
 
   // Variación % vs el mes anterior (badge en KPIs). Solo si el mes previo > 0.
   const cur = serie[serie.length - 1];
@@ -294,6 +297,11 @@ export default async function FinanzasPage() {
             <>
               <section className="fin-block fin-capture">
                 <MovimientoLauncher projects={projectOpts} today={todayInTz(ctx.tz)} tags={tags} trm={trm.value} />
+              </section>
+
+              <section className="fin-block">
+                <h2 className="fin-h2">Balance del año</h2>
+                <BalanceAnual serie={serieCompleta} today={todayInTz(ctx.tz)} />
               </section>
 
               <section className="fin-block">

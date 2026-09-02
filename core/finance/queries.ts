@@ -151,6 +151,40 @@ export function serieMensual(cashflow: CashflowMonthRow[], months = 6): SerieMes
     .slice(-months);
 }
 
+/** Años con datos en el cashflow, ascendente (para navegar el resumen anual). */
+export function aniosConDatos(serie: SerieMes[]): number[] {
+  const set = new Set<number>();
+  for (const m of serie) set.add(Number(m.month.slice(0, 4)));
+  return [...set].sort((a, b) => a - b);
+}
+
+/** Los 12 meses (Ene→Dic) de `year`, rellenando con ceros los meses sin movimientos. */
+export function serieAnioMensual(serie: SerieMes[], year: number): SerieMes[] {
+  const byMonth = new Map(serie.map((m) => [m.month, m] as const));
+  const out: SerieMes[] = [];
+  for (let mo = 1; mo <= 12; mo++) {
+    const key = `${year}-${String(mo).padStart(2, '0')}-01`;
+    out.push(byMonth.get(key) ?? { month: key, inflowMinor: 0, outflowMinor: 0, netMinor: 0 });
+  }
+  return out;
+}
+
+/** Totales del año (suma de sus meses). */
+export function totalesAnio(meses: SerieMes[]): {
+  inflowMinor: number;
+  outflowMinor: number;
+  netMinor: number;
+} {
+  return meses.reduce(
+    (acc, m) => ({
+      inflowMinor: acc.inflowMinor + m.inflowMinor,
+      outflowMinor: acc.outflowMinor + m.outflowMinor,
+      netMinor: acc.netMinor + m.netMinor,
+    }),
+    { inflowMinor: 0, outflowMinor: 0, netMinor: 0 },
+  );
+}
+
 /** ⑤ Gastos top-N del mes actual (lista ordenada, no torta). */
 export function topGastos(
   expenses: ExpenseCategoryRow[],

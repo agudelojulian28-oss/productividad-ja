@@ -4,6 +4,9 @@ import {
   resumenPorPeriodo,
   enPeriodo,
   serieMensual,
+  aniosConDatos,
+  serieAnioMensual,
+  totalesAnio,
   topGastos,
   mesActual,
 } from '@/core/finance/queries';
@@ -119,6 +122,43 @@ describe('serieMensual', () => {
     expect(s.length).toBe(2);
     expect(s[0]!.month).toBe('2026-05-01');
     expect(s[0]!.netMinor).toBe(15);
+  });
+});
+
+describe('resumen anual', () => {
+  const serie = serieMensual(
+    [
+      cf({ month: '2026-01-01', inflowMinor: 100, outflowMinor: 30, netMinor: 70 }),
+      cf({ month: '2026-03-01', inflowMinor: 50, outflowMinor: 80, netMinor: -30 }),
+      cf({ month: '2025-11-01', inflowMinor: 9, outflowMinor: 1, netMinor: 8 }),
+    ],
+    600,
+  );
+
+  it('aniosConDatos: años distintos ascendentes', () => {
+    expect(aniosConDatos(serie)).toEqual([2025, 2026]);
+  });
+
+  it('serieAnioMensual: 12 meses Ene→Dic, ceros en meses sin datos', () => {
+    const meses = serieAnioMensual(serie, 2026);
+    expect(meses.length).toBe(12);
+    expect(meses[0]!.month).toBe('2026-01-01');
+    expect(meses[0]!.netMinor).toBe(70);
+    expect(meses[1]!.netMinor).toBe(0); // febrero sin datos
+    expect(meses[2]!.netMinor).toBe(-30); // marzo negativo
+    expect(meses[11]!.month).toBe('2026-12-01');
+  });
+
+  it('serieAnioMensual: año sin datos = 12 ceros', () => {
+    const meses = serieAnioMensual(serie, 2024);
+    expect(meses.every((m) => m.netMinor === 0 && m.inflowMinor === 0)).toBe(true);
+  });
+
+  it('totalesAnio: suma ingresos/gastos/neto de los meses', () => {
+    const t = totalesAnio(serieAnioMensual(serie, 2026));
+    expect(t.inflowMinor).toBe(150);
+    expect(t.outflowMinor).toBe(110);
+    expect(t.netMinor).toBe(40);
   });
 });
 

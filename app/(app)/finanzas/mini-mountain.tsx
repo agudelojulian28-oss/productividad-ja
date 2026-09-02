@@ -7,7 +7,7 @@ import { money } from '@/lib/format';
 // (dataviz): naranja para ingresos, neutro para gastos. Con hover por punto. Las
 // cubetas (semanas o meses) las decide quien lo usa y llegan ya etiquetadas.
 const W = 240;
-const H = 44;
+const H_DEFAULT = 44;
 const PAD = 4;
 
 /** Suaviza una polilínea con curvas de Bézier (Catmull-Rom). */
@@ -33,13 +33,20 @@ export function MiniMountain({
   labels,
   values,
   tone = 'accent',
+  height = H_DEFAULT,
+  showZero = false,
 }: {
   labels: string[];
   values: number[];
   tone?: 'accent' | 'muted';
+  /** Alto del SVG en px (por defecto sparkline de 44). */
+  height?: number;
+  /** Dibuja la línea base del cero (útil cuando hay balances negativos). */
+  showZero?: boolean;
 }) {
   const gid = useId();
   const [hover, setHover] = useState<number | null>(null);
+  const H = height;
   const n = values.length;
   // Rango con cero incluido: si hay valores negativos (p. ej. balance), la línea base
   // es el cero y el área se rellena hasta ahí. Con todo positivo, base = fondo (igual).
@@ -75,6 +82,9 @@ export function MiniMountain({
             <stop offset="100%" stopColor={color} stopOpacity="0.02" />
           </linearGradient>
         </defs>
+        {showZero && min < 0 && (
+          <line x1={0} y1={baseY} x2={W} y2={baseY} stroke="var(--border)" strokeWidth={1} strokeDasharray="3 3" />
+        )}
         {areaD && <path d={areaD} fill={`url(#${gid})`} />}
         <path d={line} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         {hover !== null && pts[hover] && (
