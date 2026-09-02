@@ -1980,7 +1980,7 @@ ol {
 .recur-total-v { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
 
 /* Total recurrente combinado (ingresos + gastos + neto) */
-.recur-combo { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: -6px 0 8px; }
+.recur-combo { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 @media (max-width: 520px) { .recur-combo { grid-template-columns: 1fr; } }
 .recur-combo-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
 .recur-combo-net { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }

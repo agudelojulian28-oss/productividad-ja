@@ -80,7 +80,6 @@ export function Recurrentes({
       }))
       .sort((a, b) => b.subtotal - a.subtotal);
   }, [recurrentes, projects]);
-  const sectionTotal = groups.reduce((s, g) => s + g.subtotal, 0);
 
   return (
     <div>
@@ -135,13 +134,6 @@ export function Recurrentes({
               </ul>
             </div>
           ))}
-          <div className="recur-total">
-            <span>Total {direction === 'in' ? 'ingresos' : 'gastos'} recurrentes / mes</span>
-            <span className={`recur-total-v ${copy.cls}`}>
-              {copy.sign}
-              {money(sectionTotal, { compact: true })}
-            </span>
-          </div>
         </div>
       ) : (
         <p className="muted" style={{ marginBottom: 12 }}>

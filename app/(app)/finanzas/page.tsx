@@ -278,23 +278,26 @@ export default async function FinanzasPage() {
           </section>
 
           {(gastosRecur.length > 0 || ingresosRecur.length > 0) && (
-            <div className="recur-combo" role="group" aria-label="Total recurrente mensual">
-              <div className="recur-combo-cell">
-                <span className="recur-combo-k">Ingresos / mes</span>
-                <span className="recur-combo-v fin-pos">+{money(recurringCombo.inMinor, { compact: true })}</span>
+            <section className="fin-block">
+              <h2 className="fin-h2">Resumen recurrente / mes</h2>
+              <div className="recur-combo" role="group" aria-label="Total recurrente mensual">
+                <div className="recur-combo-cell">
+                  <span className="recur-combo-k">Ingresos / mes</span>
+                  <span className="recur-combo-v fin-pos">+{money(recurringCombo.inMinor, { compact: true })}</span>
+                </div>
+                <div className="recur-combo-cell">
+                  <span className="recur-combo-k">Gastos / mes</span>
+                  <span className="recur-combo-v fin-neg">−{money(recurringCombo.outMinor, { compact: true })}</span>
+                </div>
+                <div className="recur-combo-cell recur-combo-net">
+                  <span className="recur-combo-k">Neto recurrente / mes</span>
+                  <span className={`recur-combo-v ${recurringCombo.netMinor >= 0 ? 'fin-pos' : 'fin-neg'}`}>
+                    {recurringCombo.netMinor >= 0 ? '+' : '−'}
+                    {money(Math.abs(recurringCombo.netMinor), { compact: true })}
+                  </span>
+                </div>
               </div>
-              <div className="recur-combo-cell">
-                <span className="recur-combo-k">Gastos / mes</span>
-                <span className="recur-combo-v fin-neg">−{money(recurringCombo.outMinor, { compact: true })}</span>
-              </div>
-              <div className="recur-combo-cell recur-combo-net">
-                <span className="recur-combo-k">Neto recurrente / mes</span>
-                <span className={`recur-combo-v ${recurringCombo.netMinor >= 0 ? 'fin-pos' : 'fin-neg'}`}>
-                  {recurringCombo.netMinor >= 0 ? '+' : '−'}
-                  {money(Math.abs(recurringCombo.netMinor), { compact: true })}
-                </span>
-              </div>
-            </div>
+            </section>
           )}
 
           <section className="fin-block">
