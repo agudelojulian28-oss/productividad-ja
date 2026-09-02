@@ -1969,6 +1969,55 @@ ol {
 .recur-edit {
   align-items: stretch;
 }
+/* Recurrentes agrupados por proyecto con subtotales */
+.recur-groups { display: flex; flex-direction: column; gap: 14px; }
+.recur-group { display: flex; flex-direction: column; gap: 8px; }
+.recur-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 0 2px; }
+.recur-group-title { font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--text-muted); }
+.recur-group-sub { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.recur-total { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 10px 2px 0; border-top: 1px solid var(--border); }
+.recur-total > span:first-child { font-size: 12.5px; color: var(--text-muted); }
+.recur-total-v { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* Total recurrente combinado (ingresos + gastos + neto) */
+.recur-combo { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: -6px 0 8px; }
+@media (max-width: 520px) { .recur-combo { grid-template-columns: 1fr; } }
+.recur-combo-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+.recur-combo-net { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.recur-combo-k { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.recur-combo-v { display: block; font-size: 20px; font-weight: 800; margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+/* Informe financiero */
+.rep { display: flex; flex-direction: column; gap: 16px; }
+.rep-verdict { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.rep-badge { padding: 4px 12px; border-radius: 999px; font-weight: 800; font-size: 13px; }
+.rep-badge.rep-pos { background: var(--positive-weak); color: var(--positive); }
+.rep-badge.rep-acc { background: var(--accent-weak); color: var(--accent); }
+.rep-badge.rep-neg { background: var(--negative-weak); color: var(--negative); }
+.rep-score { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
+.rep-score-max { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.rep-trend { font-size: 12.5px; color: var(--text-muted); }
+.rep-hint { margin: 8px 0 0; font-size: 13.5px; color: var(--text-muted); }
+.rep-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 640px) { .rep-stats { grid-template-columns: repeat(4, 1fr); } }
+.rep-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; }
+.rep-stat-k { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted); }
+.rep-stat-v { display: block; font-size: 18px; font-weight: 800; margin-top: 3px; font-variant-numeric: tabular-nums; color: var(--text); }
+.rep-stat-v.pos { color: var(--positive); }
+.rep-stat-v.neg { color: var(--negative); }
+.rep-proj { border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+.rep-proj-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.rep-proj-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
+.rep-proj-note { font-size: 11.5px; }
+.rep-proj-table { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.rep-proj-row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; font-size: 13px; font-variant-numeric: tabular-nums; padding: 3px 0; }
+.rep-proj-row > span:first-child { color: var(--text-muted); }
+.rep-proj-row .pos { color: var(--positive); }
+.rep-proj-row .neg { color: var(--negative); }
+.rep-proj-cum { font-weight: 700; min-width: 64px; text-align: right; }
+.rep-proj-foot { margin: 12px 0 0; font-size: 13px; color: var(--text); }
+.rep-bullets { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.rep-bullets li { font-size: 13.5px; color: var(--text); line-height: 1.45; }
 
 /* Gastos recurrentes — pop-up de rectificación */
 @keyframes recur-fade {
@@ -4217,6 +4266,12 @@ button.mov-row:hover {
 }
 .dd-opt:hover { background: var(--accent-weak); }
 .dd-opt-on { color: var(--accent); font-weight: 700; }
+.dd-opt-label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.dd-dot { width: 9px; height: 9px; border-radius: 999px; flex-shrink: 0; }
+.dd-group {
+  padding: 8px 12px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--text-muted);
+}
 
 /* General: barra superior con el desplegable de periodo */
 .fin-stats-topbar {

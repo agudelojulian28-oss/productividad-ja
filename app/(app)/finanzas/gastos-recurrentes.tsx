@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, type FormEvent } from 'react';
+import { useMemo, useState, useTransition, type FormEvent } from 'react';
 import {
   createRecurringExpenseAction,
   updateRecurringExpenseAction,
@@ -8,6 +8,7 @@ import {
 } from '@/app/actions/finance';
 import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
+import { monthlyEquivRecurring } from '@/core/finance/analisis';
 import type { RecurringFrequency } from '@/core/finance/ports';
 import { Modal } from '../modal';
 import { DateField } from '../date-picker';
@@ -61,52 +62,87 @@ export function Recurrentes({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  // Agrupa por proyecto con subtotal mensual-equivalente (las frecuencias difieren).
+  const groups = useMemo(() => {
+    const projName = new Map(projects.map((p) => [p.id, p.title] as const));
+    const m = new Map<string, RecurRow[]>();
+    for (const r of recurrentes) {
+      const arr = m.get(r.projectId) ?? [];
+      arr.push(r);
+      m.set(r.projectId, arr);
+    }
+    return [...m.entries()]
+      .map(([pid, list]) => ({
+        projectId: pid,
+        title: projName.get(pid) ?? 'Sin proyecto',
+        subtotal: list.reduce((s, r) => s + monthlyEquivRecurring(r.amountMinor, r.frequency), 0),
+        items: list,
+      }))
+      .sort((a, b) => b.subtotal - a.subtotal);
+  }, [recurrentes, projects]);
+  const sectionTotal = groups.reduce((s, g) => s + g.subtotal, 0);
+
   return (
     <div>
       {recurrentes.length > 0 ? (
-        <ul className="fin-list" style={{ marginBottom: 14 }}>
-          {recurrentes.map((r) =>
-            editing === r.id ? (
-              <EditRow key={r.id} row={r} tags={tags} onDone={() => setEditing(null)} />
-            ) : (
-              <li key={r.id} className="recur-row">
-                <div className="recur-body">
-                  <span className="recur-title">
-                    {r.description || r.category || copy.singular}
-                  </span>
-                  <span className="recur-meta">
-                    {freqLabel(r.frequency)} · próximo {r.nextDueOn}
-                    {projects.find((p) => p.id === r.projectId)
-                      ? ` · ${projects.find((p) => p.id === r.projectId)!.title}`
-                      : ''}
-                  </span>
-                  {r.tagIds.length > 0 && <TagChips tagIds={r.tagIds} catalog={tags} />}
-                </div>
-                <span className={`recur-amt ${copy.cls}`}>
+        <div className="recur-groups" style={{ marginBottom: 14 }}>
+          {groups.map((g) => (
+            <div key={g.projectId} className="recur-group">
+              <div className="recur-group-head">
+                <span className="recur-group-title">{g.title}</span>
+                <span className={`recur-group-sub ${copy.cls}`}>
                   {copy.sign}
-                  {money(r.amountMinor, { compact: true })}
+                  {money(g.subtotal, { compact: true })}/mes
                 </span>
-                <div className="recur-actions">
-                  <button type="button" className="linkbtn" onClick={() => setEditing(r.id)}>
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    className="linkbtn task-delete"
-                    disabled={pending}
-                    onClick={() =>
-                      startTransition(async () => {
-                        await deleteRecurringExpenseAction(r.id);
-                      })
-                    }
-                  >
-                    Borrar
-                  </button>
-                </div>
-              </li>
-            ),
-          )}
-        </ul>
+              </div>
+              <ul className="fin-list">
+                {g.items.map((r) =>
+                  editing === r.id ? (
+                    <EditRow key={r.id} row={r} tags={tags} onDone={() => setEditing(null)} />
+                  ) : (
+                    <li key={r.id} className="recur-row">
+                      <div className="recur-body">
+                        <span className="recur-title">{r.description || r.category || copy.singular}</span>
+                        <span className="recur-meta">
+                          {freqLabel(r.frequency)} · próximo {r.nextDueOn}
+                        </span>
+                        {r.tagIds.length > 0 && <TagChips tagIds={r.tagIds} catalog={tags} />}
+                      </div>
+                      <span className={`recur-amt ${copy.cls}`}>
+                        {copy.sign}
+                        {money(r.amountMinor, { compact: true })}
+                      </span>
+                      <div className="recur-actions">
+                        <button type="button" className="linkbtn" onClick={() => setEditing(r.id)}>
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="linkbtn task-delete"
+                          disabled={pending}
+                          onClick={() =>
+                            startTransition(async () => {
+                              await deleteRecurringExpenseAction(r.id);
+                            })
+                          }
+                        >
+                          Borrar
+                        </button>
+                      </div>
+                    </li>
+                  ),
+                )}
+              </ul>
+            </div>
+          ))}
+          <div className="recur-total">
+            <span>Total {direction === 'in' ? 'ingresos' : 'gastos'} recurrentes / mes</span>
+            <span className={`recur-total-v ${copy.cls}`}>
+              {copy.sign}
+              {money(sectionTotal, { compact: true })}
+            </span>
+          </div>
+        </div>
       ) : (
         <p className="muted" style={{ marginBottom: 12 }}>
           {copy.vacio}

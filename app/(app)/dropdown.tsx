@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 
 // Desplegable moderno con el tema oscuro/naranja. El menú va en un portal (position:fixed)
 // para no quedar tapado por el z-index/overflow de las tarjetas. value + onChange(value).
-export type DropOption = { v: string; label: string };
+export type DropOption = { v: string; label: string; group?: string; dot?: string | null };
 
 export function Dropdown({
   value,
@@ -92,26 +92,34 @@ export function Dropdown({
             role="listbox"
             style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, minWidth: pos?.width }}
           >
-            {options.map((o) => (
-              <button
-                key={o.v}
-                type="button"
-                role="option"
-                aria-selected={o.v === value}
-                className={`dd-opt${o.v === value ? ' dd-opt-on' : ''}`}
-                onClick={() => {
-                  onChange(o.v);
-                  setOpen(false);
-                }}
-              >
-                {o.label}
-                {o.v === value && (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M5 12l5 5L20 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </button>
-            ))}
+            {options.map((o, i) => {
+              const showHeader = o.group && o.group !== options[i - 1]?.group;
+              return (
+                <div key={o.v || i}>
+                  {showHeader && <div className="dd-group">{o.group}</div>}
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={o.v === value}
+                    className={`dd-opt${o.v === value ? ' dd-opt-on' : ''}`}
+                    onClick={() => {
+                      onChange(o.v);
+                      setOpen(false);
+                    }}
+                  >
+                    <span className="dd-opt-label">
+                      {o.dot && <span className="dd-dot" style={{ background: o.dot }} aria-hidden="true" />}
+                      {o.label}
+                    </span>
+                    {o.v === value && (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M5 12l5 5L20 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
           </div>,
           document.body,
         )}

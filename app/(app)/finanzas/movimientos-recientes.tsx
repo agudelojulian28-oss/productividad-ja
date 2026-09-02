@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { money } from '@/lib/format';
 import { listMovimientosAction } from '@/app/actions/finance';
 import { Modal } from '../modal';
@@ -110,6 +110,23 @@ export function MovimientosRecientes({
     .filter((r) => dir === 'all' || r.direction === dir)
     .filter((r) => !tagFilter || r.tagIds.includes(tagFilter));
 
+  // Opciones del filtro de etiquetas, agrupadas por proyecto (ADR-029). Solo se
+  // listan las etiquetas que están en uso en los movimientos cargados.
+  const tagOptions = useMemo(() => {
+    const projName = new Map(projects.map((p) => [p.id, p.title] as const));
+    const used = new Set(base.flatMap((r) => r.tagIds));
+    const inUse = tags.filter((t) => used.has(t.id));
+    const sorted = [...inUse].sort(
+      (a, b) =>
+        (projName.get(a.projectId) ?? '').localeCompare(projName.get(b.projectId) ?? '') ||
+        a.name.localeCompare(b.name),
+    );
+    return [
+      { v: '', label: 'Todas las etiquetas' },
+      ...sorted.map((t) => ({ v: t.id, label: t.name, group: projName.get(t.projectId) ?? 'Sin proyecto', dot: t.color })),
+    ];
+  }, [tags, projects, base]);
+
   return (
     <div className="mov-wrap">
       <div className="mov-filters">
@@ -121,6 +138,17 @@ export function MovimientosRecientes({
             onChange={(v) => applyPreset(v as Preset)}
             ariaLabel="Rango de fechas"
           />
+          {tagOptions.length > 1 && (
+            <>
+              <span className="mov-filters-k">Etiqueta</span>
+              <Dropdown
+                value={tagFilter ?? ''}
+                options={tagOptions}
+                onChange={(v) => setTagFilter(v || null)}
+                ariaLabel="Filtrar por etiqueta"
+              />
+            </>
+          )}
         </div>
 
         {preset === 'custom' && (
@@ -154,30 +182,6 @@ export function MovimientosRecientes({
           </button>
         ))}
       </div>
-
-      {tags.length > 0 && (
-        <div className="mov-tagfilter" role="group" aria-label="Filtrar por etiqueta">
-          <button
-            type="button"
-            className={`tag-opt${!tagFilter ? ' tag-opt-on' : ''}`}
-            aria-pressed={!tagFilter}
-            onClick={() => setTagFilter(null)}
-          >
-            Todas
-          </button>
-          {tags.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={`tag-opt${tagFilter === t.id ? ' tag-opt-on' : ''}`}
-              aria-pressed={tagFilter === t.id}
-              onClick={() => setTagFilter(tagFilter === t.id ? null : t.id)}
-            >
-              {t.name}
-            </button>
-          ))}
-        </div>
-      )}
 
       {pending ? (
         <p className="muted mov-empty">Cargando…</p>

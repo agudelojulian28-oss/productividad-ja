@@ -4,7 +4,9 @@ import { structureRepo } from '@/adapters/supabase/structure-repo';
 import { financeRepo } from '@/adapters/supabase/finance-repo';
 import { workRepo } from '@/adapters/supabase/work-repo';
 import { resumenFinanciero, serieMensual } from '@/core/finance/queries';
+import { recurringMonthly, reporteFinanciero } from '@/core/finance/analisis';
 import { BalanceAnual } from './balance-anual';
+import { ReporteFinancieroCard } from './reporte-financiero';
 import { money, todayInTz, dayLabelInTz } from '@/lib/format';
 import { getTrm } from '@/lib/trm';
 import { signedUrl } from '@/adapters/supabase/storage';
@@ -65,6 +67,21 @@ export default async function FinanzasPage() {
   // Serie completa (todos los meses con datos) para el resumen anual del rail.
   const serieCompleta = serieMensual(cashflow, 600);
   const reservas = await getReservasAction();
+
+  // Recurrentes normalizados a mensual (combinado de ambos) + informe de salud/proyección.
+  const recurItems = recurRows.map((r) => ({
+    direction: r.direction,
+    projectId: r.projectId,
+    amountMinor: r.amountMinor,
+    frequency: r.frequency,
+  }));
+  const recurringCombo = recurringMonthly(recurItems);
+  const reporte = reporteFinanciero({
+    serie: serieCompleta,
+    recurrentes: recurItems,
+    emergencyBalanceMinor: reservas.emergencia.balanceMinor,
+    today: todayInTz(ctx.tz),
+  });
 
   // Variación % vs el mes anterior (badge en KPIs). Solo si el mes previo > 0.
   const cur = serie[serie.length - 1];
@@ -260,6 +277,26 @@ export default async function FinanzasPage() {
             />
           </section>
 
+          {(gastosRecur.length > 0 || ingresosRecur.length > 0) && (
+            <div className="recur-combo" role="group" aria-label="Total recurrente mensual">
+              <div className="recur-combo-cell">
+                <span className="recur-combo-k">Ingresos / mes</span>
+                <span className="recur-combo-v fin-pos">+{money(recurringCombo.inMinor, { compact: true })}</span>
+              </div>
+              <div className="recur-combo-cell">
+                <span className="recur-combo-k">Gastos / mes</span>
+                <span className="recur-combo-v fin-neg">−{money(recurringCombo.outMinor, { compact: true })}</span>
+              </div>
+              <div className="recur-combo-cell recur-combo-net">
+                <span className="recur-combo-k">Neto recurrente / mes</span>
+                <span className={`recur-combo-v ${recurringCombo.netMinor >= 0 ? 'fin-pos' : 'fin-neg'}`}>
+                  {recurringCombo.netMinor >= 0 ? '+' : '−'}
+                  {money(Math.abs(recurringCombo.netMinor), { compact: true })}
+                </span>
+              </div>
+            </div>
+          )}
+
           <section className="fin-block">
             <h2 className="fin-h2">Etiquetas</h2>
             <TagsSection
@@ -282,6 +319,14 @@ export default async function FinanzasPage() {
           <p className="muted fin-soon">
             Pipeline abierto y discrepancias llegan en la Etapa 5, con las ventas.
           </p>
+
+          <section className="fin-block">
+            <h2 className="fin-h2">Informe financiero</h2>
+            <p className="muted" style={{ marginBottom: 12 }}>
+              Qué tan sanas están tus finanzas y su proyección a los próximos meses.
+            </p>
+            <ReporteFinancieroCard report={reporte} />
+          </section>
         </div>
 
         {/* Rail: captura y metas. */}
