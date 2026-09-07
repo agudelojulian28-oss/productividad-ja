@@ -4,8 +4,8 @@ import { workRepo } from '@/adapters/supabase/work-repo';
 import { todayInTz } from '@/lib/format';
 import { RecurrentesPopup, type DueItem } from './recurrentes-popup';
 
-/** Server: busca gastos recurrentes VENCIDOS (next_due_on <= hoy) y, si hay, monta el
- *  pop-up de rectificación. Se renderiza en el layout para aparecer en toda la app. */
+/** Server: busca recurrentes VENCIDOS (ingresos y gastos, next_due_on <= hoy) y, si hay,
+ *  monta el pop-up de rectificación. Se renderiza en el layout para aparecer en toda la app. */
 export async function RecurrentesGate() {
   const { supabase, ctx } = await requireContext();
   const finance = financeRepo(supabase, ctx.userId);
@@ -20,7 +20,8 @@ export async function RecurrentesGate() {
     .filter((r) => r.nextDueOn <= today)
     .map((r) => ({
       id: r.id,
-      title: r.description || r.category || 'Gasto recurrente',
+      direction: r.direction,
+      title: r.description || r.category || (r.direction === 'in' ? 'Ingreso recurrente' : 'Gasto recurrente'),
       projectTitle: projName.get(r.projectId) ?? '—',
       amountMinor: r.amountMinor,
       nextDueOn: r.nextDueOn,

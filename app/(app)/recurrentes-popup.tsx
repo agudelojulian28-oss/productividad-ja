@@ -8,6 +8,7 @@ import { money } from '@/lib/format';
 
 export type DueItem = {
   id: string;
+  direction: 'in' | 'out';
   title: string;
   projectTitle: string;
   amountMinor: number;
@@ -33,8 +34,9 @@ async function fileToReceipt(file: File): Promise<Receipt> {
   return { data: dataUrl.split(',')[1]!, preview: dataUrl };
 }
 
-/** Pop-up de rectificación de gastos recurrentes vencidos. Aparece en toda la app.
- *  Por cada uno: editar el monto, adjuntar comprobante, y "Sí" (registra) o "No se hizo". */
+/** Pop-up de rectificación de recurrentes vencidos (ingresos y gastos). Aparece en toda la
+ *  app. Por cada uno: editar el monto, adjuntar comprobante, y "Sí" (registra) o "No se hizo".
+ *  El texto se adapta a la dirección; el registro usa la dirección guardada del recurrente. */
 export function RecurrentesPopup({ items }: { items: DueItem[] }) {
   const router = useRouter();
   const [i, setI] = useState(0);
@@ -45,6 +47,8 @@ export function RecurrentesPopup({ items }: { items: DueItem[] }) {
 
   if (closed || items.length === 0 || i >= items.length) return null;
   const item = items[i]!;
+  const esIngreso = item.direction === 'in';
+  const sustantivo = esIngreso ? 'Ingreso recurrente' : 'Gasto recurrente';
 
   function reset() {
     setMonto('');
@@ -80,15 +84,21 @@ export function RecurrentesPopup({ items }: { items: DueItem[] }) {
   }
 
   return (
-    <div className="recur-pop-backdrop" role="dialog" aria-modal="true" aria-label="Gasto recurrente">
+    <div className="recur-pop-backdrop" role="dialog" aria-modal="true" aria-label={sustantivo}>
       <div className="recur-pop">
         <div className="recur-pop-head">
-          <span className="recur-pop-eyebrow">Gasto recurrente · vencía {item.nextDueOn}</span>
+          <span className="recur-pop-eyebrow">{sustantivo} · vencía {item.nextDueOn}</span>
           <h2 className="recur-pop-title">{item.title}</h2>
-          <span className="recur-pop-proj">{item.projectTitle}</span>
+          <span className="recur-pop-proj">
+            {item.projectTitle} ·{' '}
+            <span className={esIngreso ? 'fin-pos' : 'fin-neg'}>
+              {esIngreso ? '+' : '−'}
+              {money(item.amountMinor, { compact: true })}
+            </span>
+          </span>
         </div>
 
-        <p className="recur-pop-q">¿Se hizo este gasto?</p>
+        <p className="recur-pop-q">{esIngreso ? '¿Se recibió este ingreso?' : '¿Se hizo este gasto?'}</p>
 
         <label className="cal-field-label">
           Monto (edítalo si cambió)
