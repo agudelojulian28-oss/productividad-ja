@@ -15,7 +15,9 @@ export type MetaProgreso = {
   metric: 'money_in' | 'money_net';
   targetValue: number; // pesos
   currentValue: number; // pesos
+  periodStart: string;
   periodEnd: string;
+  projectTitle: string;
 };
 
 function firstOfMonth(ymd: string): string {
@@ -25,6 +27,11 @@ function lastOfMonth(ymd: string): string {
   const [y, m] = ymd.split('-').map(Number);
   const last = new Date(y!, m!, 0).getDate();
   return `${ymd.slice(0, 7)}-${String(last).padStart(2, '0')}`;
+}
+/** Días desde epoch para un YMD (sin zona horaria: solo para restas de días). */
+function dayNum(ymd: string): number {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return Math.floor(Date.UTC(y!, m! - 1, d!) / 86_400_000);
 }
 
 export function MetasDinero({
@@ -37,6 +44,7 @@ export function MetasDinero({
   today: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<MetaProgreso | null>(null);
 
   return (
     <div>
@@ -49,28 +57,30 @@ export function MetasDinero({
                 : 0;
             const vencida = m.periodEnd < today && pct < 100;
             return (
-              <li key={m.goalId} className="meta-money">
-                <div className="meta-money-head">
-                  <span className="fin-row-name">{m.title}</span>
-                  <span className="muted" style={{ fontSize: 12 }}>
-                    {m.metric === 'money_in' ? 'ingresos' : 'balance'}
-                  </span>
-                </div>
-                <div className="meta-bar">
-                  <div
-                    className={`meta-bar-fill${pct >= 100 ? ' meta-done' : ''}`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <div className="meta-money-foot">
-                  <span className="fin-row-amt">
-                    {money(m.currentValue * 100, { compact: true })} /{' '}
-                    {money(m.targetValue * 100, { compact: true })}
-                  </span>
-                  <span className={vencida ? 'overdue' : 'muted'} style={{ fontSize: 12 }}>
-                    {pct}% · vence {m.periodEnd}
-                  </span>
-                </div>
+              <li key={m.goalId}>
+                <button type="button" className="meta-money meta-money-btn" onClick={() => setDetail(m)} aria-label={`Ver meta ${m.title}`}>
+                  <div className="meta-money-head">
+                    <span className="fin-row-name">{m.title}</span>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {m.metric === 'money_in' ? 'ingresos' : 'balance'}
+                    </span>
+                  </div>
+                  <div className="meta-bar">
+                    <div
+                      className={`meta-bar-fill${pct >= 100 ? ' meta-done' : ''}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="meta-money-foot">
+                    <span className="fin-row-amt">
+                      {money(m.currentValue * 100, { compact: true })} /{' '}
+                      {money(m.targetValue * 100, { compact: true })}
+                    </span>
+                    <span className={vencida ? 'overdue' : 'muted'} style={{ fontSize: 12 }}>
+                      {pct}% · vence {m.periodEnd}
+                    </span>
+                  </div>
+                </button>
               </li>
             );
           })}
@@ -91,6 +101,94 @@ export function MetasDinero({
       <Modal open={open} onClose={() => setOpen(false)} eyebrow="Finanzas" title="Nueva meta de dinero">
         <MetaForm projects={projects} today={today} onDone={() => setOpen(false)} />
       </Modal>
+
+      <Modal
+        open={detail !== null}
+        onClose={() => setDetail(null)}
+        eyebrow="Meta de dinero"
+        title={detail?.title ?? ''}
+      >
+        {detail && <MetaDetalle meta={detail} today={today} />}
+      </Modal>
+    </div>
+  );
+}
+
+/** Detalle completo de una meta: progreso, objetivo/actual/falta, periodo, ritmo. */
+function MetaDetalle({ meta, today }: { meta: MetaProgreso; today: string }) {
+  const pct = meta.targetValue > 0 ? Math.min(100, Math.round((meta.currentValue / meta.targetValue) * 100)) : 0;
+  const faltaPesos = Math.max(0, meta.targetValue - meta.currentValue);
+  const lograda = pct >= 100;
+
+  const start = dayNum(meta.periodStart);
+  const end = dayNum(meta.periodEnd);
+  const now = dayNum(today);
+  const totalDias = Math.max(1, end - start);
+  const diasRestantes = end - now;
+  const transcurridoPct = Math.max(0, Math.min(100, Math.round(((now - start) / totalDias) * 100)));
+  const vencida = now > end && !lograda;
+
+  // Ritmo: compara progreso contra tiempo transcurrido (solo mientras esté vigente).
+  let ritmo: { txt: string; tone: 'pos' | 'neg' | 'muted' } = { txt: '', tone: 'muted' };
+  if (lograda) ritmo = { txt: '🎉 ¡Meta lograda!', tone: 'pos' };
+  else if (vencida) ritmo = { txt: `Venció sin alcanzarse (llegó al ${pct}%).`, tone: 'neg' };
+  else if (pct >= transcurridoPct) ritmo = { txt: `Vas al día: ${pct}% de la meta con ${transcurridoPct}% del tiempo.`, tone: 'pos' };
+  else ritmo = { txt: `Vas algo atrás: ${pct}% de la meta con ${transcurridoPct}% del tiempo.`, tone: 'neg' };
+
+  return (
+    <div className="meta-detail">
+      <div className="meta-bar meta-bar-lg">
+        <div className={`meta-bar-fill${lograda ? ' meta-done' : ''}`} style={{ width: `${pct}%` }} />
+      </div>
+      <div className="meta-detail-pct">
+        <span className={lograda ? 'fin-pos' : vencida ? 'overdue' : ''}>{pct}%</span>
+        <span className="muted">
+          {money(meta.currentValue * 100)} de {money(meta.targetValue * 100)}
+        </span>
+      </div>
+
+      <dl className="meta-detail-dl">
+        <div>
+          <dt>Mide</dt>
+          <dd>{meta.metric === 'money_in' ? 'Ingresos del periodo' : 'Balance (ingresos − gastos)'}</dd>
+        </div>
+        <div>
+          <dt>Proyecto</dt>
+          <dd>{meta.projectTitle}</dd>
+        </div>
+        <div>
+          <dt>Objetivo</dt>
+          <dd>{money(meta.targetValue * 100)}</dd>
+        </div>
+        <div>
+          <dt>Llevas</dt>
+          <dd>{money(meta.currentValue * 100)}</dd>
+        </div>
+        <div>
+          <dt>{lograda ? 'Excedente' : 'Falta'}</dt>
+          <dd className={lograda ? 'fin-pos' : undefined}>
+            {lograda ? money((meta.currentValue - meta.targetValue) * 100) : money(faltaPesos * 100)}
+          </dd>
+        </div>
+        <div>
+          <dt>Periodo</dt>
+          <dd>{meta.periodStart} → {meta.periodEnd}</dd>
+        </div>
+        <div>
+          <dt>Tiempo</dt>
+          <dd>
+            {vencida
+              ? 'Vencida'
+              : diasRestantes <= 0
+                ? 'Último día'
+                : `Quedan ${diasRestantes} ${diasRestantes === 1 ? 'día' : 'días'}`}
+          </dd>
+        </div>
+      </dl>
+
+      <p className={`meta-detail-ritmo ${ritmo.tone === 'pos' ? 'fin-pos' : ritmo.tone === 'neg' ? 'overdue' : 'muted'}`}>
+        {ritmo.txt}
+      </p>
     </div>
   );
 }

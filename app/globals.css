@@ -2935,6 +2935,28 @@ a.mov-thumb:hover {
 .meta-bar-fill.meta-done {
   background: var(--positive);
 }
+/* Meta clicable (abre el detalle) */
+.meta-money-btn {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+  touch-action: manipulation;
+  transition: border-color 0.15s, transform 0.05s;
+}
+.meta-money-btn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.meta-money-btn:active { transform: translateY(1px); }
+
+/* Detalle de meta (pop-up) */
+.meta-detail { display: flex; flex-direction: column; gap: 14px; }
+.meta-bar-lg { height: 12px; }
+.meta-detail-pct { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.meta-detail-pct > span:first-child { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.meta-detail-dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin: 0; }
+.meta-detail-dl dt { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.meta-detail-dl dd { margin: 2px 0 0; font-size: 14px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.meta-detail-ritmo { margin: 0; font-size: 13.5px; line-height: 1.45; }
 
 /* Documentación */
 .doc-editor {
