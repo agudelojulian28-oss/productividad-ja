@@ -166,4 +166,18 @@ describe('runTool · actualizar / archivar', () => {
     expect((await d.fin.moneyGoalsProgress()).length).toBe(0);
   });
 
+  it('meta_dinero general: sin proyecto también se crea', async () => {
+    const d = deps();
+    const r = await runTool(d, 'crear', {
+      tipo: 'meta_dinero',
+      titulo: 'Ingresos totales del trimestre',
+      metrica: 'money_in',
+      objetivo: 50_000_000,
+      desde: '2026-07-01',
+      hasta: '2026-09-30',
+    });
+    expect(r.ok).toBe(true);
+    expect((await d.fin.moneyGoalsProgress())[0]!.projectId).toBeNull();
+  });
+
 });

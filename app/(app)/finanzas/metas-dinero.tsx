@@ -270,7 +270,8 @@ function MetaForm({
   const [title, setTitle] = useState(initial?.title ?? '');
   const [metric, setMetric] = useState<'money_in' | 'money_net'>(initial?.metric ?? 'money_in');
   const [objetivo, setObjetivo] = useState(initial ? String(initial.targetValue) : '');
-  const [projectId, setProjectId] = useState(initial?.projectId ?? projects[0]?.id ?? '');
+  // '' = meta general (cuenta todos los ingresos/balance del periodo).
+  const [projectId, setProjectId] = useState(initial?.projectId ?? '');
   const [desde, setDesde] = useState(initial?.periodStart ?? firstOfMonth(today));
   const [hasta, setHasta] = useState(initial?.periodEnd ?? lastOfMonth(today));
   const [error, setError] = useState<string | null>(null);
@@ -283,7 +284,6 @@ function MetaForm({
     const minor = parseAmountToMinor(objetivo);
     if (!t) return setError('Ponle un nombre a la meta');
     if (!minor) return setError('Objetivo inválido');
-    if (!projectId) return setError('Elige un proyecto');
     startTransition(async () => {
       const res = editando
         ? await updateMoneyGoalAction({
@@ -291,7 +291,7 @@ function MetaForm({
             title: t,
             metric,
             targetValue: minor / 100,
-            projectId,
+            projectId: projectId || null, // '' → limpiar a general
             periodStart: desde,
             periodEnd: hasta,
           })
@@ -299,7 +299,7 @@ function MetaForm({
             title: t,
             metric,
             targetValue: minor / 100, // pesos
-            projectId,
+            projectId: projectId || undefined, // '' → meta general
             periodStart: desde,
             periodEnd: hasta,
           });
@@ -344,7 +344,7 @@ function MetaForm({
           className="field"
           aria-label="Proyecto de la meta"
         >
-          {projects.length === 0 && <option value="">Crea un proyecto primero</option>}
+          <option value="">General (todos los ingresos)</option>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.title}

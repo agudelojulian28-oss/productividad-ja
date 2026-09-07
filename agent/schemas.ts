@@ -110,7 +110,7 @@ export const Crear = z
       .uuid()
       .optional()
       .describe(
-        'Proyecto. El dinero (movimiento y meta_dinero) SIEMPRE se atribuye a un proyecto. Requerido: meta, meta_dinero, movimiento, recurrente, etiqueta (las etiquetas son por proyecto). Opcional: tarea, evento, documento',
+        'Proyecto. Requerido: meta, movimiento, recurrente, etiqueta (las etiquetas son por proyecto). Opcional: tarea, evento, documento, meta_dinero (sin proyecto = meta general que cuenta todos los ingresos/balance).',
       ),
     meta_id: z.uuid().optional().describe('Meta. Opcional: tarea, evento, tarea_recurrente'),
     fecha: Instant.optional().describe('Inicio con offset. tarea (vence, opcional), evento (inicio, requerido)'),
@@ -166,14 +166,8 @@ export const Crear = z
         case 'area':
           return !!d.titulo && !!d.clase;
         case 'meta_dinero':
-          return (
-            !!d.titulo &&
-            !!d.metrica &&
-            d.objetivo != null &&
-            !!d.proyecto_id &&
-            !!d.desde &&
-            !!d.hasta
-          );
+          // proyecto_id es opcional: sin proyecto = meta general (todos los ingresos).
+          return !!d.titulo && !!d.metrica && d.objetivo != null && !!d.desde && !!d.hasta;
         case 'documento':
           return !!d.titulo;
         case 'movimiento':

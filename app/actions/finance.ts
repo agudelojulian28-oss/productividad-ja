@@ -139,7 +139,7 @@ export async function createMoneyGoalAction(input: {
   title: string;
   metric: 'money_in' | 'money_net';
   targetValue: number;
-  projectId: string;
+  projectId?: string;
   areaId?: string;
   incomeSourceId?: string;
   periodStart: string;
@@ -156,7 +156,7 @@ export async function updateMoneyGoalAction(input: {
   title?: string;
   metric?: 'money_in' | 'money_net';
   targetValue?: number;
-  projectId?: string;
+  projectId?: string | null;
   periodStart?: string;
   periodEnd?: string;
 }): Promise<Result<{ id: string }>> {

@@ -278,7 +278,7 @@ export interface MoneyGoalInsert {
   title: string;
   metric: 'money_in' | 'money_net';
   targetValue: number; // en pesos (COP)
-  projectId: string;
+  projectId?: string; // sin proyecto = meta general (todos los ingresos/balance)
   areaId?: string;
   incomeSourceId?: string;
   periodStart: string;
@@ -289,7 +289,7 @@ export interface MoneyGoalPatch {
   title?: string;
   metric?: 'money_in' | 'money_net';
   targetValue?: number; // pesos (COP)
-  projectId?: string;
+  projectId?: string | null; // null = volverla general
   periodStart?: string;
   periodEnd?: string;
 }

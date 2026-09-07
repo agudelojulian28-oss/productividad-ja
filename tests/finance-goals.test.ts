@@ -23,17 +23,18 @@ describe('createMoneyGoal', () => {
     expect(list.ok && list.value.length).toBe(1);
   });
 
-  it('exige proyecto (INVALID_INPUT)', async () => {
+  it('permite meta general (sin proyecto): cuenta todo', async () => {
     const repo = makeFakeFinanceRepo();
     const r = await createMoneyGoal(ctx(), repo, {
-      title: 'x',
+      title: 'Ingresos totales del año',
       metric: 'money_net',
       targetValue: 100,
       periodStart: '2026-07-01',
       periodEnd: '2026-07-31',
     });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe('INVALID_INPUT');
+    expect(r.ok).toBe(true);
+    const list = await listMoneyGoals(ctx(), repo);
+    expect(list.ok && list.value[0]!.projectId).toBeNull();
   });
 
   it('rechaza periodo invertido (INVALID_INPUT)', async () => {

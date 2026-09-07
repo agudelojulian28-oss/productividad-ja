@@ -78,8 +78,9 @@ export const MoneyGoalCreate = z
     metric: z.enum(MONEY_METRICS),
     /** Objetivo en pesos (COP), no en centavos. */
     targetValue: z.number().positive().max(1_000_000_000_000),
-    /** Proyecto al que se atribuye la meta de dinero (ADR-026). */
-    projectId: z.uuid(),
+    /** Proyecto al que se atribuye (opcional). Sin proyecto = meta general: cuenta
+     *  todos los ingresos/balance del periodo. */
+    projectId: z.uuid().optional(),
     areaId: z.uuid().optional(),
     incomeSourceId: z.uuid().optional(),
     periodStart: Ymd,
@@ -96,7 +97,8 @@ export const MoneyGoalUpdate = z.object({
   title: z.string().trim().min(1).max(120).optional(),
   metric: z.enum(MONEY_METRICS).optional(),
   targetValue: z.number().positive().max(1_000_000_000_000).optional(),
-  projectId: z.uuid().optional(),
+  /** uuid = atar a un proyecto · null = volverla general · ausente = sin cambio. */
+  projectId: z.uuid().nullable().optional(),
   periodStart: Ymd.optional(),
   periodEnd: Ymd.optional(),
 });

@@ -162,7 +162,7 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
       if (patch.title !== undefined) g.title = patch.title;
       if (patch.metric !== undefined) g.metric = patch.metric;
       if (patch.targetValue !== undefined) g.targetValue = patch.targetValue;
-      if (patch.projectId !== undefined) g.projectId = patch.projectId;
+      if (patch.projectId !== undefined) g.projectId = patch.projectId ?? null;
       if (patch.periodStart !== undefined) g.periodStart = patch.periodStart;
       if (patch.periodEnd !== undefined) g.periodEnd = patch.periodEnd;
     },

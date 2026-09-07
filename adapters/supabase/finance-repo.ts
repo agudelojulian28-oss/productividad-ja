@@ -294,7 +294,7 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
         .from('goals')
         .insert({
           user_id: userId,
-          project_id: input.projectId,
+          project_id: input.projectId ?? null,
           area_id: input.areaId ?? null,
           income_source_id: input.incomeSourceId ?? null,
           title: input.title,
