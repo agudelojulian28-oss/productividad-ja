@@ -2957,6 +2957,18 @@ a.mov-thumb:hover {
 .meta-detail-dl dt { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
 .meta-detail-dl dd { margin: 2px 0 0; font-size: 14px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 .meta-detail-ritmo { margin: 0; font-size: 13.5px; line-height: 1.45; }
+.meta-detail-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.meta-del { color: var(--negative); }
+
+/* Estado de la meta en la lista: verde si lograda, rojo si venció sin cumplirse */
+.meta-money.meta-state-done {
+  border-color: color-mix(in srgb, var(--positive) 55%, var(--border));
+  background: var(--positive-weak);
+}
+.meta-money.meta-state-overdue {
+  border-color: color-mix(in srgb, var(--negative) 55%, var(--border));
+  background: var(--negative-weak);
+}
 
 /* Documentación */
 .doc-editor {

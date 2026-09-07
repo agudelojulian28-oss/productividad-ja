@@ -312,6 +312,37 @@ export function financeRepo(supabase: SupabaseClient, userId: string): FinanceRe
       return { id: (data as { id: string }).id };
     },
 
+    async getMoneyGoal(id) {
+      const { data, error } = await supabase
+        .from('goals')
+        .select('id,period_start,period_end')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data
+        ? {
+            id: (data as Record<string, unknown>).id as string,
+            periodStart: (data as Record<string, unknown>).period_start as string,
+            periodEnd: (data as Record<string, unknown>).period_end as string,
+          }
+        : null;
+    },
+    async updateMoneyGoal(id, patch) {
+      const upd: Record<string, unknown> = {};
+      if (patch.title !== undefined) upd.title = patch.title;
+      if (patch.metric !== undefined) upd.metric = patch.metric;
+      if (patch.targetValue !== undefined) upd.target_value = patch.targetValue;
+      if (patch.projectId !== undefined) upd.project_id = patch.projectId;
+      if (patch.periodStart !== undefined) upd.period_start = patch.periodStart;
+      if (patch.periodEnd !== undefined) upd.period_end = patch.periodEnd;
+      const { error } = await supabase.from('goals').update(upd).eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+    async deleteMoneyGoal(id) {
+      const { error } = await supabase.from('goals').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+
     async moneyGoalsProgress() {
       const { data, error } = await supabase
         .from('goal_progress')

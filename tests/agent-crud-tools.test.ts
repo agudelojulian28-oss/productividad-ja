@@ -136,4 +136,34 @@ describe('runTool · actualizar / archivar', () => {
     expect(await d.repo.getTask(t.id)).toBeNull();
   });
 
+  it('meta_dinero: crea, lista con id, edita y borra', async () => {
+    const d = deps();
+    const p = await d.repo.insertProject({ title: 'P', areaId: AREA });
+    const c = await runTool(d, 'crear', {
+      tipo: 'meta_dinero',
+      titulo: 'Ingresos julio',
+      metrica: 'money_in',
+      objetivo: 20_000_000,
+      proyecto_id: p.id,
+      desde: '2026-07-01',
+      hasta: '2026-07-31',
+    });
+    expect(c.ok).toBe(true);
+
+    const lst = await runTool(d, 'consultar', { vista: 'metas_dinero' });
+    expect(lst.ok).toBe(true);
+    const id = lst.ok ? (lst.value as { id: string }[])[0]!.id : '';
+    expect(id).toBeTruthy();
+
+    const u = await runTool(d, 'actualizar', { tipo: 'meta_dinero', id, objetivo: 25_000_000, titulo: 'Ingresos agosto' });
+    expect(u.ok).toBe(true);
+    const meta = (await d.fin.moneyGoalsProgress())[0]!;
+    expect(meta.targetValue).toBe(25_000_000);
+    expect(meta.title).toBe('Ingresos agosto');
+
+    const del = await runTool(d, 'archivar', { tipo: 'meta_dinero', id });
+    expect(del.ok).toBe(true);
+    expect((await d.fin.moneyGoalsProgress()).length).toBe(0);
+  });
+
 });

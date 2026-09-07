@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createMoneyGoal, listMoneyGoals } from '@/core/finance/goals';
+import { createMoneyGoal, listMoneyGoals, updateMoneyGoal, deleteMoneyGoal } from '@/core/finance/goals';
 import { makeFakeFinanceRepo } from './fake-finance-repo';
 import { ctx } from './fake-repo';
 
@@ -80,5 +80,54 @@ describe('createMoneyGoal', () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('RULE_VIOLATION');
+  });
+});
+
+describe('updateMoneyGoal / deleteMoneyGoal', () => {
+  async function unaMeta() {
+    const repo = makeFakeFinanceRepo();
+    const c = await createMoneyGoal(ctx(), repo, {
+      title: 'Ingresos de julio',
+      metric: 'money_in',
+      targetValue: 20_000_000,
+      projectId: PROJ,
+      periodStart: '2026-07-01',
+      periodEnd: '2026-07-31',
+    });
+    const id = c.ok ? (c.value as { id: string }).id : '';
+    return { repo, id };
+  }
+
+  it('edita título, objetivo y métrica', async () => {
+    const { repo, id } = await unaMeta();
+    const r = await updateMoneyGoal(ctx(), repo, { id, title: 'Meta agosto', targetValue: 30_000_000, metric: 'money_net' });
+    expect(r.ok).toBe(true);
+    const list = await listMoneyGoals(ctx(), repo);
+    const m = list.ok ? list.value[0]! : null;
+    expect(m!.title).toBe('Meta agosto');
+    expect(m!.targetValue).toBe(30_000_000);
+    expect(m!.metric).toBe('money_net');
+  });
+
+  it('rechaza periodo invertido (RULE_VIOLATION)', async () => {
+    const { repo, id } = await unaMeta();
+    const r = await updateMoneyGoal(ctx(), repo, { id, periodStart: '2026-08-31', periodEnd: '2026-08-01' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('RULE_VIOLATION');
+  });
+
+  it('meta inexistente → NOT_FOUND', async () => {
+    const { repo } = await unaMeta();
+    const r = await updateMoneyGoal(ctx(), repo, { id: OTRA, title: 'x' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('NOT_FOUND');
+  });
+
+  it('borra la meta', async () => {
+    const { repo, id } = await unaMeta();
+    const d = await deleteMoneyGoal(ctx(), repo, id);
+    expect(d.ok).toBe(true);
+    const list = await listMoneyGoals(ctx(), repo);
+    expect(list.ok && list.value.length).toBe(0);
   });
 });

@@ -90,3 +90,14 @@ export const MoneyGoalCreate = z
     path: ['periodEnd'],
   });
 export type MoneyGoalCreateInput = z.infer<typeof MoneyGoalCreate>;
+
+export const MoneyGoalUpdate = z.object({
+  id: z.uuid(),
+  title: z.string().trim().min(1).max(120).optional(),
+  metric: z.enum(MONEY_METRICS).optional(),
+  targetValue: z.number().positive().max(1_000_000_000_000).optional(),
+  projectId: z.uuid().optional(),
+  periodStart: Ymd.optional(),
+  periodEnd: Ymd.optional(),
+});
+export type MoneyGoalUpdateInput = z.infer<typeof MoneyGoalUpdate>;

@@ -152,6 +152,24 @@ export function makeFakeFinanceRepo(): FinanceRepo & {
     async moneyGoalsProgress(): Promise<MoneyGoalProgressRow[]> {
       return goals.filter((g) => g.status === 'active');
     },
+    async getMoneyGoal(id: string) {
+      const g = goals.find((x) => x.goalId === id);
+      return g ? { id: g.goalId, periodStart: g.periodStart, periodEnd: g.periodEnd } : null;
+    },
+    async updateMoneyGoal(id, patch): Promise<void> {
+      const g = goals.find((x) => x.goalId === id);
+      if (!g) return;
+      if (patch.title !== undefined) g.title = patch.title;
+      if (patch.metric !== undefined) g.metric = patch.metric;
+      if (patch.targetValue !== undefined) g.targetValue = patch.targetValue;
+      if (patch.projectId !== undefined) g.projectId = patch.projectId;
+      if (patch.periodStart !== undefined) g.periodStart = patch.periodStart;
+      if (patch.periodEnd !== undefined) g.periodEnd = patch.periodEnd;
+    },
+    async deleteMoneyGoal(id: string): Promise<void> {
+      const i = goals.findIndex((x) => x.goalId === id);
+      if (i >= 0) goals.splice(i, 1);
+    },
     async insertSustaining(input): Promise<SustainingServiceRow> {
       const row: SustainingServiceRow = {
         id: uuid(),

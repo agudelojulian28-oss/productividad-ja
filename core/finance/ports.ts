@@ -285,6 +285,15 @@ export interface MoneyGoalInsert {
   periodEnd: string;
 }
 
+export interface MoneyGoalPatch {
+  title?: string;
+  metric?: 'money_in' | 'money_net';
+  targetValue?: number; // pesos (COP)
+  projectId?: string;
+  periodStart?: string;
+  periodEnd?: string;
+}
+
 // Fila de la vista goal_progress, ya con el progreso calculado (en pesos).
 export interface MoneyGoalProgressRow {
   goalId: string;
@@ -334,6 +343,9 @@ export interface FinanceRepo {
 
   insertMoneyGoal(input: MoneyGoalInsert): Promise<{ id: string }>;
   moneyGoalsProgress(): Promise<MoneyGoalProgressRow[]>;
+  getMoneyGoal(id: string): Promise<{ id: string; periodStart: string; periodEnd: string } | null>;
+  updateMoneyGoal(id: string, patch: MoneyGoalPatch): Promise<void>;
+  deleteMoneyGoal(id: string): Promise<void>;
 
   // Reservas (flujo de caja + fondo de emergencia).
   ensureReserves(): Promise<void>; // crea las filas flujo/emergencia si faltan

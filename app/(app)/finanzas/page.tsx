@@ -368,6 +368,7 @@ export default async function FinanzasPage() {
                     currentValue: m.currentValue,
                     periodStart: m.periodStart,
                     periodEnd: m.periodEnd,
+                    projectId: m.projectId,
                     projectTitle: (m.projectId ? projName.get(m.projectId) : undefined) ?? '—',
                   }))}
                   today={todayInTz(ctx.tz)}

@@ -8,7 +8,7 @@ import {
   createIncomeSource,
   archiveIncomeSource,
 } from '@/core/finance/income-sources';
-import { createMoneyGoal } from '@/core/finance/goals';
+import { createMoneyGoal, updateMoneyGoal, deleteMoneyGoal } from '@/core/finance/goals';
 import {
   createRecurringExpense,
   updateRecurringExpense,
@@ -147,6 +147,28 @@ export async function createMoneyGoalAction(input: {
 }): Promise<Result<{ id: string }>> {
   const { ctx, repo } = await deps();
   const result = await createMoneyGoal(ctx, repo, input);
+  revalidatePath('/finanzas');
+  return result;
+}
+
+export async function updateMoneyGoalAction(input: {
+  id: string;
+  title?: string;
+  metric?: 'money_in' | 'money_net';
+  targetValue?: number;
+  projectId?: string;
+  periodStart?: string;
+  periodEnd?: string;
+}): Promise<Result<{ id: string }>> {
+  const { ctx, repo } = await deps();
+  const result = await updateMoneyGoal(ctx, repo, input);
+  revalidatePath('/finanzas');
+  return result;
+}
+
+export async function deleteMoneyGoalAction(id: string): Promise<Result<{ id: string }>> {
+  const { ctx, repo } = await deps();
+  const result = await deleteMoneyGoal(ctx, repo, id);
   revalidatePath('/finanzas');
   return result;
 }

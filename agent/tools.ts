@@ -25,7 +25,7 @@ import {
   confirmRecurringExpense,
   skipRecurringExpense,
 } from '@/core/finance/recurring';
-import { createMoneyGoal } from '@/core/finance/goals';
+import { createMoneyGoal, updateMoneyGoal, deleteMoneyGoal } from '@/core/finance/goals';
 import {
   createTag,
   updateTag,
@@ -388,6 +388,20 @@ export async function runTool(
           flujo_de_caja: one('flujo'),
           fondo_de_emergencia: one('emergencia'),
         });
+      }
+      if (vista === 'metas_dinero') {
+        const metas = await fin.moneyGoalsProgress();
+        return ok(
+          metas.map((m) => ({
+            id: m.goalId,
+            titulo: m.title,
+            mide: m.metric === 'money_in' ? 'ingresos' : 'balance',
+            objetivo: money(m.targetValue * 100),
+            actual: money(m.currentValue * 100),
+            progreso_pct: m.targetValue > 0 ? Math.min(100, Math.round((m.currentValue / m.targetValue) * 100)) : 0,
+            periodo: `${m.periodStart} → ${m.periodEnd}`,
+          })),
+        );
       }
       if (vista === 'informe') {
         await fin.ensureReserves();
@@ -855,6 +869,19 @@ export async function runTool(
           });
           return r.ok ? ok({ etiqueta_id: r.value.id, nombre: r.value.name, color: r.value.color }) : r;
         }
+        case 'meta_dinero': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          const r = await updateMoneyGoal(ctx, deps.finance, {
+            id: v.id,
+            title: v.titulo,
+            metric: v.metrica,
+            targetValue: v.objetivo, // pesos
+            projectId: v.proyecto_id,
+            periodStart: v.desde,
+            periodEnd: v.hasta,
+          });
+          return r.ok ? ok({ meta_dinero_id: r.value.id }) : r;
+        }
       }
       return err('INVALID_INPUT', 'Tipo desconocido');
     }
@@ -891,6 +918,11 @@ export async function runTool(
         case 'etiqueta': {
           if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
           const r = await deleteTag(ctx, deps.finance, v.id);
+          return r.ok ? ok({ borrada: v.id }) : r;
+        }
+        case 'meta_dinero': {
+          if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
+          const r = await deleteMoneyGoal(ctx, deps.finance, v.id);
           return r.ok ? ok({ borrada: v.id }) : r;
         }
         case 'area': {

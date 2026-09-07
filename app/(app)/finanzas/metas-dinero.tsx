@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useTransition, type FormEvent } from 'react';
-import { createMoneyGoalAction } from '@/app/actions/finance';
+import { useRouter } from 'next/navigation';
+import { createMoneyGoalAction, updateMoneyGoalAction, deleteMoneyGoalAction } from '@/app/actions/finance';
 import { parseAmountToMinor } from '@/lib/parse-amount';
 import { money } from '@/lib/format';
 import { Modal } from '../modal';
@@ -17,6 +18,7 @@ export type MetaProgreso = {
   currentValue: number; // pesos
   periodStart: string;
   periodEnd: string;
+  projectId: string | null;
   projectTitle: string;
 };
 
@@ -43,8 +45,15 @@ export function MetasDinero({
   metas: MetaProgreso[];
   today: string;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<MetaProgreso | null>(null);
+  const [editing, setEditing] = useState(false);
+
+  function closeDetail() {
+    setDetail(null);
+    setEditing(false);
+  }
 
   return (
     <div>
@@ -55,10 +64,12 @@ export function MetasDinero({
               m.targetValue > 0
                 ? Math.min(100, Math.round((m.currentValue / m.targetValue) * 100))
                 : 0;
+            const lograda = pct >= 100;
             const vencida = m.periodEnd < today && pct < 100;
+            const stateCls = lograda ? ' meta-state-done' : vencida ? ' meta-state-overdue' : '';
             return (
               <li key={m.goalId}>
-                <button type="button" className="meta-money meta-money-btn" onClick={() => setDetail(m)} aria-label={`Ver meta ${m.title}`}>
+                <button type="button" className={`meta-money meta-money-btn${stateCls}`} onClick={() => setDetail(m)} aria-label={`Ver meta ${m.title}`}>
                   <div className="meta-money-head">
                     <span className="fin-row-name">{m.title}</span>
                     <span className="muted" style={{ fontSize: 12 }}>
@@ -104,18 +115,58 @@ export function MetasDinero({
 
       <Modal
         open={detail !== null}
-        onClose={() => setDetail(null)}
+        onClose={closeDetail}
         eyebrow="Meta de dinero"
-        title={detail?.title ?? ''}
+        title={editing ? `Editar · ${detail?.title ?? ''}` : (detail?.title ?? '')}
       >
-        {detail && <MetaDetalle meta={detail} today={today} />}
+        {detail &&
+          (editing ? (
+            <MetaForm
+              projects={projects}
+              today={today}
+              initial={detail}
+              onDone={() => {
+                closeDetail();
+                router.refresh();
+              }}
+              onCancel={() => setEditing(false)}
+            />
+          ) : (
+            <MetaDetalle
+              meta={detail}
+              today={today}
+              onEdit={() => setEditing(true)}
+              onDeleted={() => {
+                closeDetail();
+                router.refresh();
+              }}
+            />
+          ))}
       </Modal>
     </div>
   );
 }
 
 /** Detalle completo de una meta: progreso, objetivo/actual/falta, periodo, ritmo. */
-function MetaDetalle({ meta, today }: { meta: MetaProgreso; today: string }) {
+function MetaDetalle({
+  meta,
+  today,
+  onEdit,
+  onDeleted,
+}: {
+  meta: MetaProgreso;
+  today: string;
+  onEdit: () => void;
+  onDeleted: () => void;
+}) {
+  const [pending, startTransition] = useTransition();
+  function borrar() {
+    if (!confirm(`¿Borrar la meta "${meta.title}"?`)) return;
+    startTransition(async () => {
+      const r = await deleteMoneyGoalAction(meta.goalId);
+      if (r.ok) onDeleted();
+    });
+  }
   const pct = meta.targetValue > 0 ? Math.min(100, Math.round((meta.currentValue / meta.targetValue) * 100)) : 0;
   const faltaPesos = Math.max(0, meta.targetValue - meta.currentValue);
   const lograda = pct >= 100;
@@ -189,6 +240,15 @@ function MetaDetalle({ meta, today }: { meta: MetaProgreso; today: string }) {
       <p className={`meta-detail-ritmo ${ritmo.tone === 'pos' ? 'fin-pos' : ritmo.tone === 'neg' ? 'overdue' : 'muted'}`}>
         {ritmo.txt}
       </p>
+
+      <div className="meta-detail-actions">
+        <button type="button" className="btn-primary" onClick={onEdit} disabled={pending}>
+          Editar
+        </button>
+        <button type="button" className="btn-ghost meta-del" onClick={borrar} disabled={pending}>
+          {pending ? '…' : 'Borrar'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -196,18 +256,23 @@ function MetaDetalle({ meta, today }: { meta: MetaProgreso; today: string }) {
 function MetaForm({
   projects,
   today,
+  initial,
   onDone,
+  onCancel,
 }: {
   projects: Project[];
   today: string;
+  initial?: MetaProgreso;
   onDone: () => void;
+  onCancel?: () => void;
 }) {
-  const [title, setTitle] = useState('');
-  const [metric, setMetric] = useState<'money_in' | 'money_net'>('money_in');
-  const [objetivo, setObjetivo] = useState('');
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
-  const [desde, setDesde] = useState(firstOfMonth(today));
-  const [hasta, setHasta] = useState(lastOfMonth(today));
+  const editando = !!initial;
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [metric, setMetric] = useState<'money_in' | 'money_net'>(initial?.metric ?? 'money_in');
+  const [objetivo, setObjetivo] = useState(initial ? String(initial.targetValue) : '');
+  const [projectId, setProjectId] = useState(initial?.projectId ?? projects[0]?.id ?? '');
+  const [desde, setDesde] = useState(initial?.periodStart ?? firstOfMonth(today));
+  const [hasta, setHasta] = useState(initial?.periodEnd ?? lastOfMonth(today));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -220,15 +285,25 @@ function MetaForm({
     if (!minor) return setError('Objetivo inválido');
     if (!projectId) return setError('Elige un proyecto');
     startTransition(async () => {
-      const res = await createMoneyGoalAction({
-        title: t,
-        metric,
-        targetValue: minor / 100, // pesos
-        projectId,
-        periodStart: desde,
-        periodEnd: hasta,
-      });
-      if (!res.ok) setError(res.message ?? 'No se pudo crear');
+      const res = editando
+        ? await updateMoneyGoalAction({
+            id: initial!.goalId,
+            title: t,
+            metric,
+            targetValue: minor / 100,
+            projectId,
+            periodStart: desde,
+            periodEnd: hasta,
+          })
+        : await createMoneyGoalAction({
+            title: t,
+            metric,
+            targetValue: minor / 100, // pesos
+            projectId,
+            periodStart: desde,
+            periodEnd: hasta,
+          });
+      if (!res.ok) setError(res.message ?? 'No se pudo guardar');
       else onDone();
     });
   }
@@ -287,9 +362,16 @@ function MetaForm({
           </div>
         </div>
         {error && <p className="error-text">{error}</p>}
-        <button type="submit" className="btn-primary" disabled={pending}>
-          {pending ? '…' : 'Crear meta de dinero'}
-        </button>
+        <div className="meta-detail-actions">
+          <button type="submit" className="btn-primary" disabled={pending}>
+            {pending ? '…' : editando ? 'Guardar cambios' : 'Crear meta de dinero'}
+          </button>
+          {onCancel && (
+            <button type="button" className="btn-ghost" onClick={onCancel} disabled={pending}>
+              Cancelar
+            </button>
+          )}
+        </div>
       </form>
   );
 }
