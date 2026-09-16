@@ -70,8 +70,9 @@ export async function addFlujoAllocation(
  * Movimiento del fondo de emergencia.
  *  · 'in'  → crea PRIMERO el gasto del balance (proyecto dedicado del fondo) y LUEGO
  *            el movimiento del fondo con `linked_transaction_id`.
- *  · 'out' → solo el movimiento del fondo (la plata se gastó en la emergencia).
- * El fondo debe tener proyecto/área dedicados (los asegura la acción antes de llamar).
+ *  · 'out' → INGRESO al balance (la plata vuelve a tu disponible) + baja el fondo.
+ * Simétrico: mover plata entre el balance y el fondo se refleja en ambos lados. El fondo
+ * debe tener proyecto/área dedicados (los asegura la acción antes de llamar).
  */
 export async function addEmergencyMovement(
   ctx: ActorContext,
@@ -84,26 +85,23 @@ export async function addEmergencyMovement(
 
   const fund = await repo.getReserveFund('emergencia');
   if (!fund || fund.id !== d.fundId) return err('NOT_FOUND', 'Ese fondo no existe');
-
-  let linkedTransactionId: string | null = null;
-  if (d.direction === 'in') {
-    if (!fund.projectId || !fund.areaId) {
-      return err('RULE_VIOLATION', 'El fondo de emergencia aún no tiene proyecto dedicado');
-    }
-    // El aporte se registra como un GASTO del balance (no como ingreso).
-    const tx = await registrarMovimiento(ctx, repo, {
-      direction: 'out',
-      amountMinor: d.amountMinor,
-      currency: 'COP',
-      areaId: fund.areaId,
-      projectId: fund.projectId,
-      category: 'Fondo de emergencia',
-      description: d.description ?? 'Aporte al fondo de emergencia',
-      occurredOn: d.occurredOn,
-    });
-    if (!tx.ok) return tx;
-    linkedTransactionId = tx.value.id;
+  if (!fund.projectId || !fund.areaId) {
+    return err('RULE_VIOLATION', 'El fondo de emergencia aún no tiene proyecto dedicado');
   }
+
+  // Aportar ('in' al fondo) sale del balance como GASTO; retirar ('out' del fondo)
+  // vuelve al balance como INGRESO. La transacción queda ligada al movimiento del fondo.
+  const tx = await registrarMovimiento(ctx, repo, {
+    direction: d.direction === 'in' ? 'out' : 'in',
+    amountMinor: d.amountMinor,
+    currency: 'COP',
+    areaId: fund.areaId,
+    projectId: fund.projectId,
+    category: 'Fondo de emergencia',
+    description: d.description ?? (d.direction === 'in' ? 'Aporte al fondo de emergencia' : 'Retiro del fondo de emergencia'),
+    occurredOn: d.occurredOn,
+  });
+  if (!tx.ok) return tx;
 
   const row = await repo.insertReserveMovement({
     fundId: d.fundId,
@@ -111,7 +109,7 @@ export async function addEmergencyMovement(
     amountMinor: d.amountMinor,
     occurredOn: d.occurredOn,
     description: d.description ?? null,
-    linkedTransactionId,
+    linkedTransactionId: tx.value.id,
   });
   return ok(row);
 }

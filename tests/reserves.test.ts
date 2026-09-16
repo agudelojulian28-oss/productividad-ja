@@ -85,22 +85,33 @@ describe('addEmergencyMovement', () => {
     expect(repo._reserveMovements[0]!.linkedTransactionId).toBe(repo._txs[0]!.id);
   });
 
-  it('retirar (out) solo baja el fondo, no toca el balance', async () => {
+  it('retirar (out) vuelve al balance como INGRESO + baja el fondo', async () => {
     const { repo, fundId } = await emergReady();
     await addEmergencyMovement(ctx, repo, { fundId, direction: 'in', amountMinor: 300_000 });
     const r = await addEmergencyMovement(ctx, repo, { fundId, direction: 'out', amountMinor: 100_000 });
     expect(r.ok).toBe(true);
-    expect(repo._txs).toHaveLength(1); // sigue habiendo solo el gasto del aporte
+    // Dos transacciones: el gasto del aporte (out) y el ingreso del retiro (in).
+    expect(repo._txs).toHaveLength(2);
+    const ingreso = repo._txs.find((t) => t.direction === 'in');
+    expect(ingreso!.baseAmountMinor).toBe(100_000);
     const sum = (await repo.reserveSummary()).find((s) => s.kind === 'emergencia');
     expect(sum!.balanceMinor).toBe(200_000); // 300k − 100k
     const out = repo._reserveMovements.find((m) => m.direction === 'out');
-    expect(out!.linkedTransactionId).toBeNull();
+    expect(out!.linkedTransactionId).toBe(ingreso!.id); // ligado al ingreso
   });
 
   it('aportar sin proyecto dedicado falla con RULE_VIOLATION', async () => {
     const repo = await seededRepo();
     const fund = await repo.getReserveFund('emergencia');
     const r = await addEmergencyMovement(ctx, repo, { fundId: fund!.id, direction: 'in', amountMinor: 1000 });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('RULE_VIOLATION');
+  });
+
+  it('retirar sin proyecto dedicado también falla con RULE_VIOLATION', async () => {
+    const repo = await seededRepo();
+    const fund = await repo.getReserveFund('emergencia');
+    const r = await addEmergencyMovement(ctx, repo, { fundId: fund!.id, direction: 'out', amountMinor: 1000 });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('RULE_VIOLATION');
   });

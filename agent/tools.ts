@@ -654,16 +654,16 @@ export async function runTool(
                 aviso: `⚠ Peligro: vas a retirar ${money(amountMinor)} del fondo de emergencia. Este dinero solo debe gastarse en una emergencia real. Confírmalo con el usuario y vuelve a llamar con confirmar=true.`,
               });
             }
-            const fund = await deps.finance.getReserveFund('emergencia');
-            if (!fund) return err('NOT_FOUND', 'No se encontró el fondo de emergencia');
+            const ensured = await ensureEmergencyFund(deps);
+            if (!ensured) return err('EXTERNAL_ERROR', 'No se pudo preparar el fondo de emergencia');
             const r = await addEmergencyMovement(ctx, deps.finance, {
-              fundId: fund.id,
+              fundId: ensured.fundId,
               direction: 'out',
               amountMinor,
               occurredOn: v.desde,
               description: v.descripcion,
             });
-            return r.ok ? ok({ retirado: money(amountMinor), fondo: 'emergencia' }) : r;
+            return r.ok ? ok({ retirado: money(amountMinor), fondo: 'emergencia', nota: 'Volvió a tu balance como ingreso.' }) : r;
           }
           // Aporte al fondo: cuenta como GASTO real del balance (proyecto dedicado).
           const ensured = await ensureEmergencyFund(deps);

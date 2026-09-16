@@ -453,8 +453,10 @@ function EmergencyModal({
             onChange={(ev) => setDesc(ev.target.value)}
             aria-label="Descripción"
           />
-          {direction === 'in' && (
+          {direction === 'in' ? (
             <p className="rsv-note">Aportar cuenta como un <strong>gasto de tu balance</strong> (la plata queda apartada).</p>
+          ) : (
+            <p className="rsv-note">Retirar <strong>vuelve a tu balance como ingreso</strong> (la plata sale del fondo).</p>
           )}
           {confirmOut && (
             <div className="rsv-danger-box" role="alertdialog" aria-label="Confirmar retiro">

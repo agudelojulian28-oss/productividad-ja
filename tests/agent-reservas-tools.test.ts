@@ -51,13 +51,14 @@ describe('runTool · reservas (agente)', () => {
     expect(d.fin._reserveMovements).toHaveLength(0);
   });
 
-  it('emergencia: retirar CON confirmar baja el fondo, sin tocar el balance', async () => {
+  it('emergencia: retirar CON confirmar baja el fondo y entra al balance como ingreso', async () => {
     const d = deps();
     await runTool(d, 'crear', { tipo: 'reserva', fondo: 'emergencia', direccion: 'ingreso', monto: 300_000 });
-    const txsBefore = d.fin._txs.length;
+    const txsBefore = d.fin._txs.length; // 1 (el gasto del aporte)
     const r = await runTool(d, 'crear', { tipo: 'reserva', fondo: 'emergencia', direccion: 'gasto', monto: 100_000, confirmar: true });
     expect(r.ok).toBe(true);
-    expect(d.fin._txs.length).toBe(txsBefore); // el retiro no crea transacción
+    expect(d.fin._txs.length).toBe(txsBefore + 1); // el retiro crea un ingreso
+    expect(d.fin._txs.some((t) => t.direction === 'in' && t.baseAmountMinor === 10_000_000)).toBe(true);
     const sum = (await d.fin.reserveSummary()).find((s) => s.kind === 'emergencia');
     expect(sum!.balanceMinor).toBe(20_000_000); // (300k − 100k pesos) × 100
   });
