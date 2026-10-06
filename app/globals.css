@@ -4490,6 +4490,7 @@ button.mov-row:hover {
 .rsv-pop-dl dt { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
 .rsv-pop-dl dd { margin: 2px 0 0; font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .rsv-meta-btn { width: 100%; }
+.rsv-pop-apartar { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 .rsv-meta-edit { display: flex; gap: 8px; align-items: stretch; }
 .rsv-meta-edit .field { flex: 1; }
 

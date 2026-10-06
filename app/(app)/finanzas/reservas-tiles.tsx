@@ -88,6 +88,12 @@ export function ReservasTiles({ data, today }: { data: ReservasData; today: stri
           <FlujoPopover
             data={data}
             pending={pending}
+            onAllocate={(amountMinor) =>
+              start(async () => {
+                const r = await addFlujoAllocationAction({ fundId: data.flujo.fundId, amountMinor, occurredOn: today });
+                if (r.ok) refresh();
+              })
+            }
             onSaveMeta={(target) =>
               start(async () => {
                 await updateReserveFundAction({ id: data.flujo.fundId, targetMinor: target });
@@ -189,14 +195,17 @@ export function ReservasTiles({ data, today }: { data: ReservasData; today: stri
 function FlujoPopover({
   data,
   pending,
+  onAllocate,
   onSaveMeta,
 }: {
   data: ReservasData;
   pending: boolean;
+  onAllocate: (amountMinor: number) => void;
   onSaveMeta: (targetMinor: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [meta, setMeta] = useState(toPesos(data.flujo.targetMinor));
+  const [apartar, setApartar] = useState('');
   return (
     <div className="rsv-pop" role="dialog" aria-label="Detalle del flujo de caja">
       <p className="rsv-pop-title">Flujo de caja · uso diario</p>
@@ -218,6 +227,33 @@ function FlujoPopover({
           <dd>{money(data.flujo.remainingMinor)}</dd>
         </div>
       </dl>
+      <div className="rsv-pop-apartar">
+        <label className="cal-field-label">
+          Apartar dinero (COP)
+          <div className="rsv-meta-edit">
+            <input
+              className="field"
+              inputMode="decimal"
+              value={apartar}
+              onChange={(e) => setApartar(e.target.value)}
+              aria-label="Monto a apartar"
+              placeholder="0"
+            />
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={pending || toMinor(apartar) <= 0}
+              onClick={() => {
+                onAllocate(toMinor(apartar));
+                setApartar('');
+              }}
+            >
+              {pending ? '…' : 'Apartar'}
+            </button>
+          </div>
+        </label>
+      </div>
+
       {editing ? (
         <div className="rsv-meta-edit">
           <input
