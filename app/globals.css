@@ -1771,6 +1771,10 @@ ol {
   color: var(--text-muted);
   margin-bottom: 12px;
 }
+/* Encabezado de sección con una acción a la derecha */
+.fin-h2-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.fin-h2-row .fin-h2 { margin-bottom: 12px; }
+.recur-launch .meta-add { margin: 0; }
 .fin-form {
   display: flex;
   flex-direction: column;

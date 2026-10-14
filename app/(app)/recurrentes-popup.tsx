@@ -37,7 +37,7 @@ async function fileToReceipt(file: File): Promise<Receipt> {
 /** Pop-up de rectificación de recurrentes vencidos (ingresos y gastos). Aparece en toda la
  *  app. Por cada uno: editar el monto, adjuntar comprobante, y "Sí" (registra) o "No se hizo".
  *  El texto se adapta a la dirección; el registro usa la dirección guardada del recurrente. */
-export function RecurrentesPopup({ items }: { items: DueItem[] }) {
+export function RecurrentesPopup({ items, onClose }: { items: DueItem[]; onClose?: () => void }) {
   const router = useRouter();
   const [i, setI] = useState(0);
   const [monto, setMonto] = useState('');
@@ -50,6 +50,10 @@ export function RecurrentesPopup({ items }: { items: DueItem[] }) {
   const esIngreso = item.direction === 'in';
   const sustantivo = esIngreso ? 'Ingreso recurrente' : 'Gasto recurrente';
 
+  function cerrar() {
+    setClosed(true);
+    onClose?.();
+  }
   function reset() {
     setMonto('');
     setReceipt(null);
@@ -57,8 +61,8 @@ export function RecurrentesPopup({ items }: { items: DueItem[] }) {
   function advance() {
     reset();
     if (i + 1 >= items.length) {
-      setClosed(true);
       router.refresh();
+      cerrar();
     } else {
       setI(i + 1);
     }
@@ -154,7 +158,7 @@ export function RecurrentesPopup({ items }: { items: DueItem[] }) {
           <button type="button" className="linkbtn" disabled={busy} onClick={noSeHizo}>
             No se hizo
           </button>
-          <button type="button" className="linkbtn" disabled={busy} onClick={() => setClosed(true)}>
+          <button type="button" className="linkbtn" disabled={busy} onClick={cerrar}>
             Ahora no
           </button>
         </div>

@@ -19,6 +19,8 @@ import { MetasDinero } from './metas-dinero';
 import { FinStats } from './fin-stats';
 import { MovimientosRecientes, type MovRow } from './movimientos-recientes';
 import { Recurrentes, type RecurRow } from './gastos-recurrentes';
+import { RecurrentesLauncher } from './recurrentes-launcher';
+import type { DueItem } from '../recurrentes-popup';
 import { TagsSection } from './tags-section';
 import { PageHero } from '../page-hero';
 import { EmptyState, emptyIcons } from '../empty-state';
@@ -93,6 +95,18 @@ export default async function FinanzasPage() {
 
   // Ingresos y gastos por proyecto del mes en curso (ADR-026).
   const projName = new Map(projects.map((p) => [p.id, p.title] as const));
+
+  // Recurrentes vencidos (para el botón que abre el pop-up a demanda).
+  const dueRecurrentes: DueItem[] = recurrentes
+    .filter((r) => r.nextDueOn <= todayInTz(ctx.tz))
+    .map((r) => ({
+      id: r.id,
+      direction: r.direction,
+      title: r.description || r.category || (r.direction === 'in' ? 'Ingreso recurrente' : 'Gasto recurrente'),
+      projectTitle: projName.get(r.projectId) ?? '—',
+      amountMinor: r.amountMinor,
+      nextDueOn: r.nextDueOn,
+    }));
   const currentMonth = `${todayInTz(ctx.tz).slice(0, 7)}-01`;
   const thisMonth = byProj.filter((r) => r.month === currentMonth);
   const fuentes = thisMonth
@@ -256,7 +270,10 @@ export default async function FinanzasPage() {
           </section>
 
           <section className="fin-block">
-            <h2 className="fin-h2">Gastos recurrentes</h2>
+            <div className="fin-h2-row">
+              <h2 className="fin-h2">Gastos recurrentes</h2>
+              <RecurrentesLauncher due={dueRecurrentes} />
+            </div>
             <Recurrentes
               direction="out"
               projects={projectOpts}
