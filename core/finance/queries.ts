@@ -169,6 +169,12 @@ export function serieAnioMensual(serie: SerieMes[], year: number): SerieMes[] {
   return out;
 }
 
+/** Neto acumulado (caja): suma de ingresos − gastos de TODOS los meses. Es el "flujo de
+ *  caja" = balance acumulado de meses anteriores + el mes actual hasta hoy. Puede ser negativo. */
+export function netoAcumulado(serie: SerieMes[]): number {
+  return serie.reduce((s, m) => s + m.netMinor, 0);
+}
+
 /** Totales del año (suma de sus meses). */
 export function totalesAnio(meses: SerieMes[]): {
   inflowMinor: number;

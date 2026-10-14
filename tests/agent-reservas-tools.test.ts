@@ -16,18 +16,11 @@ function deps(): ToolDeps & {
 }
 
 describe('runTool · reservas (agente)', () => {
-  it('flujo: apartar es un movimiento in y NO crea transacción', async () => {
+  it('flujo: crear se rechaza (es el balance acumulado, no un sobre)', async () => {
     const d = deps();
     const r = await runTool(d, 'crear', { tipo: 'reserva', fondo: 'flujo', direccion: 'ingreso', monto: 100_000 });
-    expect(r.ok).toBe(true);
-    expect(d.fin._reserveMovements.filter((m) => m.direction === 'in')).toHaveLength(1);
-    expect(d.fin._txs).toHaveLength(0);
-  });
-
-  it('flujo: retirar (gasto) se rechaza', async () => {
-    const d = deps();
-    const r = await runTool(d, 'crear', { tipo: 'reserva', fondo: 'flujo', direccion: 'gasto', monto: 100_000 });
     expect(r.ok).toBe(false);
+    expect(d.fin._reserveMovements).toHaveLength(0);
   });
 
   it('emergencia: aportar crea el proyecto dedicado + un GASTO del balance', async () => {

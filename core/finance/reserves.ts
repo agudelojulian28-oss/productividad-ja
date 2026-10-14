@@ -4,11 +4,12 @@ import type { FinanceRepo, ReserveMovementRow, ReserveSummaryRow } from './ports
 import type { SerieMes } from './queries';
 import { registrarMovimiento } from './transactions';
 
-// Reservas (Finanzas): dos apartados de dinero.
-//  · flujo      → dinero apartado para el uso diario. NO crea transacción (sale del
-//                 balance conceptualmente, pero no se descuenta). Solo aportes ('in').
-//  · emergencia → colchón. Aportar ('in') = GASTO real del balance en el proyecto
-//                 dedicado del fondo; retirar ('out') = solo baja el fondo (peligro en UI).
+// Reservas (Finanzas):
+//  · flujo      → NO es un sobre: es la caja acumulada (neto de todos los meses + el mes
+//                 actual), calculada en la acción desde el cashflow. Aquí solo vive su META
+//                 (fondo 'flujo'.target_minor), que se edita con updateReserveFund.
+//  · emergencia → colchón. Aportar ('in') = GASTO real del balance; retirar ('out') =
+//                 INGRESO al balance. Ambos crean una transacción ligada al proyecto dedicado.
 // Casos de uso puros: validar → autorizar → reglas → ejecutar → Result. Un solo usuario.
 
 const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida (YYYY-MM-DD)');
@@ -18,13 +19,6 @@ const ReserveFundUpdate = z.object({
   id: z.uuid(),
   targetMinor: z.number().int().min(0).max(1_000_000_000_000).optional(),
   description: z.string().trim().max(2000).nullable().optional(),
-});
-
-const FlujoAllocation = z.object({
-  fundId: z.uuid(),
-  amountMinor: Amount,
-  occurredOn: Ymd.optional(),
-  description: z.string().trim().max(500).nullable().optional(),
 });
 
 const EmergencyMovement = z.object({
@@ -46,24 +40,6 @@ export async function updateReserveFund(
   const { id, ...patch } = parsed.data;
   await repo.updateReserveFund(id, patch);
   return ok({ id });
-}
-
-/** Aparta dinero al flujo de caja (movimiento 'in'). No toca el balance. */
-export async function addFlujoAllocation(
-  _ctx: ActorContext,
-  repo: FinanceRepo,
-  raw: unknown,
-): Promise<Result<ReserveMovementRow>> {
-  const parsed = FlujoAllocation.safeParse(raw);
-  if (!parsed.success) return err('INVALID_INPUT', 'Datos inválidos', parsed.error.issues);
-  const row = await repo.insertReserveMovement({
-    fundId: parsed.data.fundId,
-    direction: 'in',
-    amountMinor: parsed.data.amountMinor,
-    occurredOn: parsed.data.occurredOn,
-    description: parsed.data.description ?? null,
-  });
-  return ok(row);
 }
 
 /**

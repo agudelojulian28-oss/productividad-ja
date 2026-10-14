@@ -33,8 +33,8 @@ import {
   setTransactionTags,
   setRecurringTags,
 } from '@/core/finance/tags';
-import { resumenFinanciero, resumenPorPeriodo, enPeriodo, topGastos, serieMensual } from '@/core/finance/queries';
-import { addFlujoAllocation, addEmergencyMovement, updateReserveFund } from '@/core/finance/reserves';
+import { resumenFinanciero, resumenPorPeriodo, enPeriodo, topGastos, serieMensual, netoAcumulado } from '@/core/finance/queries';
+import { addEmergencyMovement, updateReserveFund } from '@/core/finance/reserves';
 import { reporteFinanciero } from '@/core/finance/analisis';
 import { sustainingSummary, monthlyEquivalent, toCopMinor } from '@/core/finance/sustaining';
 import { getTrm } from '@/lib/trm';
@@ -372,21 +372,21 @@ export async function runTool(
       }
       if (vista === 'reservas') {
         await fin.ensureReserves();
-        const summary = await fin.reserveSummary();
-        const one = (k: 'flujo' | 'emergencia') => {
-          const r = summary.find((s) => s.kind === k);
-          if (!r) return { saldo: money(0), meta: money(0), bajo_meta: false };
-          return {
-            saldo: money(r.balanceMinor),
-            meta: r.targetMinor > 0 ? money(r.targetMinor) : 'sin meta',
-            falta: money(Math.max(0, r.targetMinor - r.balanceMinor)),
-            bajo_meta: r.targetMinor > 0 && r.balanceMinor < r.targetMinor,
-            descripcion: r.description ?? undefined,
-          };
-        };
+        const [summary, cashflow] = await Promise.all([fin.reserveSummary(), fin.cashflowMonthly()]);
+        const detalle = (r: (typeof summary)[number] | undefined, saldoMinor: number) => ({
+          saldo: money(saldoMinor),
+          meta: r && r.targetMinor > 0 ? money(r.targetMinor) : 'sin meta',
+          falta: r && r.targetMinor > 0 ? money(Math.max(0, r.targetMinor - saldoMinor)) : money(0),
+          bajo_meta: !!r && r.targetMinor > 0 && saldoMinor < r.targetMinor,
+          descripcion: r?.description ?? undefined,
+        });
+        const flujoRow = summary.find((s) => s.kind === 'flujo');
+        const emergRow = summary.find((s) => s.kind === 'emergencia');
+        // Flujo de caja = caja acumulada (neto de todos los meses), no un sobre.
+        const acumulado = netoAcumulado(serieMensual(cashflow, 600));
         return ok({
-          flujo_de_caja: one('flujo'),
-          fondo_de_emergencia: one('emergencia'),
+          flujo_de_caja: { ...detalle(flujoRow, acumulado), nota: 'Balance acumulado de todos los meses + el mes actual.' },
+          fondo_de_emergencia: detalle(emergRow, emergRow?.balanceMinor ?? 0),
         });
       }
       if (vista === 'metas_dinero') {
@@ -632,18 +632,9 @@ export async function runTool(
           await deps.finance.ensureReserves();
           const amountMinor = Math.round(v.monto! * 100);
           if (v.fondo === 'flujo') {
-            if (v.direccion !== 'ingreso') {
-              return err('INVALID_INPUT', 'El flujo de caja solo recibe aportes (direccion=ingreso)');
-            }
-            const fund = await deps.finance.getReserveFund('flujo');
-            if (!fund) return err('NOT_FOUND', 'No se encontró el flujo de caja');
-            const r = await addFlujoAllocation(ctx, deps.finance, {
-              fundId: fund.id,
-              amountMinor,
-              occurredOn: v.desde,
-              description: v.descripcion,
-            });
-            return r.ok ? ok({ apartado: money(amountMinor), fondo: 'flujo de caja' }) : r;
+            // El flujo de caja ya NO es un sobre: es el balance acumulado (calculado). No se
+            // aparta ni se retira. Para cambiar su META usa: actualizar reserva fondo=flujo.
+            return err('INVALID_INPUT', 'El flujo de caja es tu balance acumulado (no se aparta). Para su meta usa actualizar reserva fondo=flujo.');
           }
           // fondo === 'emergencia'
           if (v.direccion === 'gasto') {

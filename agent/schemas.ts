@@ -122,11 +122,11 @@ export const Crear = z
     direccion: z
       .enum(['ingreso', 'gasto'])
       .optional()
-      .describe('movimiento: ingreso o gasto. recurrente: ingreso o gasto (def gasto). reserva: ingreso=aportar/apartar, gasto=retirar (solo fondo de emergencia)'),
+      .describe('movimiento: ingreso o gasto. recurrente: ingreso o gasto (def gasto). reserva (solo emergencia): ingreso=aportar, gasto=retirar'),
     fondo: z
       .enum(['flujo', 'emergencia'])
       .optional()
-      .describe('Solo reserva: flujo (uso diario, solo aportes) o emergencia (aportar/retirar)'),
+      .describe('reserva: emergencia (aportar/retirar). El flujo de caja NO se crea aquí: es el balance acumulado; su meta se cambia con actualizar reserva fondo=flujo'),
     confirmar: z
       .boolean()
       .optional()

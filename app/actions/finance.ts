@@ -32,12 +32,11 @@ import {
 } from '@/core/finance/sustaining';
 import {
   updateReserveFund,
-  addFlujoAllocation,
   addEmergencyMovement,
   reserveView,
   mesesDeGastos,
 } from '@/core/finance/reserves';
-import { serieMensual, resumenPorPeriodo } from '@/core/finance/queries';
+import { serieMensual, netoAcumulado } from '@/core/finance/queries';
 import type { ReserveMovementRow, ReserveSummaryRow } from '@/core/finance/ports';
 import type { SustainingServiceRow } from '@/core/finance/ports';
 import type { RecurringExpenseRow, RecurringFrequency, TagRow } from '@/core/finance/ports';
@@ -575,12 +574,11 @@ export interface ReservasData {
   flujo: ReservaTile;
   emergencia: ReservaTile & { movements: ReserveMovementRow[] };
   suggestedTargetMinor: number; // 6 meses de gastos
-  lastMonthBalanceMinor: number;
-  lastMonthLabel: string; // 'YYYY-MM'
-  flujoAllocatedThisMonth: boolean; // ya se apartó al flujo en el mes en curso
 }
 
-/** Estado de las reservas para los tiles + modal (una sola lectura para la página). */
+/** Estado de las reservas para los tiles + modal (una sola lectura para la página).
+ *  Flujo de caja = balance acumulado (todos los meses + el actual hasta hoy), calculado.
+ *  La meta del flujo se guarda en el fondo 'flujo' (target_minor). */
 export async function getReservasAction(): Promise<ReservasData> {
   const { supabase, ctx } = await requireContext();
   const repo = financeRepo(supabase, ctx.userId);
@@ -598,7 +596,7 @@ export async function getReservasAction(): Promise<ReservasData> {
       balanceMinor: 0,
       movements: 0,
     };
-  const tile = (row: ReserveSummaryRow): ReservaTile => {
+  const emergTile = (row: ReserveSummaryRow): ReservaTile => {
     const v = reserveView(row);
     return {
       fundId: row.fundId,
@@ -611,27 +609,23 @@ export async function getReservasAction(): Promise<ReservasData> {
   };
   const flujoRow = byKind('flujo');
   const emergRow = byKind('emergencia');
-  const [emergMovs, flujoMovs] = await Promise.all([
-    emergRow.fundId ? repo.listReserveMovements(emergRow.fundId) : Promise.resolve([]),
-    flujoRow.fundId ? repo.listReserveMovements(flujoRow.fundId) : Promise.resolve([]),
-  ]);
-  const mesPasado = resumenPorPeriodo(cashflow, ctx.tz, 'mes_pasado');
-  const thisMonth = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz, year: 'numeric', month: '2-digit' }).format(new Date());
-  const flujoAllocatedThisMonth = flujoMovs.some((m) => m.occurredOn.startsWith(thisMonth));
+  const emergMovs = emergRow.fundId ? await repo.listReserveMovements(emergRow.fundId) : [];
+
+  // Flujo de caja = caja acumulada (neto de todos los meses). La meta vive en el fondo 'flujo'.
+  const acumuladoMinor = netoAcumulado(serieMensual(cashflow, 600));
+  const flujo: ReservaTile = {
+    fundId: flujoRow.fundId,
+    targetMinor: flujoRow.targetMinor,
+    balanceMinor: acumuladoMinor,
+    belowTarget: flujoRow.targetMinor > 0 && acumuladoMinor < flujoRow.targetMinor,
+    remainingMinor: Math.max(0, flujoRow.targetMinor - acumuladoMinor),
+    description: flujoRow.description,
+  };
 
   return {
-    flujo: tile(flujoRow),
-    emergencia: { ...tile(emergRow), movements: emergMovs },
+    flujo,
+    emergencia: { ...emergTile(emergRow), movements: emergMovs },
     suggestedTargetMinor: mesesDeGastos(serieMensual(cashflow, 6), 6),
-    lastMonthBalanceMinor: mesPasado.netMinor,
-    lastMonthLabel: (() => {
-      const now = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz, year: 'numeric', month: '2-digit' }).format(new Date());
-      const [y, m] = now.split('-').map(Number);
-      const d = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, 1));
-      d.setUTCMonth(d.getUTCMonth() - 1);
-      return d.toISOString().slice(0, 7);
-    })(),
-    flujoAllocatedThisMonth,
   };
 }
 
@@ -642,18 +636,6 @@ export async function updateReserveFundAction(input: {
 }): Promise<Result<{ id: string }>> {
   const { ctx, repo } = await deps();
   const r = await updateReserveFund(ctx, repo, input);
-  revalidatePath('/finanzas');
-  return r;
-}
-
-export async function addFlujoAllocationAction(input: {
-  fundId: string;
-  amountMinor: number;
-  occurredOn?: string;
-  description?: string | null;
-}): Promise<Result<ReserveMovementRow>> {
-  const { ctx, repo } = await deps();
-  const r = await addFlujoAllocation(ctx, repo, input);
   revalidatePath('/finanzas');
   return r;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { money } from '@/lib/format';
 import { parseAmountToMinor } from '@/lib/parse-amount';
@@ -9,7 +9,6 @@ import { SegSelect } from '../seg-select';
 import { DateField } from '../date-picker';
 import {
   updateReserveFundAction,
-  addFlujoAllocationAction,
   addEmergencyMovementAction,
   type ReservasData,
 } from '@/app/actions/finance';
@@ -32,25 +31,6 @@ export function ReservasTiles({ data, today }: { data: ReservasData; today: stri
   const [pending, start] = useTransition();
   const [emergOpen, setEmergOpen] = useState(false);
   const [flujoPop, setFlujoPop] = useState(false);
-  const [promptOpen, setPromptOpen] = useState(false);
-
-  const monthKey = today.slice(0, 7);
-
-  // Pop-up mensual del flujo: día 2–3 del mes, bajo meta, sin aporte este mes y no
-  // saltado antes. Si la meta está cumplida, no pregunta.
-  useEffect(() => {
-    const day = Number(today.slice(8, 10));
-    if (day < 2 || day > 3) return;
-    if (!data.flujo.belowTarget) return;
-    if (data.flujoAllocatedThisMonth) return;
-    let skipped = false;
-    try {
-      skipped = localStorage.getItem(`flujo-skip-${monthKey}`) === '1';
-    } catch {
-      skipped = false;
-    }
-    if (!skipped) setPromptOpen(true);
-  }, [today, monthKey, data.flujo.belowTarget, data.flujoAllocatedThisMonth]);
 
   function refresh() {
     router.refresh();
@@ -73,14 +53,16 @@ export function ReservasTiles({ data, today }: { data: ReservasData; today: stri
         >
           <div className="kpi-k">Flujo de caja</div>
           <div className="kpi-vrow">
-            <span className="kpi-v kpi-acc">{money(data.flujo.balanceMinor, { compact: true })}</span>
+            <span className={`kpi-v ${data.flujo.balanceMinor >= 0 ? 'kpi-acc' : 'kpi-neg'}`}>
+              {money(data.flujo.balanceMinor, { compact: true })}
+            </span>
           </div>
           <div className="kpi-sub">
             {data.flujo.targetMinor > 0
               ? data.flujo.belowTarget
                 ? `${pct(data.flujo.balanceMinor, data.flujo.targetMinor)}% · faltan ${money(data.flujo.remainingMinor, { compact: true })}`
                 : '✓ meta cumplida'
-              : 'para uso diario'}
+              : 'caja acumulada'}
           </div>
           {data.flujo.targetMinor > 0 && <Meter balance={data.flujo.balanceMinor} target={data.flujo.targetMinor} />}
         </button>
@@ -88,12 +70,6 @@ export function ReservasTiles({ data, today }: { data: ReservasData; today: stri
           <FlujoPopover
             data={data}
             pending={pending}
-            onAllocate={(amountMinor) =>
-              start(async () => {
-                const r = await addFlujoAllocationAction({ fundId: data.flujo.fundId, amountMinor, occurredOn: today });
-                if (r.ok) refresh();
-              })
-            }
             onSaveMeta={(target) =>
               start(async () => {
                 await updateReserveFundAction({ id: data.flujo.fundId, targetMinor: target });
@@ -133,36 +109,6 @@ export function ReservasTiles({ data, today }: { data: ReservasData; today: stri
         )}
       </button>
 
-      {promptOpen && (
-        <FlujoPrompt
-          data={data}
-          pending={pending}
-          onAllocate={(amountMinor) =>
-            start(async () => {
-              const r = await addFlujoAllocationAction({ fundId: data.flujo.fundId, amountMinor, occurredOn: today });
-              if (r.ok) {
-                setPromptOpen(false);
-                refresh();
-              }
-            })
-          }
-          onSaveMeta={(target) =>
-            start(async () => {
-              await updateReserveFundAction({ id: data.flujo.fundId, targetMinor: target });
-              refresh();
-            })
-          }
-          onSkip={() => {
-            try {
-              localStorage.setItem(`flujo-skip-${monthKey}`, '1');
-            } catch {
-              /* sin persistencia */
-            }
-            setPromptOpen(false);
-          }}
-        />
-      )}
-
       {emergOpen && (
         <EmergencyModal
           data={data}
@@ -195,27 +141,24 @@ export function ReservasTiles({ data, today }: { data: ReservasData; today: stri
 function FlujoPopover({
   data,
   pending,
-  onAllocate,
   onSaveMeta,
 }: {
   data: ReservasData;
   pending: boolean;
-  onAllocate: (amountMinor: number) => void;
   onSaveMeta: (targetMinor: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [meta, setMeta] = useState(toPesos(data.flujo.targetMinor));
-  const [apartar, setApartar] = useState('');
   return (
     <div className="rsv-pop" role="dialog" aria-label="Detalle del flujo de caja">
-      <p className="rsv-pop-title">Flujo de caja · uso diario</p>
+      <p className="rsv-pop-title">Flujo de caja · caja acumulada</p>
       <p className="rsv-pop-text">
-        Dinero apartado del balance del mes para el día a día. Sale del balance, pero no se
-        descuenta (solo se aparta).
+        Tu caja acumulada: el balance (ingresos − gastos) de todos los meses más lo que va del
+        mes actual. Se calcula solo de tus movimientos.
       </p>
       <dl className="rsv-pop-dl">
         <div>
-          <dt>Apartado</dt>
+          <dt>Acumulado</dt>
           <dd>{money(data.flujo.balanceMinor)}</dd>
         </div>
         <div>
@@ -224,35 +167,9 @@ function FlujoPopover({
         </div>
         <div>
           <dt>Falta</dt>
-          <dd>{money(data.flujo.remainingMinor)}</dd>
+          <dd>{data.flujo.targetMinor > 0 ? money(data.flujo.remainingMinor) : '—'}</dd>
         </div>
       </dl>
-      <div className="rsv-pop-apartar">
-        <label className="cal-field-label">
-          Apartar dinero (COP)
-          <div className="rsv-meta-edit">
-            <input
-              className="field"
-              inputMode="decimal"
-              value={apartar}
-              onChange={(e) => setApartar(e.target.value)}
-              aria-label="Monto a apartar"
-              placeholder="0"
-            />
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={pending || toMinor(apartar) <= 0}
-              onClick={() => {
-                onAllocate(toMinor(apartar));
-                setApartar('');
-              }}
-            >
-              {pending ? '…' : 'Apartar'}
-            </button>
-          </div>
-        </label>
-      </div>
 
       {editing ? (
         <div className="rsv-meta-edit">
@@ -274,67 +191,6 @@ function FlujoPopover({
         </button>
       )}
     </div>
-  );
-}
-
-// ── Pop-up mensual del flujo ───────────────────────────────────────────────
-function FlujoPrompt({
-  data,
-  pending,
-  onAllocate,
-  onSaveMeta,
-  onSkip,
-}: {
-  data: ReservasData;
-  pending: boolean;
-  onAllocate: (amountMinor: number) => void;
-  onSaveMeta: (targetMinor: number) => void;
-  onSkip: () => void;
-}) {
-  const sugerido = Math.max(0, Math.min(data.flujo.remainingMinor, data.lastMonthBalanceMinor));
-  const [amount, setAmount] = useState(toPesos(sugerido));
-  const [editMeta, setEditMeta] = useState(false);
-  const [meta, setMeta] = useState(toPesos(data.flujo.targetMinor));
-  return (
-    <Modal open onClose={onSkip} eyebrow="Cierre de mes" title="¿Cuánto apartas para el flujo de caja?" size="sm">
-      <p className="rsv-prompt-lead">
-        El mes pasado ({data.lastMonthLabel}) tu balance fue{' '}
-        <strong>{money(data.lastMonthBalanceMinor)}</strong>. Aparta lo que quieras para el uso diario,
-        hacia tu meta de {data.flujo.targetMinor > 0 ? money(data.flujo.targetMinor) : '—'}.
-      </p>
-      <label className="cal-field-label">
-        Monto a apartar (COP)
-        <input
-          className="field"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          aria-label="Monto a apartar"
-        />
-      </label>
-      {editMeta && (
-        <label className="cal-field-label">
-          Nueva meta (COP)
-          <div className="rsv-meta-edit">
-            <input className="field" inputMode="decimal" value={meta} onChange={(e) => setMeta(e.target.value)} aria-label="Meta del flujo" />
-            <button type="button" className="btn-ghost" disabled={pending} onClick={() => onSaveMeta(toMinor(meta))}>
-              Guardar meta
-            </button>
-          </div>
-        </label>
-      )}
-      <div className="rsv-prompt-actions">
-        <button type="button" className="btn-primary" disabled={pending || toMinor(amount) <= 0} onClick={() => onAllocate(toMinor(amount))}>
-          {pending ? '…' : `Apartar ${money(toMinor(amount), { compact: true })}`}
-        </button>
-        <button type="button" className="btn-ghost" onClick={() => setEditMeta((v) => !v)}>
-          {editMeta ? 'Ocultar meta' : 'Editar meta'}
-        </button>
-        <button type="button" className="btn-ghost" onClick={onSkip}>
-          Ahora no
-        </button>
-      </div>
-    </Modal>
   );
 }
 

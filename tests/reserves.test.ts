@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   updateReserveFund,
-  addFlujoAllocation,
   addEmergencyMovement,
   reserveView,
   mesesDeGastos,
@@ -42,20 +41,6 @@ describe('mesesDeGastos', () => {
   });
   it('sin datos → 0', () => {
     expect(mesesDeGastos([], 6)).toBe(0);
-  });
-});
-
-describe('addFlujoAllocation', () => {
-  it('inserta un movimiento in y NO crea transacción', async () => {
-    const repo = await seededRepo();
-    const flujo = await repo.getReserveFund('flujo');
-    const r = await addFlujoAllocation(ctx, repo, { fundId: flujo!.id, amountMinor: 50_000 });
-    expect(r.ok).toBe(true);
-    expect(repo._reserveMovements).toHaveLength(1);
-    expect(repo._reserveMovements[0]!.direction).toBe('in');
-    expect(repo._txs).toHaveLength(0); // el flujo no toca el balance
-    const sum = (await repo.reserveSummary()).find((s) => s.kind === 'flujo');
-    expect(sum!.balanceMinor).toBe(50_000);
   });
 });
 

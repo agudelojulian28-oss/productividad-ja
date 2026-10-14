@@ -4,6 +4,7 @@ import {
   resumenPorPeriodo,
   enPeriodo,
   serieMensual,
+  netoAcumulado,
   aniosConDatos,
   serieAnioMensual,
   totalesAnio,
@@ -122,6 +123,21 @@ describe('serieMensual', () => {
     expect(s.length).toBe(2);
     expect(s[0]!.month).toBe('2026-05-01');
     expect(s[0]!.netMinor).toBe(15);
+  });
+});
+
+describe('netoAcumulado (flujo de caja)', () => {
+  it('suma el neto de todos los meses (puede ser negativo)', () => {
+    const serie = serieMensual(
+      [
+        cf({ month: '2026-07-01', netMinor: 500_000 }),
+        cf({ month: '2026-08-01', netMinor: -200_000 }),
+        cf({ month: '2026-09-01', netMinor: 100_000 }),
+      ],
+      600,
+    );
+    expect(netoAcumulado(serie)).toBe(400_000);
+    expect(netoAcumulado([])).toBe(0);
   });
 });
 
