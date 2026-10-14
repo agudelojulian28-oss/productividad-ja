@@ -82,6 +82,10 @@ export function VoiceOrb() {
   const [conversando, setConversando] = useState(false); // modo conversación continua
   const [heard, setHeard] = useState(''); // lo que Aura va oyendo (en vivo)
   const [wakeOn, setWakeOn] = useState(false); // escuchar la palabra "Aura" (app abierta)
+  // En móvil/táctil no corremos la escucha permanente de "Aura": deja el micrófono
+  // encendido todo el tiempo y el navegador suena en cada reinicio. Ahí es tocar-para-hablar.
+  const [isTouch, setIsTouch] = useState(false);
+  const isTouchRef = useRef(false);
 
   const wakeOnRef = useRef(false);
   const openRef = useRef(false);
@@ -132,13 +136,24 @@ export function VoiceOrb() {
   }, [open]);
 
   useEffect(() => {
+    // Dispositivo táctil (celular/tablet): sin escucha permanente de "Aura".
+    let touch = false;
+    try {
+      touch = window.matchMedia('(pointer: coarse)').matches;
+    } catch {
+      touch = 'ontouchstart' in window;
+    }
+    setIsTouch(touch);
+    isTouchRef.current = touch;
+
     try {
       const v = localStorage.getItem(VOICE_ON_KEY);
       if (v === '0') {
         setVoiceOn(false);
         voiceOnRef.current = false;
       }
-      if (localStorage.getItem(WAKE_ON_KEY) === '1') {
+      // El wake permanente solo se recuerda en escritorio (en móvil nunca se enciende solo).
+      if (!touch && localStorage.getItem(WAKE_ON_KEY) === '1') {
         setWakeOn(true);
         wakeOnRef.current = true;
       }
@@ -710,6 +725,7 @@ export function VoiceOrb() {
   // frase (sin cortar ni repetir). Al terminar de hablar: manda el comando; si solo
   // dijiste "Aura", abre y escucha. Se reinicia al instante para no perder palabras.
   const startWake = useCallback(() => {
+    if (isTouchRef.current) return; // en táctil no hay escucha permanente
     const Ctor = getSpeechRecCtor();
     if (!Ctor || wakeRecRef.current || !wakeOnRef.current || openRef.current) return;
     const clearTimer = () => {
@@ -813,7 +829,7 @@ export function VoiceOrb() {
   // un gesto para arrancar el micrófono, así que reintentamos al volver a la pestaña
   // (visibilidad/foco) y en el primer toque. `startWake` se auto-protege (no duplica).
   useEffect(() => {
-    if (!wakeOn) return;
+    if (!wakeOn || isTouch) return;
     const ensure = () => {
       if (!wakeRecRef.current && !openRef.current && !wakeArmedRef.current) startWakeRef.current();
     };
@@ -831,7 +847,7 @@ export function VoiceOrb() {
       window.removeEventListener('pointerdown', ensure, { capture: true });
       window.removeEventListener('keydown', ensure);
     };
-  }, [wakeOn]);
+  }, [wakeOn, isTouch]);
 
   const toggleWake = () => {
     const next = !wakeOn;
@@ -975,10 +991,12 @@ export function VoiceOrb() {
                 />
                 Conversación continua
               </label>
-              <label className="voice-conv-toggle">
-                <input type="checkbox" checked={wakeOn} onChange={toggleWake} />
-                Despertar diciendo “Aura”
-              </label>
+              {!isTouch && (
+                <label className="voice-conv-toggle">
+                  <input type="checkbox" checked={wakeOn} onChange={toggleWake} />
+                  Despertar diciendo “Aura”
+                </label>
+              )}
             </div>
           </div>
         </div>
