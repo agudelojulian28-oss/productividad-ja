@@ -6,6 +6,10 @@ const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?([+-]\d{
 const Instant = z.string().regex(ISO_WITH_OFFSET, 'ISO-8601 con offset (ej. 2026-07-24T16:00:00-05:00)');
 const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Día YYYY-MM-DD');
 const RECUR_FREQ = ['semanal', 'quincenal', 'mensual', 'bimestral', 'trimestral', 'anual'] as const;
+const SALUD_SECCION = ['entrenamiento', 'dieta', 'cuerpo', 'espiritual'] as const;
+const SALUD_ELEMENTO = ['rutina', 'ejercicio', 'comida', 'salvavidas', 'tratamiento', 'compromiso', 'habito'] as const;
+const Hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Hora HH:MM (24 h)');
+const Dias = z.array(z.number().int().min(1).max(7)).min(1).max(7);
 
 
 const Alcance = z
@@ -42,6 +46,7 @@ export const Consultar = z.object({
       'recurrentes',
       'etiquetas',
       'metas_dinero',
+      'salud',
       'sostenimiento',
       'reservas',
       'informe',
@@ -56,7 +61,8 @@ export const Consultar = z.object({
         'Dinero: resumen_financiero, por_proyecto (ingresos/gastos por proyecto), movimientos (lista de ' +
         'ingresos/gastos filtrable por rango de fechas: usa desde/hasta/direccion), gastos, recurrentes ' +
         '(gastos e ingresos recurrentes), etiquetas (lista de etiquetas con sus IDs para poder asignarlas), metas_dinero (metas de dinero con sus IDs, progreso, periodo y proyecto — para actualizarlas o borrarlas), sostenimiento (costos de operar la app: total mensual y alertas de recarga/renovación), reservas (flujo de caja y fondo de emergencia: saldo, meta y si están bajo la meta), informe (salud financiera: tasa de ahorro, costos fijos, cobertura del fondo, tendencia, score y proyección de los próximos meses), por_cobrar, pipeline. ' +
-        'Agenda: conflictos (solapes próximos 7 días), huecos (ratos libres; usa duracion_min).',
+        'Agenda: conflictos (solapes próximos 7 días), huecos (ratos libres; usa duracion_min). ' +
+        'Salud: salud (plan de Julián con IDs: checklist de hoy con lo marcado, entreno que toca, comidas con horas, hora dorada, compromisos con Dios, semana de entreno, racha y mercado). Úsala SIEMPRE antes de organizar el día o la semana.',
     ),
   fecha: Ymd.optional().describe('Solo vista=agenda: día YYYY-MM-DD (por defecto hoy)'),
   desde: Ymd.optional().describe('Solo vista=movimientos: inicio del rango YYYY-MM-DD (inclusive)'),
@@ -96,8 +102,20 @@ export const Crear = z
         'tarea_recurrente',
         'etiqueta',
         'reserva',
+        'salud',
+        'mercado',
       ])
       .describe('Qué crear'),
+    seccion: z.enum(SALUD_SECCION).optional().describe('Solo salud: entrenamiento | dieta | cuerpo | espiritual'),
+    elemento: z
+      .enum(SALUD_ELEMENTO)
+      .optional()
+      .describe('Solo salud: rutina, ejercicio (va dentro de una rutina: pasa padre_id), comida, salvavidas, tratamiento, compromiso, habito (p. ej. hora dorada; sus pasos van con padre_id)'),
+    padre_id: z.uuid().optional().describe('Solo salud: id del elemento padre (rutina para un ejercicio, hora dorada para un paso)'),
+    hora: Hhmm.optional().describe('Solo salud: hora del día HH:MM (comidas, hábitos)'),
+    dias: Dias.optional().describe('Solo salud: días ISO 1=lunes … 7=domingo (sin esto = todos los días)'),
+    seguimiento: z.boolean().optional().describe('Solo salud: si aparece en el checklist diario'),
+    cantidad: z.string().trim().max(60).optional().describe('Solo mercado: cantidad (ej. "30", "1 kg")'),
     titulo: z
       .string()
       .trim()
@@ -131,11 +149,11 @@ export const Crear = z
       .boolean()
       .optional()
       .describe('Solo reserva gasto del fondo de emergencia (retiro): pon true SOLO después de que el usuario confirme; es dinero de emergencia'),
-    monto: z.number().positive().optional().describe('movimiento / recurrente: en la moneda, NO centavos (ej. 50000, 12.5)'),
+    monto: z.number().positive().optional().describe('movimiento / recurrente: en la moneda, NO centavos (ej. 50000, 12.5) · mercado: precio en pesos'),
     moneda: z.enum(['COP', 'USD']).optional().describe('Solo movimiento (por defecto COP)'),
     tasa: z.number().positive().optional().describe('Solo movimiento en USD: COP por 1 USD'),
     categoria: z.string().trim().max(80).optional().describe('movimiento gasto / recurrente (ej. almuerzo, arriendo)'),
-    frecuencia: z.enum(RECUR_FREQ).optional().describe('recurrente / tarea_recurrente: cada cuánto se repite'),
+    frecuencia: z.enum(RECUR_FREQ).optional().describe('recurrente / tarea_recurrente: cada cuánto se repite · mercado: cada cuánto se compra'),
     color_hex: z
       .string()
       .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
@@ -150,7 +168,7 @@ export const Crear = z
     clase_doc: z.enum(['proceso', 'preferencia', 'nota']).optional().describe('Solo documento (por defecto nota)'),
     descripcion: z.string().max(5000).optional().describe('evento: notas · movimiento: concepto (ej. "almuerzo con cliente"), máx 500'),
     color: z.enum(COLOR_NAMES).optional().describe('Solo evento'),
-    duracion_min: z.number().int().min(5).max(1440).optional().describe('Solo evento: minutos (30 def)'),
+    duracion_min: z.number().int().min(1).max(1440).optional().describe('evento: minutos (30 def) · salud: duración en minutos'),
   })
   .refine(
     (d) => {
@@ -180,6 +198,10 @@ export const Crear = z
           return !!d.titulo && !!d.proyecto_id;
         case 'reserva':
           return !!d.fondo && d.monto != null && !!d.direccion;
+        case 'salud':
+          return !!d.titulo && !!d.seccion && !!d.elemento;
+        case 'mercado':
+          return !!d.titulo;
         default:
           return false;
       }
@@ -191,8 +213,13 @@ export const Crear = z
 export const Actualizar = z
   .object({
     tipo: z
-      .enum(['tarea', 'evento', 'meta', 'meta_dinero', 'proyecto', 'area', 'documento', 'recurrente', 'tarea_recurrente', 'movimiento', 'etiqueta', 'reserva'])
+      .enum(['tarea', 'evento', 'meta', 'meta_dinero', 'proyecto', 'area', 'documento', 'recurrente', 'tarea_recurrente', 'movimiento', 'etiqueta', 'reserva', 'salud', 'mercado'])
       .describe('Qué actualizar'),
+    hora: Hhmm.nullable().optional().describe('Solo salud: nueva hora HH:MM (null = sin hora)'),
+    dias: Dias.nullable().optional().describe('Solo salud: nuevos días ISO 1..7 (null = todos los días)'),
+    seguimiento: z.boolean().optional().describe('Solo salud: activar/quitar del checklist diario'),
+    duracion_min: z.number().int().min(1).max(600).nullable().optional().describe('Solo salud: nueva duración en minutos'),
+    cantidad: z.string().trim().max(60).nullable().optional().describe('Solo mercado: nueva cantidad'),
     id: z.string().min(1).optional().describe('ID de la entidad (uuid; para evento es el id de Google de consultar agenda). No aplica a reserva (usa fondo)'),
     fondo: z.enum(['flujo', 'emergencia']).optional().describe('Solo reserva: cuál fondo cambiar (su meta con objetivo, y/o descripcion)'),
     accion: z
@@ -213,7 +240,8 @@ export const Actualizar = z
       .describe(
         'tarea: completar|reabrir|reprogramar|descripcion|mover · meta: factores|descripcion · ' +
           'proyecto/area: descripcion · documento: editar|anexar|fijar · evento: editar · ' +
-          'recurrente: confirmar (registra el gasto y avanza) | omitir (avanza sin registrar); sin accion = editar campos',
+          'recurrente: confirmar (registra el gasto y avanza) | omitir (avanza sin registrar); sin accion = editar campos · ' +
+          'salud: completar (marca hecho en el día "desde", def hoy) | reabrir (desmarca); sin accion = editar · mercado: completar (comprado) | reabrir; sin accion = editar',
       ),
     monto: z
       .number()
@@ -273,8 +301,8 @@ export const Actualizar = z
 // ── archivar / borrar (unión por tipo) ──────────────────────────────────────
 export const Archivar = z.object({
   tipo: z
-    .enum(['tarea', 'evento', 'documento', 'area', 'recurrente', 'tarea_recurrente', 'movimiento', 'etiqueta', 'meta_dinero'])
-    .describe('Qué eliminar/archivar. tarea/evento/documento/recurrente/tarea_recurrente/movimiento/etiqueta/meta_dinero se borran; area se archiva'),
+    .enum(['tarea', 'evento', 'documento', 'area', 'recurrente', 'tarea_recurrente', 'movimiento', 'etiqueta', 'meta_dinero', 'salud', 'mercado'])
+    .describe('Qué eliminar/archivar. tarea/evento/documento/recurrente/tarea_recurrente/movimiento/etiqueta/meta_dinero/salud/mercado se borran; area se archiva'),
   id: z.string().min(1).describe('ID (uuid; para evento el id de Google)'),
   alcance: Alcance.optional().describe('Solo evento: serie o instancia (por defecto serie)'),
 });

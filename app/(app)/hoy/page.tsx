@@ -15,6 +15,8 @@ import { RealtimeRefresh } from '../realtime-refresh';
 import { ChoquesBanner } from '../choques-banner';
 import { PageHero, type Kpi } from '../page-hero';
 import { EmptyState, emptyIcons } from '../empty-state';
+import { getSaludData } from '@/app/actions/health';
+import { SaludHoy } from './salud-hoy';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,11 +35,13 @@ export default async function HoyPage() {
   const today = todayInTz(ctx.tz);
 
   const from7 = addDaysYmd(today, -6); // 7 días: hoy y los 6 anteriores
-  const [tasks, projects, events, txWin] = await Promise.all([
+  const [tasks, projects, events, txWin, salud] = await Promise.all([
     repo.listTasks({ status: 'pending' }),
     repo.listProjects(),
     getDayEvents(supabase, ctx, today),
     finance.listTransactions({ from: from7, to: today, limit: 1000 }),
+    // Salud es secundaria en Hoy: si falla, Hoy sigue funcionando sin la tarjeta.
+    getSaludData().catch(() => null),
   ]);
   const projectName = new Map(projects.map((p) => [p.id, p.title] as const));
 
@@ -175,6 +179,7 @@ export default async function HoyPage() {
               </ul>
             )}
           </div>
+          {salud && <SaludHoy data={salud} />}
         </div>
 
         {/* Main: las tareas, el foco del trabajo. En escritorio, columna izquierda. */}

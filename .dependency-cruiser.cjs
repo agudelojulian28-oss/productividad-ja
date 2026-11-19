@@ -72,6 +72,13 @@ module.exports = {
       from: { path: '^core/structure/' },
       to: { path: '^core/(work|commerce|finance|goals)/' },
     },
+    {
+      name: 'health-isolated',
+      comment: 'health no importa de otros módulos de core; la sincronización con finanzas vive en lib/salud-mercado.ts.',
+      severity: 'error',
+      from: { path: '^core/health/' },
+      to: { path: '^core/(work|commerce|finance|goals|structure)/' },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

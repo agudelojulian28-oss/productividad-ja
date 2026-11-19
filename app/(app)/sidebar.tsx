@@ -13,6 +13,9 @@ const I = {
     <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8" /><path d="M5 10v10h14V10" /></svg>
   ),
   finanzas: <svg viewBox="0 0 24 24"><path d="M4 19V5m5 14V9m5 10V7m5 12V4" /></svg>,
+  salud: (
+    <svg viewBox="0 0 24 24"><path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z" /></svg>
+  ),
   calendario: (
     <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4m8-4v4" /></svg>
   ),
@@ -29,6 +32,7 @@ const I = {
 const primary: Item[] = [
   { href: '/hoy', label: 'Hoy', icon: I.hoy },
   { href: '/finanzas', label: 'Finanzas', icon: I.finanzas },
+  { href: '/salud', label: 'Salud', icon: I.salud },
   { href: '/calendario', label: 'Calendario', icon: I.calendario },
   { href: '/chat', label: 'Chat', icon: I.chat },
   { href: '/docs', label: 'Docs', icon: I.docs },

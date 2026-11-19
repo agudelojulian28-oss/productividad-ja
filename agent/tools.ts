@@ -39,6 +39,23 @@ import { reporteFinanciero } from '@/core/finance/analisis';
 import { sustainingSummary, monthlyEquivalent, toCopMinor } from '@/core/finance/sustaining';
 import { getTrm } from '@/lib/trm';
 import { detectarChoques, huecosLibres } from '@/lib/agenda';
+import type { HealthRepo } from '@/core/health/ports';
+import { createHealthItem, updateHealthItem, deleteHealthItem, setHealthCheckin } from '@/core/health/items';
+import { createGrocery, updateGrocery, deleteGrocery } from '@/core/health/groceries';
+import { seedHealthPlan } from '@/core/health/seed';
+import {
+  checklistForDay,
+  routineForDay,
+  weekSchedule,
+  childrenOf,
+  streak,
+  weekCompletionPct,
+  groceryMonthlyMinor,
+  isoWeekday,
+  addDaysYmd as addDaysSalud,
+  WEEKDAY_LONG,
+} from '@/core/health/plan';
+import { syncMercado } from '@/lib/salud-mercado';
 import type { StructureRepo } from '@/core/structure/ports';
 import { createArea, archiveArea, setAreaDescription } from '@/core/structure/areas';
 import { createDocument, appendToDocument, updateDocument, deleteDocument } from '@/core/structure/documents';
@@ -69,6 +86,7 @@ export interface ToolDeps {
   repo: WorkRepo;
   finance?: FinanceRepo;
   structure?: StructureRepo;
+  health?: HealthRepo;
   listCalendar?: (dateYmd: string) => Promise<GEvent[]>;
   listRange?: (startYmd: string, endYmd: string) => Promise<GEvent[]>;
   /** ¿Google Calendar está conectado? Distingue "sin conexión" de "agenda vacía". */
@@ -254,6 +272,63 @@ export async function runTool(
           tz: ctx.tz,
         });
         return ok(huecos.slice(0, 10).map((h) => ({ desde: h.startIso, hasta: h.endIso })));
+      }
+
+      // Salud: el plan de Julián para organizar la agenda (mismos reductores que la app).
+      if (vista === 'salud') {
+        if (!deps.health) return err('EXTERNAL_ERROR', 'Salud no está disponible');
+        const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz }).format(new Date());
+        await seedHealthPlan(ctx, deps.health);
+        const [items, checkins, groceries] = await Promise.all([
+          deps.health.listItems(),
+          deps.health.listCheckins(addDaysSalud(hoy, -120), hoy),
+          deps.health.listGroceries(),
+        ]);
+        const hechos = new Set(checkins.filter((c) => c.day === hoy).map((c) => c.itemId));
+        const rutina = routineForDay(items, hoy);
+        const raiz = (s: string, k: string) => items.filter((i) => i.section === s && i.kind === k && i.active && !i.parentId);
+        const hd = raiz('espiritual', 'habito')[0];
+        const hdPasos = hd ? childrenOf(items, hd.id) : [];
+        return ok({
+          hoy,
+          dia: WEEKDAY_LONG[isoWeekday(hoy) - 1],
+          entreno_hoy: rutina
+            ? { id: rutina.id, rutina: rutina.title, detalle: rutina.detail ?? undefined, ejercicios: childrenOf(items, rutina.id).map((e) => e.title) }
+            : 'descanso',
+          checklist_hoy: checklistForDay(items, hoy).map((i) => ({
+            id: i.id,
+            titulo: i.title,
+            seccion: i.section,
+            hora: i.timeOfDay ?? undefined,
+            minutos: i.durationMin ?? undefined,
+            hecho: hechos.has(i.id),
+          })),
+          comidas: raiz('dieta', 'comida')
+            .sort((a, b) => (a.timeOfDay ?? '99').localeCompare(b.timeOfDay ?? '99'))
+            .map((i) => ({ id: i.id, hora: i.timeOfDay ?? undefined, nombre: i.title, detalle: i.detail ?? undefined })),
+          hora_dorada: hd
+            ? {
+                id: hd.id,
+                minutos: hdPasos.reduce((s, k) => s + (k.durationMin ?? 0), 0) || hd.durationMin || undefined,
+                hora: hd.timeOfDay ?? undefined,
+                pasos: hdPasos.map((k) => ({ id: k.id, titulo: k.title, minutos: k.durationMin ?? undefined })),
+              }
+            : undefined,
+          compromisos: raiz('espiritual', 'compromiso').map((i) => i.title),
+          semana_entreno: Object.fromEntries(weekSchedule(items).map((r, i) => [WEEKDAY_LONG[i], r ? r.title : 'descanso'])),
+          tratamientos: raiz('cuerpo', 'tratamiento').map((i) => ({ id: i.id, titulo: i.title, detalle: i.detail ?? undefined })),
+          salvavidas: raiz('dieta', 'salvavidas').map((i) => i.title),
+          racha_dias: streak(items, checkins, hoy),
+          cumplimiento_7_dias_pct: weekCompletionPct(items, checkins, hoy),
+          mercado: {
+            total_mes: money(groceryMonthlyMinor(groceries)),
+            items: groceries
+              .filter((g) => g.active)
+              .map((g) => ({ id: g.id, nombre: g.name, cantidad: g.quantity ?? undefined, precio: g.costMinor ? money(g.costMinor) : 'sin precio', comprado: g.checked })),
+          },
+          reglas_agenda:
+            'Al organizar: no agendes trabajo el domingo; 1 misa por semana; reserva la hora dorada (~30 min) temprano; respeta el entreno del día y las comidas a su hora.',
+        });
       }
 
       // Dinero
@@ -668,6 +743,37 @@ export async function runTool(
           });
           return r.ok ? ok({ aportado: money(amountMinor), fondo: 'emergencia', nota: 'Cuenta como gasto de tu balance.' }) : r;
         }
+        case 'salud': {
+          if (!deps.health) return err('EXTERNAL_ERROR', 'Salud no está disponible');
+          const r = await createHealthItem(ctx, deps.health, {
+            section: v.seccion,
+            kind: v.elemento,
+            parentId: v.padre_id ?? null,
+            title: v.titulo,
+            detail: v.descripcion ?? null,
+            timeOfDay: v.hora ?? null,
+            durationMin: v.duracion_min ?? null,
+            weekdays: v.dias ?? null,
+            trackable: v.seguimiento ?? false,
+          });
+          return r.ok ? ok({ salud_id: r.value.id, titulo: r.value.title, seccion: r.value.section }) : r;
+        }
+        case 'mercado': {
+          if (!deps.health || !deps.finance) return err('EXTERNAL_ERROR', 'Salud/Finanzas no está disponible');
+          const r = await createGrocery(ctx, deps.health, {
+            name: v.titulo,
+            quantity: v.cantidad ?? null,
+            costMinor: v.monto != null ? Math.round(v.monto * 100) : 0,
+            frequency: v.frecuencia ?? 'semanal',
+          });
+          if (!r.ok) return r;
+          const s = await syncMercado(
+            ctx,
+            { health: deps.health, finance: deps.finance, work: repo, structure: deps.structure },
+            todayInTz(ctx.tz),
+          );
+          return ok({ mercado_id: r.value.id, total_mes: money(s.monthlyMinor), gasto_fijo_sincronizado: s.synced });
+        }
       }
       return err('INVALID_INPUT', 'Tipo desconocido');
     }
@@ -870,6 +976,45 @@ export async function runTool(
           });
           return r.ok ? ok({ meta_dinero_id: r.value.id }) : r;
         }
+        case 'salud': {
+          if (!deps.health) return err('EXTERNAL_ERROR', 'Salud no está disponible');
+          if (v.accion === 'completar' || v.accion === 'reabrir') {
+            const dia = v.desde ?? new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz }).format(new Date());
+            const r = await setHealthCheckin(ctx, deps.health, { itemId: v.id, day: dia, done: v.accion === 'completar' });
+            return r.ok ? ok({ marcado: r.value.done, dia: r.value.day }) : r;
+          }
+          const r = await updateHealthItem(ctx, deps.health, {
+            id: v.id,
+            title: v.titulo,
+            detail: v.descripcion,
+            timeOfDay: v.hora,
+            durationMin: v.duracion_min,
+            weekdays: v.dias,
+            trackable: v.seguimiento,
+          });
+          return r.ok ? ok({ actualizado: r.value.id, titulo: r.value.title }) : r;
+        }
+        case 'mercado': {
+          if (!deps.health || !deps.finance) return err('EXTERNAL_ERROR', 'Salud/Finanzas no está disponible');
+          if (v.accion === 'completar' || v.accion === 'reabrir') {
+            const r = await updateGrocery(ctx, deps.health, { id: v.id, checked: v.accion === 'completar' });
+            return r.ok ? ok({ comprado: r.value.checked, nombre: r.value.name }) : r;
+          }
+          const r = await updateGrocery(ctx, deps.health, {
+            id: v.id,
+            name: v.titulo,
+            quantity: v.cantidad,
+            costMinor: v.monto != null ? Math.round(v.monto * 100) : undefined,
+            frequency: v.frecuencia,
+          });
+          if (!r.ok) return r;
+          const s = await syncMercado(
+            ctx,
+            { health: deps.health, finance: deps.finance, work: repo, structure: deps.structure },
+            todayInTz(ctx.tz),
+          );
+          return ok({ actualizado: r.value.id, total_mes: money(s.monthlyMinor), gasto_fijo_sincronizado: s.synced });
+        }
       }
       return err('INVALID_INPUT', 'Tipo desconocido');
     }
@@ -912,6 +1057,22 @@ export async function runTool(
           if (!deps.finance) return err('EXTERNAL_ERROR', 'Finanzas no está disponible');
           const r = await deleteMoneyGoal(ctx, deps.finance, v.id);
           return r.ok ? ok({ borrada: v.id }) : r;
+        }
+        case 'salud': {
+          if (!deps.health) return err('EXTERNAL_ERROR', 'Salud no está disponible');
+          const r = await deleteHealthItem(ctx, deps.health, v.id);
+          return r.ok ? ok({ borrado: v.id }) : r;
+        }
+        case 'mercado': {
+          if (!deps.health || !deps.finance) return err('EXTERNAL_ERROR', 'Salud/Finanzas no está disponible');
+          const r = await deleteGrocery(ctx, deps.health, v.id);
+          if (!r.ok) return r;
+          const s = await syncMercado(
+            ctx,
+            { health: deps.health, finance: deps.finance, work: repo, structure: deps.structure },
+            todayInTz(ctx.tz),
+          );
+          return ok({ borrado: v.id, total_mes: money(s.monthlyMinor) });
         }
         case 'area': {
           if (!deps.structure) return err('EXTERNAL_ERROR', 'No disponible');

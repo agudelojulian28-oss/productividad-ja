@@ -5,6 +5,7 @@ import { workRepo } from '@/adapters/supabase/work-repo';
 import { getGoogleTokenCipher } from '@/adapters/supabase/integrations';
 import { financeRepo } from '@/adapters/supabase/finance-repo';
 import { structureRepo } from '@/adapters/supabase/structure-repo';
+import { healthRepo } from '@/adapters/supabase/health-repo';
 import { anthropicClient } from '@/adapters/anthropic/client';
 import { runAgent, type AgentDeps, type InputImage } from '@/agent/loop';
 import {
@@ -26,6 +27,7 @@ export function buildAgentDeps(supabase: ServerSupabase, ctx: ActorContext): Age
     repo,
     finance: financeRepo(supabase, ctx.userId),
     structure: structureRepo(supabase, ctx.userId),
+    health: healthRepo(supabase, ctx.userId),
     listCalendar: (dateYmd) => getDayEvents(supabase, ctx, dateYmd),
     listRange: (startYmd, endYmd) => getRangeEvents(supabase, ctx, startYmd, endYmd),
     async googleConnected() {
