@@ -1,11 +1,11 @@
 import { ok, type Result, type ActorContext } from '@/core/types';
-import type { HealthItemInsert, HealthRepo, GroceryInsert } from './ports';
+import type { HealthSeedNode, HealthRepo, GroceryInsert } from './ports';
 
 // Plan inicial transcrito de la "Planeación final 2026 y 2027 — Inquebrantable" de Julián
 // (fotos del cuaderno + "Compromisos con Dios"). Todo es editable; lo que no se leyó bien
 // en el manuscrito va con needsReview=true para revisarlo en la app.
 
-type SeedNode = Omit<HealthItemInsert, 'parentId'> & { children?: Omit<SeedNode, 'section'>[] };
+type SeedNode = HealthSeedNode;
 
 const L = 1, M = 2, Mi = 3, J = 4, V = 5, S = 6, D = 7;
 
@@ -121,29 +121,15 @@ export const SEED_GROCERIES: GroceryInsert[] = [
   { name: 'Pack de la sopería', frequency: 'semanal', sortOrder: 12 },
 ];
 
-/** Precarga el plan y la lista UNA sola vez en la vida de la cuenta. El reclamo es atómico
- *  (claimSeed), así dos cargas simultáneas no duplican el plan. Si ya hay elementos, no
- *  inserta nada. */
+/** Precarga el plan y la lista UNA sola vez en la vida de la cuenta, en una sola
+ *  transacción (repo.seedPlan): o queda todo o nada, nadie ve el plan a medias y dos cargas
+ *  simultáneas no duplican. Si ya hay elementos, no los pisa. */
 export async function seedHealthPlan(
   _ctx: ActorContext,
   repo: HealthRepo,
 ): Promise<Result<{ seeded: boolean }>> {
   const settings = await repo.getSettings();
   if (settings?.seededAt) return ok({ seeded: false }); // camino rápido (ya precargado)
-  if (!(await repo.claimSeed())) return ok({ seeded: false }); // otra petición lo está haciendo
-
-  const [items, groceries] = await Promise.all([repo.listItems(), repo.listGroceries()]);
-  if (items.length === 0) {
-    for (const node of SEED_PLAN) {
-      const { children, ...data } = node;
-      const parent = await repo.insertItem({ ...data, parentId: null });
-      for (const ch of children ?? []) {
-        await repo.insertItem({ ...ch, section: node.section, parentId: parent.id });
-      }
-    }
-  }
-  if (groceries.length === 0) {
-    for (const g of SEED_GROCERIES) await repo.insertGrocery(g);
-  }
-  return ok({ seeded: items.length === 0 });
+  const seeded = await repo.seedPlan(SEED_PLAN, SEED_GROCERIES);
+  return ok({ seeded });
 }

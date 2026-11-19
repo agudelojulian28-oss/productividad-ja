@@ -41,7 +41,10 @@ export default async function HoyPage() {
     getDayEvents(supabase, ctx, today),
     finance.listTransactions({ from: from7, to: today, limit: 1000 }),
     // Salud es secundaria en Hoy: si falla, Hoy sigue funcionando sin la tarjeta.
-    getSaludData().catch(() => null),
+    getSaludData().catch((e: unknown) => {
+      console.error('[hoy] tarjeta de salud no disponible:', e);
+      return null;
+    }),
   ]);
   const projectName = new Map(projects.map((p) => [p.id, p.title] as const));
 

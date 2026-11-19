@@ -40,6 +40,10 @@ export interface HealthItemInsert {
   needsReview?: boolean;
   sortOrder?: number;
 }
+/** Nodo del plan precargado: un elemento raíz con sus hijos (rutina → ejercicios). */
+export type HealthSeedChild = Omit<HealthItemInsert, 'section' | 'parentId'>;
+export type HealthSeedNode = Omit<HealthItemInsert, 'parentId'> & { children?: HealthSeedChild[] };
+
 export type HealthItemPatch = Partial<Omit<HealthItemInsert, 'section' | 'kind' | 'parentId'>> & {
   active?: boolean;
 };
@@ -96,7 +100,8 @@ export interface HealthRepo {
 
   getSettings(): Promise<HealthSettingsRow | null>;
   upsertSettings(patch: HealthSettingsPatch): Promise<HealthSettingsRow>;
-  /** Reclama la precarga de forma atómica: true solo para la PRIMERA llamada (marca
-   *  seeded_at si estaba vacío). Evita duplicar el plan si dos páginas cargan a la vez. */
-  claimSeed(): Promise<boolean>;
+  /** Precarga el plan y la lista en UNA transacción (todo o nada). true solo para la
+   *  PRIMERA llamada de la vida de la cuenta (marca seeded_at); nunca pisa elementos que ya
+   *  existan. Dos cargas simultáneas no duplican y nadie ve el plan a medias. */
+  seedPlan(plan: HealthSeedNode[], groceries: GroceryInsert[]): Promise<boolean>;
 }

@@ -216,20 +216,15 @@ export function healthRepo(supabase: SupabaseClient, userId: string): HealthRepo
       if (error) throw new Error(error.message);
       return toSettings(data as Record<string, unknown>);
     },
-    async claimSeed() {
-      // 1) La fila de ajustes existe (insert si falta; no pisa nada si ya está).
-      const { error: insErr } = await supabase
-        .from('health_settings')
-        .upsert({ user_id: userId }, { onConflict: 'user_id', ignoreDuplicates: true });
-      if (insErr) throw new Error(insErr.message);
-      // 2) Update condicional: solo una petición encuentra seeded_at vacío.
-      const { data, error } = await supabase
-        .from('health_settings')
-        .update({ seeded_at: new Date().toISOString() })
-        .is('seeded_at', null)
-        .select('id');
+    async seedPlan(plan, groceries) {
+      // Un solo viaje: la RPC reclama (seeded_at) e inserta todo en UNA transacción, con RLS
+      // como el usuario (security invoker). Ver migración 20261119130000_salud_seed_atomico.
+      const { data, error } = await supabase.rpc('seed_health_plan', {
+        p_plan: plan,
+        p_groceries: groceries,
+      });
       if (error) throw new Error(error.message);
-      return ((data as unknown[] | null) ?? []).length > 0;
+      return data === true;
     },
   };
 }

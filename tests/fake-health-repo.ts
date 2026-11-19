@@ -2,6 +2,7 @@
 import type {
   HealthRepo,
   HealthItemRow,
+  HealthItemInsert,
   GroceryRow,
   HealthSettingsRow,
   CheckinRow,
@@ -128,9 +129,51 @@ export function makeFakeHealthRepo(): HealthRepo & {
       } as HealthSettingsRow;
       return settings;
     },
-    async claimSeed() {
+    async seedPlan(plan, seedGroceries) {
+      // Síncrono por dentro (sin await entre el reclamo y las inserciones): emula la
+      // transacción de la RPC, así dos llamadas simultáneas no se intercalan.
       if (settings?.seededAt) return false;
       settings = { groceryRecurringId: null, groceryProjectId: null, ...(settings ?? {}), seededAt: new Date().toISOString() };
+      const add = (input: HealthItemInsert): HealthItemRow => {
+        const row: HealthItemRow = {
+          id: uuid(),
+          section: input.section,
+          kind: input.kind,
+          parentId: input.parentId ?? null,
+          title: input.title,
+          detail: input.detail ?? null,
+          timeOfDay: input.timeOfDay ?? null,
+          durationMin: input.durationMin ?? null,
+          weekdays: input.weekdays ?? null,
+          trackable: input.trackable ?? false,
+          needsReview: input.needsReview ?? false,
+          sortOrder: input.sortOrder ?? 0,
+          active: true,
+        };
+        items.set(row.id, row);
+        return row;
+      };
+      if (items.size === 0) {
+        for (const { children, ...node } of plan) {
+          const parent = add({ ...node, parentId: null });
+          for (const ch of children ?? []) add({ ...ch, section: node.section, parentId: parent.id });
+        }
+      }
+      if (groceries.size === 0) {
+        for (const g of seedGroceries) {
+          const row: GroceryRow = {
+            id: uuid(),
+            name: g.name,
+            quantity: g.quantity ?? null,
+            costMinor: g.costMinor ?? 0,
+            frequency: g.frequency ?? 'semanal',
+            checked: false,
+            sortOrder: g.sortOrder ?? 0,
+            active: true,
+          };
+          groceries.set(row.id, row);
+        }
+      }
       return true;
     },
   };
