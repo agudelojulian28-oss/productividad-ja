@@ -70,7 +70,7 @@ export const SEED_PLAN: SeedNode[] = [
     sortOrder: 2,
     children: [
       { kind: 'ejercicio', title: 'Calentamiento', sortOrder: 1 },
-      { kind: 'ejercicio', title: 'Tratamiento / estiramiento ~6 min', needsReview: true, sortOrder: 2 },
+      { kind: 'ejercicio', title: 'Terapia / estiramiento', durationMin: 45, sortOrder: 2 },
       { kind: 'ejercicio', title: 'Spiderman (calistenia): 10 flexiones · 15 sentadillas · 10 jalones de pecho', detail: '20 min sin parar.', sortOrder: 3 },
     ],
   },
