@@ -35,7 +35,7 @@ describe('runTool · salud (agente)', () => {
     const v = r.value as SaludView;
     expect(v.checklist_hoy.length).toBeGreaterThan(0);
     expect(v.compromisos).toContain('No trabajar los domingos');
-    expect(v.semana_entreno.domingo).toBe('descanso');
+    expect(v.semana_entreno.domingo).toMatch(/^descanso/i);
     expect(v.hora_dorada?.minutos).toBe(30);
   });
 

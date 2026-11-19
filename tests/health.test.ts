@@ -38,11 +38,12 @@ describe('plan · días y rutinas', () => {
   it('semana precargada: L A1 · M B · Mi A2 · J B · V A1 · S B · D descanso', async () => {
     const repo = await seeded();
     const items = await repo.listItems();
-    const corto = weekSchedule(items).map((r) => (r ? r.title.split('·')[0]!.trim() : null));
-    expect(corto).toEqual(['A1', 'B', 'A2', 'B', 'A1', 'B', null]);
+    const corto = weekSchedule(items).map((r) => (r ? r.title.split(/[·/]/)[0]!.trim() : null));
+    expect(corto).toEqual(['A1', 'B', 'A2', 'B', 'A1', 'B', 'Descanso']);
     expect(routineForDay(items, LUN)?.title).toMatch(/^A1/);
     expect(routineForDay(items, MIE)?.title).toMatch(/^A2/);
-    expect(routineForDay(items, DOM)).toBeNull();
+    expect(routineForDay(items, DOM)?.title).toMatch(/^Descanso/);
+    expect(routineForDay(items, LUN)?.durationMin).toBe(105);
   });
 
   it('la rutina trae sus ejercicios y la hora dorada suma ~30 min', async () => {
@@ -61,7 +62,7 @@ describe('plan · checklist, racha y semana', () => {
     const items = await repo.listItems();
     const dom = checklistForDay(items, DOM).map((i) => i.title);
     expect(dom).toContain('Preparar comida (domingo)');
-    expect(dom.some((t) => /^A1|^A2|^B/.test(t))).toBe(false);
+    expect(dom.some((t) => /^A1|^A2|^B|^Descanso/.test(t))).toBe(false); // el descanso no se "marca"
     const lun = checklistForDay(items, LUN).map((i) => i.title);
     expect(lun.some((t) => t.startsWith('A1'))).toBe(true);
     expect(lun).toContain('Hora dorada');
