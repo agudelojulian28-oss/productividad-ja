@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState, useTransition } from 'react';
+import { useEffect, useId, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Modal } from '../modal';
@@ -136,8 +136,21 @@ export function GroceryList({
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
 
+  // Marcado optimista: la casilla responde al instante y se guarda por detrás (en el
+  // celular, esperar al servidor hacía parecer que "no dejaba" marcar).
+  const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
+  const isChecked = (g: GroceryRow) => optimistic[g.id] ?? g.checked;
+  // Cuando llegan datos del servidor, suelta las marcas locales que ya coinciden.
+  useEffect(() => {
+    setOptimistic((o) => {
+      const next: Record<string, boolean> = {};
+      for (const g of groceries) if (g.id in o && o[g.id] !== g.checked) next[g.id] = o[g.id]!;
+      return Object.keys(next).length === Object.keys(o).length ? o : next;
+    });
+  }, [groceries]);
+
   const activos = groceries.filter((g) => g.active);
-  const comprados = activos.filter((g) => g.checked).length;
+  const comprados = activos.filter(isChecked).length;
   const sinPrecio = activos.filter((g) => g.costMinor === 0).length;
 
   const avisar = (s: MercadoSync | null | undefined) => {
@@ -164,11 +177,19 @@ export function GroceryList({
       router.refresh();
     });
   }
-  function toggle(g: GroceryRow, checked: boolean) {
-    start(async () => {
-      await updateGroceryAction({ id: g.id, checked });
-      router.refresh();
-    });
+  async function toggle(g: GroceryRow, checked: boolean) {
+    setError(null);
+    setOptimistic((o) => ({ ...o, [g.id]: checked }));
+    let ok = false;
+    try {
+      ok = (await updateGroceryAction({ id: g.id, checked })).ok;
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      setOptimistic((o) => ({ ...o, [g.id]: !checked })); // revierte
+      setAviso(`No se pudo guardar "${g.name}". Revisa la conexión e inténtalo de nuevo.`);
+    }
   }
   function remove(g: GroceryRow) {
     if (!confirm(`¿Quitar "${g.name}" de la lista?`)) return;
@@ -267,6 +288,7 @@ export function GroceryList({
                 disabled={pending}
                 onClick={() =>
                   start(async () => {
+                    setOptimistic({});
                     await resetGroceriesAction();
                     router.refresh();
                   })
@@ -280,14 +302,14 @@ export function GroceryList({
             {activos.map((g) => {
               const id = `gro-${g.id}`;
               return (
-                <li key={g.id} className={`sl-gro-row${g.checked ? ' on' : ''}`}>
+                <li key={g.id} className={`sl-gro-row${isChecked(g) ? ' on' : ''}`}>
                   <label htmlFor={id} className="sl-gro-label">
                     <input
                       id={id}
                       type="checkbox"
                       className="sl-check-input"
-                      checked={g.checked}
-                      onChange={(e) => toggle(g, e.target.checked)}
+                      checked={isChecked(g)}
+                      onChange={(e) => void toggle(g, e.target.checked)}
                     />
                     <span className="sl-check-box" aria-hidden="true">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
