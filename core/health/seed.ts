@@ -104,7 +104,7 @@ export const SEED_PLAN: SeedNode[] = [
   { section: 'dieta', kind: 'comida', title: 'Desayuno', detail: '100 g de carbohidratos + 2 huevos.', timeOfDay: '11:00', durationMin: 30, trackable: true, sortOrder: 1 },
   { section: 'dieta', kind: 'comida', title: 'Almuerzo', detail: '100 g de carbohidratos + ensalada (pico de gallo con pepino) + 150 g de pollo o carne.', timeOfDay: '15:00', durationMin: 30, trackable: true, sortOrder: 2 },
   { section: 'dieta', kind: 'comida', title: 'Postre o algo', detail: 'Yogurt griego + whey + banano + canela + miel.', timeOfDay: '16:00', durationMin: 30, trackable: true, sortOrder: 3 },
-  { section: 'dieta', kind: 'comida', title: 'Cena', detail: 'Tacos (carbohidratos) + ensalada + 150 g de pescado.', timeOfDay: '18:00', durationMin: 30, trackable: true, needsReview: true, sortOrder: 4 },
+  { section: 'dieta', kind: 'comida', title: 'Cena', detail: 'Tortillas de arroz y maíz (carbohidratos) + ensalada + 150 g de pescado.', timeOfDay: '18:00', durationMin: 30, trackable: true, sortOrder: 4 },
   { section: 'dieta', kind: 'comida', title: 'Postcena', detail: 'Helado en Ninja Creamy (2 días): mango + sandía · remolacha y fresa con whey.', timeOfDay: '20:00', durationMin: 30, trackable: true, needsReview: true, sortOrder: 5 },
   { section: 'dieta', kind: 'habito', title: 'Preparar comida (domingo)', detail: '2 horas de cocina. Hacer la lista y mercar.', weekdays: [D], durationMin: 120, trackable: true, sortOrder: 6 },
   { section: 'dieta', kind: 'habito', title: 'Preparación diaria', detail: '30 minutos al día: dejar casi listas todas las comidas.', durationMin: 30, sortOrder: 7 },
